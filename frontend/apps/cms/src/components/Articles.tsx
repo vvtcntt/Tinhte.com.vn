@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError, apiFetch } from '../lib/api';
 import {
   ARTICLE_STATUSES,
@@ -27,11 +27,37 @@ import { useStaff } from './session';
 
 function errorText(e: unknown): string {
   if (e instanceof ApiError) {
-    if (e.code === 'REVISION_CONFLICT') return 'Bài vừa được người khác lưu. Tải lại để xem bản mới nhất (các thay đổi chưa lưu của bạn sẽ mất).';
+    if (e.code === 'REVISION_CONFLICT') return 'Bài vừa được người khác lưu. Tải bản mới nhất: bỏ thay đổi của bạn, hoặc giữ nội dung của bạn rồi lưu đè.';
     const fields = e.problem.errors ? Object.entries(e.problem.errors).map(([k, v]) => `${k}: ${v.join(' ')}`).join(' · ') : '';
     return [e.problem.detail ?? e.problem.title, fields].filter(Boolean).join(' — ');
   }
   return 'Không kết nối được API. Thử lại.';
+}
+
+// Sao lưu bản chưa lưu trong trình duyệt (mất mạng, đóng tab nhầm — WBS-030 "autosave/offline"). Chỉ là tiện ích theo
+// người dùng: trình duyệt chặn lưu trữ thì bỏ qua.
+const BACKUP_PREFIX = 'tt-cms:article-draft:';
+
+function readBackup(articleId: string): { draft: Draft; savedAt: string } | null {
+  try {
+    const raw = window.localStorage.getItem(BACKUP_PREFIX + articleId);
+    return raw ? (JSON.parse(raw) as { draft: Draft; savedAt: string }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBackup(articleId: string, draft: Draft | null) {
+  try {
+    if (draft) window.localStorage.setItem(BACKUP_PREFIX + articleId, JSON.stringify({ draft, savedAt: new Date().toISOString() }));
+    else window.localStorage.removeItem(BACKUP_PREFIX + articleId);
+  } catch {
+    // bỏ qua
+  }
+}
+
+function sameDraft(a: Draft, b: Draft): boolean {
+  return (Object.keys(a) as (keyof Draft)[]).every((k) => a[k] === b[k]);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -309,6 +335,8 @@ function ArticleEditor({ articleId }: { articleId: string }) {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(false);
   const [historyKey, setHistoryKey] = useState(0);
+  const [restorable, setRestorable] = useState<{ draft: Draft; savedAt: string } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -322,7 +350,10 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       setEtag(a.etag);
       setRevision(r);
       const body = blocksToText((r?.bodyBlocks ?? []) as Block[]);
-      setDraft({ title: r?.title ?? art.title, slug: art.slug, summary: r?.summary ?? '', categoryId: r?.categoryId ?? '', body: body.text });
+      const loaded: Draft = { title: r?.title ?? art.title, slug: art.slug, summary: r?.summary ?? '', categoryId: r?.categoryId ?? '', body: body.text };
+      setDraft(loaded);
+      const backup = readBackup(articleId);
+      setRestorable(backup && !sameDraft(backup.draft, loaded) ? backup : null);
       setChangeReason('');
       setHistoryKey((k) => k + 1);
     } catch (e) {
@@ -343,7 +374,26 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       body: blocksToText((revision?.bodyBlocks ?? []) as Block[]).text,
     };
   }, [article, revision]);
-  const dirty = !!draft && !!original && (Object.keys(draft) as (keyof Draft)[]).some((k) => draft[k] !== original[k]);
+  const dirty = !!draft && !!original && !sameDraft(draft, original);
+
+  // Sao lưu cục bộ khi có thay đổi chưa lưu; hết thay đổi (đã lưu / hoàn tác) thì xóa.
+  useEffect(() => {
+    if (!draft || !original) return;
+    const timer = window.setTimeout(() => writeBackup(articleId, dirty ? draft : null), 800);
+    return () => window.clearTimeout(timer);
+  }, [articleId, draft, original, dirty]);
+
+  // Ctrl/Cmd+S = Lưu.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Cảnh báo khi rời trang mà chưa lưu.
   useEffect(() => {
@@ -388,6 +438,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
     setMessage(null);
     try {
       await apiFetch<AdminArticle>(`/admin/articles/${encodeURIComponent(article.id)}`, { method: 'PATCH', body, ifMatch: etag ?? undefined });
+      writeBackup(article.id, null);
       await load();
       setMessage({ kind: 'ok', text: article.publicRevisionId ? 'Đã lưu. Bản công khai giữ nguyên tới lần xuất bản sau.' : 'Đã lưu bản nháp.' });
     } catch (err) {
@@ -397,11 +448,34 @@ function ArticleEditor({ articleId }: { articleId: string }) {
     }
   };
 
+  // Xung đột 412: tải bản mới nhất nhưng giữ nội dung đang soạn (lưu lần nữa sẽ ghi đè các trường bạn đã đổi).
+  const keepMine = async () => {
+    const mine = draft;
+    const before = original;
+    await load();
+    setRestorable(null);
+    setDraft((fresh) => (fresh ? { ...mine, slug: mine.slug === before.slug ? fresh.slug : mine.slug } : fresh));
+    setMessage({ kind: 'ok', text: 'Đã tải bản mới nhất và giữ nội dung của bạn. Xem lại rồi bấm Lưu để ghi đè.' });
+  };
+
   return (
     <section className="stack">
       <Link href="/articles" className="back">
         ← Bài viết
       </Link>
+      {restorable && (
+        <div className="banner warn" role="status">
+          <span>Có nội dung chưa lưu từ {formatTime(restorable.savedAt)} trên máy này.</span>
+          <span className="row-end">
+            <button type="button" className="button small" disabled={!editable} onClick={() => { setDraft(restorable.draft); setRestorable(null); }}>
+              Khôi phục
+            </button>
+            <button type="button" className="button small" onClick={() => { writeBackup(article.id, null); setRestorable(null); }}>
+              Bỏ
+            </button>
+          </span>
+        </div>
+      )}
       <div className="title-row">
         <h1>{original.title}</h1>
         <StatusBadge status={article.status} />
@@ -425,7 +499,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       )}
 
       <div className="editor-layout">
-        <form className="card stack-sm" onSubmit={save}>
+        <form ref={formRef} className="card stack-sm" onSubmit={save}>
           <label className="field">
             <span>Tiêu đề</span>
             <input value={draft.title} onChange={(e) => set({ title: e.target.value })} maxLength={300} required disabled={!editable || busy} />
@@ -481,9 +555,14 @@ function ArticleEditor({ articleId }: { articleId: string }) {
             <div className={message.kind === 'ok' ? 'banner ok' : 'banner error'} role={message.kind === 'ok' ? 'status' : 'alert'}>
               <span>{message.text}</span>
               {message.conflict && (
-                <button type="button" className="button small" onClick={() => void load().then(() => setMessage(null))}>
-                  Tải lại
-                </button>
+                <span className="row-end">
+                  <button type="button" className="button small" onClick={() => void load().then(() => { writeBackup(article.id, null); setRestorable(null); setMessage(null); })}>
+                    Tải lại (bỏ thay đổi của tôi)
+                  </button>
+                  <button type="button" className="button small" onClick={() => void keepMine()}>
+                    Giữ nội dung của tôi
+                  </button>
+                </span>
               )}
             </div>
           )}
