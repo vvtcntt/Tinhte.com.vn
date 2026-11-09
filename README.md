@@ -76,6 +76,13 @@ Chạy API từ thư mục `backend/src/Tinhte.Api` (hoặc `dotnet run --projec
 
 Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa file hosts. Khi chạy Next trực tiếp, `/api/v1/*` được rewrite sang API (`TT_API_ORIGIN`). Qua edge (Caddy hoặc CDN) thì edge route `/api/*`.
 
+### Bài viết: revision + publish pointer (WBS-022, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md))
+
+- CMS (site `cms`): `GET/POST /admin/articles`, `GET/PATCH /admin/articles/{id}` (If-Match), `GET /admin/articles/{id}/revisions[/{revisionId}?compareTo=]`, `POST /admin/articles/{id}/publish` (`content.publish` + MFA, Idempotency-Key).
+- Công khai (site `public-web`): `GET /articles/{slug}` — chỉ public revision; slug cũ → 308; đã gỡ/hết quyền → 410.
+- Revision rời `DRAFT` hoặc đang public bị DB đóng băng (migration 0320): sửa bài đang public tạo revision mới, bản công khai giữ nguyên tới lần publish sau.
+- Chưa có: duyệt (WBS-024 — publish cần revision `APPROVED`), rights/nguồn (WBS-023 — publish cần quyền `CLEARED`), lịch/preview (WBS-025), outbox (WBS-020). Bài tài trợ chỉ hiển thị khi cờ `ads.sponsored_publication` ON **và** đã cấu hình `News:SponsoredLabel` (câu chữ Legal duyệt).
+
 ## Đa subdomain (tóm tắt ADR-0001)
 
 - Mỗi subdomain là một mục trong `config/sites/sites.json`. Routing (Next `proxy.ts`, middleware ASP.NET), CSP, robots/sitemap, tên cookie, bề mặt API, bảng `tt.sites`, DNS/TLS/edge đều **suy ra** từ đó.
@@ -92,7 +99,7 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Next.js `web`, `cms` | `next build` OK; chạy production và kiểm HTTP theo Host: 200/308/400/404, header bảo mật, robots/sitemap theo môi trường |
 | Script registry | validate, plan, db-sync, Caddyfile `--check`, chặn hostname viết cứng: OK |
 | Contract tĩnh v0.3 | 34/34 PASS |
-| Migration v0.3 + 0312 (PGlite, PostgreSQL 18.6) | 151/151 PASS |
+| Migration v0.3 + 0312 (PGlite, PostgreSQL 18.6) | 151/151 PASS; sau 0313 + 0320/0321 (WBS-022): 179/179 PASS |
 | `Tinhte.DbMigrator` | `up` hai lần trên PGlite: 14 file rồi không đổi; API thật có DB: `/health/ready` OK |
 | **PostgreSQL 18 thật** (máy dev, Windows) | `Tinhte.DbMigrator up`: 15 migration (0000 stub + 0299…0313) + đồng bộ `tt.sites`; `dotnet test` **163/163 PASS** với `TT_TEST_PG` trỏ DB `tinhte_test` |
 | **Chưa chạy** | Docker Compose, CI trên GitHub (job backend có PostgreSQL 17), schema 04 thật, kiểm thử đồng thời nhiều kết nối, E2E trình duyệt tự động |
@@ -112,3 +119,4 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 017–018 | Staff auth, RBAC | Có: OIDC (IdP bất kỳ) + PKCE, phiên phía server thu hồi được, MFA theo amr/acr, CSRF double-submit, ma trận quyền (DRAFT chờ BA/PO); migration 0313; UI CMS: đăng nhập, khung, menu theo quyền, cảnh báo MFA, đăng xuất. Chưa: IdP thật, màn hình nghiệp vụ |
 | 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |
+| 022 | Content type, article revision, publish pointer | Có (API, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md)): tạo/sửa/đọc/danh sách bài CMS, lịch sử + diff revision, publish pointer, đọc công khai theo slug + redirect 308; migration 0320/0321. `dotnet test` 187/187 PASS với DB (PGlite), 151 PASS + 36 SKIP không DB. Chưa: duyệt (024), rights (023), lịch (025), outbox (020), UI CMS (030) |

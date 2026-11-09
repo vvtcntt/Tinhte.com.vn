@@ -195,3 +195,13 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - `returnTo` chỉ được gắn khi đã xác minh state (biết `returnTo` gốc) và theo cùng mẫu của tham số `ReturnTo`.
 - Mô tả máy đọc được ở extension `x-browser-error-redirect` của operation. Không đổi đường dẫn, schema, mã lỗi hay status. Kiểm lại: 34/34 test tĩnh PASS.
 - (bổ sung) `GET /auth/staff/oidc/start` và `/callback` thêm **503 `DEPENDENCY_UNAVAILABLE`** khi chưa cấu hình đăng nhập staff, IdP không truy cập được hoặc DB phiên không dùng được (trước đó rơi thành 500). Trình duyệt nhận 302 về `/login?error=DEPENDENCY_UNAVAILABLE&reason=unavailable`. Inventory cập nhật status/mã lỗi. Test tĩnh 34/34 PASS.
+
+## 11. Cập nhật Sprint 0 — revision bài viết (WBS-022, ADR-0005, 2026-11-09)
+
+- `ArticleRevision` (dùng cho `getAdminArticlesArticleidRevisions`, `getArticleRevision` / `RevisionDetail`): **thêm trường tùy chọn** `summary`, `categoryId`, `updatedAt`, `publishedAt`, `publishedBy`; mô tả giá trị của `status` (DRAFT, IN_REVIEW, CHANGES_REQUESTED, REJECTED, APPROVED, PUBLISHED, SUPERSEDED). Lý do: sapo và chuyên mục nằm trên revision (bản công khai không đổi trước khi publish), CMS cần chúng để mở bản nháp. Chỉ bổ sung, không phá vỡ.
+- Không đổi đường dẫn, operationId, mã lỗi hay status. Hành vi đã hiện thực (ghi rõ để TL/PO duyệt):
+  - `patchAdminArticlesArticleid` trả 409 `STATE_CONFLICT` khi bài `IN_REVIEW`/`APPROVED`/`SCHEDULED`/`RETRACTED`; `sourceId`/`licenseId` trả 422 cho tới khi có taxonomy (WBS-023).
+  - `publishArticle` chỉ nhận revision `APPROVED`; quyền không `CLEARED` hoặc hết hạn → 422 `RIGHTS_INVALID`; revision không thuộc bài → 422 `VALIDATION_FAILED`.
+  - `getPublicArticle`: ETag = `W/"<publicRevisionId>"`; bài từng public nhưng `UNPUBLISHED`/`RETRACTED`/hết quyền → 410 `CONTENT_WITHDRAWN`; slug cũ → 308 với `Location` tương đối.
+- Đề xuất (chưa sửa spec, chờ TL/PO): `summary` và `bodyBlocks` chưa có giới hạn độ dài/số phần tử; `sponsorLabel` cần câu chữ Legal duyệt (đang đọc từ cấu hình `News:SponsoredLabel`, thiếu thì không phục vụ bài tài trợ).
+- Kiểm lại: 34/34 test tĩnh PASS.

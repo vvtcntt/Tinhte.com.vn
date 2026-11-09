@@ -70,8 +70,9 @@ public sealed class HostRoutingTests(WebApplicationFactory<Program> factory) : I
         Assert.Contains("'admin' is not served on site 'www'", problem.GetProperty("detail").GetString(), StringComparison.Ordinal);
 
         using var onCms = await Client().SendAsync(Request(HttpMethod.Get, "cms.tinhte.localhost", "/api/v1/admin/articles"));
-        Assert.Equal("cms", onCms.Headers.GetValues("X-TT-Site").Single());          // qua được cổng site; endpoint chưa làm → 404 của routing
-        Assert.NotEqual("application/problem+json", onCms.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("cms", onCms.Headers.GetValues("X-TT-Site").Single());          // qua được cổng site, tới endpoint (WBS-022) → cần phiên staff
+        Assert.Equal(HttpStatusCode.Unauthorized, onCms.StatusCode);
+        Assert.Equal("UNAUTHENTICATED", (await ProblemAsync(onCms)).GetProperty("code").GetString());
 
         using var publicOnCms = await Client().SendAsync(Request(HttpMethod.Get, "cms.tinhte.localhost", "/api/v1/site/config"));
         Assert.Equal(HttpStatusCode.NotFound, publicOnCms.StatusCode);                 // cms chỉ có bề mặt admin
