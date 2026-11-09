@@ -6,7 +6,7 @@ namespace Tinhte.DbMigrator;
 
 /// <summary>
 /// Lối tắt CHỈ cho máy dev. Hợp đồng v0.3 chưa có cách xác nhận quyền nội dung của bài (nguồn/giấy phép — WBS-023,
-/// đề xuất ở ADR-0006 chờ TL/PO/Legal/DBA), nên publish luôn bị 422 RIGHTS_INVALID. Lệnh này đặt
+/// đề xuất ở ADR-0007 chờ TL/PO/Legal/DBA), nên publish luôn bị 422 RIGHTS_INVALID. Lệnh này đặt
 /// <c>rights_status = CLEARED</c> để thử luồng xuất bản trên máy dev. Ngoài Development lệnh từ chối chạy:
 /// trên staging/production quyền chỉ được xác nhận qua quy trình đã duyệt — không bao giờ "coi giấy phép là đã có".
 /// </summary>

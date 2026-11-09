@@ -1,12 +1,12 @@
 ---
-id: ADR-0006
+id: ADR-0007
 title: Nguồn, giấy phép và xác nhận quyền nội dung của bài viết
 status: PROPOSED — ĐỀ XUẤT, CHƯA HIỆN THỰC. Chờ TL (hợp đồng), PO/BA (vai trò, ma trận quyền), Legal (chính sách quyền), DBA (bảng giấy phép schema 04)
 date: 2026-11-09
 related: ADR-0004, ADR-0005, WBS-023, WBS-032, WBS-124, FR-NEWS-006, FR-NEWS-003, FR-VID-008, AIR-018
 ---
 
-# ADR-0006 — Nguồn, giấy phép và xác nhận quyền nội dung của bài viết
+# ADR-0007 — Nguồn, giấy phép và xác nhận quyền nội dung của bài viết
 
 ## Bối cảnh
 

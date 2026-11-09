@@ -88,7 +88,7 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 - trình soạn tạm: đoạn cách bằng dòng trống, `##` / `###` là tiêu đề, `>` là trích dẫn, có nút xem trước;
 - lưu bằng If-Match; khi người khác vừa lưu thì báo xung đột kèm nút tải lại;
 - lịch sử phiên bản, so sánh với phiên bản trước;
-- nút xuất bản (`content.publish` + MFA). Chỉ bật khi bài đã được duyệt. Hợp đồng chưa có cách xác nhận quyền nội dung (WBS-023, đề xuất [ADR-0006](doc/adr/ADR-0006-content-sources-licenses-rights.md) chờ TL/PO/Legal/DBA), nên trên máy dev dùng lệnh `dotnet run --project backend/src/Tinhte.DbMigrator -- clear-rights --article <id|slug>` (chỉ chạy ở Development).
+- nút xuất bản (`content.publish` + MFA). Chỉ bật khi bài đã được duyệt. Hợp đồng chưa có cách xác nhận quyền nội dung (WBS-023, đề xuất [ADR-0007](doc/adr/ADR-0007-content-sources-licenses-rights.md) chờ TL/PO/Legal/DBA), nên trên máy dev dùng lệnh `dotnet run --project backend/src/Tinhte.DbMigrator -- clear-rights --article <id|slug>` (chỉ chạy ở Development).
 
 Form chọn chuyên mục dùng `GET /admin/categories` (chỉ đọc; tạo/sửa chuyên mục thuộc WBS-023/032). Trên máy dev, thêm chuyên mục bằng SQL trong pgAdmin (DB `tinhte`):
 
