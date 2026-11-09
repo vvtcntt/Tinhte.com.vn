@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="DevSeed.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

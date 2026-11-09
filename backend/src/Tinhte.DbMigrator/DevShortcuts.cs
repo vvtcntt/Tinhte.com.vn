@@ -12,6 +12,32 @@ namespace Tinhte.DbMigrator;
 /// </summary>
 internal static class DevShortcuts
 {
+    /// <summary>
+    /// Nạp dữ liệu mẫu (DevSeed.sql): user, chuyên mục, 20 bài ở đủ trạng thái, tin nổi bật trang chủ. Idempotent.
+    /// CHỈ Development — không bao giờ đưa dữ liệu giả lên staging/production.
+    /// </summary>
+    public static async Task<string> SeedAsync(NpgsqlDataSource dataSource, IHostEnvironment env, MigrationRunner runner)
+    {
+        if (!env.IsDevelopment())
+        {
+            throw new MigrationException("seed-dev is a Development-only command: sample content must never reach staging or production.");
+        }
+
+        var path = Path.Combine(AppContext.BaseDirectory, "DevSeed.sql");
+        if (!File.Exists(path)) throw new MigrationException($"seed file not found: {path}");
+        await runner.RunInTransactionAsync(await File.ReadAllTextAsync(path));
+
+        await using var c = await dataSource.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand("""
+            SELECT (SELECT count(*) FROM tt.articles WHERE id::text LIKE '00000000-0000-4000-8003-%'),
+                   (SELECT count(*) FROM tt.articles WHERE id::text LIKE '00000000-0000-4000-8003-%' AND status = 'PUBLISHED'),
+                   (SELECT count(*) FROM tt.home_featured_articles WHERE site_key = 'www')
+            """, c);
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        return $"dev seed: {reader.GetInt64(0)} sample articles ({reader.GetInt64(1)} published), {reader.GetInt64(2)} home pins on site www — DEV ONLY";
+    }
+
     public static async Task<string> ClearRightsAsync(NpgsqlDataSource dataSource, IHostEnvironment env, string? article, string? expires)
     {
         if (!env.IsDevelopment())

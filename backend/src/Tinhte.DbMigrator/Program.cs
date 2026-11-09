@@ -12,6 +12,7 @@ using Tinhte.Platform.Sites;
 //   dotnet run --project backend/src/Tinhte.DbMigrator -- status
 //   dotnet run --project backend/src/Tinhte.DbMigrator -- grant-role --issuer <iss> --subject <sub> --role ADMIN --reason "..." [--name "..."]
 //   dotnet run --project backend/src/Tinhte.DbMigrator -- clear-rights --article <id|slug> [--expires <ISO>]   (CHỈ Development)
+//   dotnet run --project backend/src/Tinhte.DbMigrator -- seed-dev      (dữ liệu mẫu, CHỈ Development)
 // Cấu hình: ConnectionStrings__Tinhte (biến môi trường / secret), Database:Migrations:Directory, Sites:RegistryPath.
 // Content root = thư mục chứa bản build để luôn đọc appsettings*.json của migrator, dù chạy từ thư mục nào.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
@@ -52,8 +53,12 @@ try
             Console.WriteLine(await DevShortcuts.ClearRightsAsync(dataSource, builder.Environment, builder.Configuration["article"], builder.Configuration["expires"]));
             break;
 
+        case "seed-dev":
+            Console.WriteLine(await DevShortcuts.SeedAsync(dataSource, builder.Environment, runner));
+            break;
+
         default:
-            Console.Error.WriteLine($"unknown command '{command}' (use: up | status | grant-role | clear-rights)");
+            Console.Error.WriteLine($"unknown command '{command}' (use: up | status | grant-role | clear-rights | seed-dev)");
             return 2;
     }
 

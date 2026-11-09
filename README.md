@@ -49,6 +49,22 @@ TT_TEST_PG="$ConnectionStrings__Tinhte" dotnet test backend/Tinhte.slnx   # gồ
 ```
 
 `Pooling=false` chỉ cần với PGlite. Stub schema 04 chỉ áp ở Development; staging/production dùng schema 04 thật của DBA.
+
+**Dữ liệu mẫu (chỉ Development).** Sau `up`, nạp nội dung giả để xem trang chủ và CMS:
+
+```bash
+dotnet run --project backend/src/Tinhte.DbMigrator -- seed-dev
+```
+
+Lệnh nạp:
+- 3 user mẫu;
+- 7 chuyên mục, trong đó 1 chuyên mục đã tắt;
+- 20 bài: 16 bài công khai, 1 bài đã gỡ, 1 bài chờ duyệt, 1 bản nháp;
+- 4 bài ghim Tin nổi bật, trong đó có 1 bài đã gỡ để kiểm việc bị ẩn.
+
+Bài đi đúng luồng duyệt → xuất bản, nên trigger DB vẫn kiểm như thật. Lối tắt duy nhất là quyền `CLEARED`.
+
+Lệnh không nạp bài tài trợ (cờ OFF) và chưa nạp video. Chạy lại không nhân đôi dữ liệu. Muốn làm mới thì dùng DB mới (khởi động lại PGlite). Ngoài Development lệnh từ chối chạy. Nội dung nằm trong `backend/src/Tinhte.DbMigrator/DevSeed.sql`.
 Ngoài Development, API cần `Pagination:CursorSigningKey` (base64 ≥ 32 byte, từ secret manager) — thiếu thì không khởi động.
 
 ### Đăng nhập staff + RBAC (WBS-017/018, [ADR-0004](doc/adr/ADR-0004-staff-auth-session-rbac.md))
