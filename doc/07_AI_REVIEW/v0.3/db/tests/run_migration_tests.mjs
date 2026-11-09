@@ -240,12 +240,12 @@ async function behaviour(sc, db) {
   await expectOk(sc, db, 'N4 revision đã đóng băng vẫn đổi được trạng thái + thông tin xuất bản', `${REV('f5', `status = 'IN_REVIEW'`)} ${REV('f5', `status = 'APPROVED'`)} ${REV('f5', `status = 'PUBLISHED', published_at = now(), published_by = '${U1}'`)}`);
   await expectError(sc, db, 'N5 revision đã rời DRAFT không quay lại DRAFT', `${REV('f5', `status = 'IN_REVIEW'`)} ${REV('f5', `status = 'REJECTED', review_note = 'Thiếu nguồn'`)} ${REV('f5', `status = 'DRAFT'`)}`, /STATE_CONFLICT.*cannot return to DRAFT/);
   await expectError(sc, db, 'N6 revision không xóa được (lịch sử sửa bài)', `DELETE FROM tt.article_revisions WHERE id = '${id('f5')}'`, /APPEND_ONLY/);
-  await expectError(sc, db, 'N7 status revision ngoài vòng đời bị chặn (CHECK khi INSERT; UPDATE còn bị trigger 0322 chặn trước)', `INSERT INTO tt.article_revisions (article_id, number, title, status) VALUES ('${id('b2')}', 9, 'x', 'LIVE')`, /ck_article_revisions_status/);
+  await expectError(sc, db, 'N7 status revision ngoài vòng đời bị chặn (CHECK khi INSERT; UPDATE còn bị trigger 0324 chặn trước)', `INSERT INTO tt.article_revisions (article_id, number, title, status) VALUES ('${id('b2')}', 9, 'x', 'LIVE')`, /ck_article_revisions_status/);
   await expectError(sc, db, 'N8 slug sai định dạng bị chặn', `UPDATE tt.articles SET slug = 'Bai Mot' WHERE id = '${id('b2')}'`, /ck_articles_slug_format/);
   await expectError(sc, db, 'N9 body revision phải là mảng block', REV('f5', `body = '{"type":"p"}'`), /ck_article_revisions_body_array/);
   await expectError(sc, db, 'N10 published_by thiếu published_at bị chặn', REV('f5', `published_by = '${U1}'`), /ck_article_revisions_published_pair/);
 
-  // Quy trình duyệt (0322/0323, WBS-024, FR-CMS-002/010)
+  // Quy trình duyệt (0324/0325, WBS-024, FR-CMS-002/010)
   const REVIEW = `${REV('f5', `status = 'IN_REVIEW', submitted_by = '${U2}', submitted_at = now()`)}`;
   await expectError(sc, db, 'W1 không nhảy cóc DRAFT → APPROVED (phải qua IN_REVIEW)', REV('f5', `status = 'APPROVED'`), /STATE_CONFLICT.*from DRAFT to APPROVED/);
   await expectError(sc, db, 'W2 yêu cầu sửa không có lý do → REASON_REQUIRED', `${REVIEW} ${REV('f5', `status = 'CHANGES_REQUESTED', review_note = ' ok '`)}`, /REASON_REQUIRED/);

@@ -1,4 +1,4 @@
--- 0322 — Quy trình duyệt bài (WBS-024; FR-NEWS-004, FR-CMS-002, FR-CMS-010)
+-- 0324 — Quy trình duyệt bài (WBS-024; FR-NEWS-004, FR-CMS-002, FR-CMS-010)
 -- Khớp API v0.3: submitArticleForReview, approveArticleRevision, postAdminArticlesArticleidRequestChanges,
 -- postAdminArticlesArticleidReject; ArticleRevision.submitted*/reviewed*/reviewNote.
 --
@@ -11,26 +11,26 @@
 --       SUPERSEDED → PUBLISHED (rollback, WBS sau)
 --   • CHANGES_REQUESTED / REJECTED phải có lý do ≥ 5 ký tự (REASON_REQUIRED);
 --   • thông tin gửi/duyệt đã ghi thì không sửa được (STATE_CONFLICT).
--- CHECK thêm ở dạng NOT VALID, VALIDATE ở 0323.
+-- CHECK thêm ở dạng NOT VALID, VALIDATE ở 0325.
 
 SELECT tt_migration.require_column('article_revisions', 'status');   -- cần 0320
 SELECT tt_migration.require_table('users');
 
 DO $$
 BEGIN
-  PERFORM tt_migration.add_column('0322', 'article_revisions', 'submitted_by', 'uuid REFERENCES tt.users(id)');
-  PERFORM tt_migration.add_column('0322', 'article_revisions', 'submitted_at', 'timestamptz');
-  PERFORM tt_migration.add_column('0322', 'article_revisions', 'reviewed_by', 'uuid REFERENCES tt.users(id)');
-  PERFORM tt_migration.add_column('0322', 'article_revisions', 'reviewed_at', 'timestamptz');
-  PERFORM tt_migration.add_column('0322', 'article_revisions', 'review_note', 'varchar(2000)');
+  PERFORM tt_migration.add_column('0324', 'article_revisions', 'submitted_by', 'uuid REFERENCES tt.users(id)');
+  PERFORM tt_migration.add_column('0324', 'article_revisions', 'submitted_at', 'timestamptz');
+  PERFORM tt_migration.add_column('0324', 'article_revisions', 'reviewed_by', 'uuid REFERENCES tt.users(id)');
+  PERFORM tt_migration.add_column('0324', 'article_revisions', 'reviewed_at', 'timestamptz');
+  PERFORM tt_migration.add_column('0324', 'article_revisions', 'review_note', 'varchar(2000)');
 
-  PERFORM tt_migration.add_constraint('0322', 'article_revisions', 'ck_article_revisions_submitted_pair',
+  PERFORM tt_migration.add_constraint('0324', 'article_revisions', 'ck_article_revisions_submitted_pair',
     'CHECK ((submitted_by IS NULL) = (submitted_at IS NULL)) NOT VALID');
-  PERFORM tt_migration.add_constraint('0322', 'article_revisions', 'ck_article_revisions_reviewed_pair',
+  PERFORM tt_migration.add_constraint('0324', 'article_revisions', 'ck_article_revisions_reviewed_pair',
     'CHECK ((reviewed_by IS NULL) = (reviewed_at IS NULL)) NOT VALID');
 
   -- Hàng đợi duyệt (WBS-031): revision đang chờ, cũ nhất trước.
-  PERFORM tt_migration.add_index('0322', 'article_revisions', 'ix_article_revisions_in_review',
+  PERFORM tt_migration.add_index('0324', 'article_revisions', 'ix_article_revisions_in_review',
     'ON tt.article_revisions (submitted_at) WHERE status = ''IN_REVIEW''');
 END $$;
 
@@ -60,8 +60,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
-SELECT tt_migration.track_function('0322', 'tg_article_revision_workflow()');
+SELECT tt_migration.track_function('0324', 'tg_article_revision_workflow()');
 
-SELECT tt_migration.add_trigger('0322', 'article_revisions', 'trg_article_revisions_workflow',
+SELECT tt_migration.add_trigger('0324', 'article_revisions', 'trg_article_revisions_workflow',
   'BEFORE UPDATE OF status, submitted_by, submitted_at, reviewed_by, reviewed_at, review_note ON tt.article_revisions '
   || 'FOR EACH ROW EXECUTE FUNCTION tt.tg_article_revision_workflow()');

@@ -21,7 +21,7 @@ namespace Tinhte.Modules.News.Application;
 ///   <item>Yêu cầu sửa / từ chối bắt buộc lý do (≥ 5 ký tự) → 422 REASON_REQUIRED; người phụ trách tiếp theo
 ///         (assigneeId) là người đã gửi duyệt.</item>
 ///   <item>Thứ tự lỗi theo catalog: 403 quyền → 404 → 403 SoD → 428/412 → 422 → 409.</item>
-///   <item>Trigger 0322 chặn ở DB mọi bước chuyển sai, thiếu lý do và sửa lại hồ sơ duyệt.</item>
+///   <item>Trigger 0324 chặn ở DB mọi bước chuyển sai, thiếu lý do và sửa lại hồ sơ duyệt.</item>
 /// </list>
 /// </summary>
 public sealed partial class ArticleService

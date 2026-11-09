@@ -16,7 +16,7 @@ created_at: 2026-11-09
 | Hạng mục | Kết quả |
 |---|---|
 | Chạy thật trên PostgreSQL | **Có**, PostgreSQL 18.6 qua PGlite 0.5.10 (WASM), dùng stub schema 04 |
-| Test tự động | **203/203 PASS** (chạy lại 09/11/2026 sau khi thêm 0322/0323 — WBS-024; 179/179 sau 0320/0321; trước đó 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
+| Test tự động | **203/203 PASS** (chạy lại 09/11/2026 sau khi thêm 0324/0325 — WBS-024; 179/179 sau 0320/0321; trước đó 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
 | Kịch bản A: DB sạch | up → up lần 2 không đổi schema → 50+ test hành vi → down toàn bộ → schema **trùng khớp baseline** → up lại |
 | Kịch bản B: DB đã áp SQL v0.2 | SQL v0.2 chạy được (lần đầu được thử) → up → 0310 **dừng đúng** vì dữ liệu cũ → backfill → 0310 → down → schema và khóa cờ **trở về đúng v0.2** |
 | Kịch bản C: thiếu bảng tiên quyết | migration dừng, kèm thông báo rõ bảng còn thiếu |
@@ -45,8 +45,8 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | 0314 | `user_status_history` | Lịch sử đình chỉ/kích hoạt tài khoản (chỉ thêm); trigger trên `tt.users.status` bắt buộc `tt.reason` → `REASON_REQUIRED`. Down từ chối nếu đã có lịch sử | WBS-115, FR-ID-004/007 |
 | 0320 | `article_revisions` | Revision bài (WBS-022): `status` (DRAFT→IN_REVIEW→…→PUBLISHED→SUPERSEDED), `summary`, `category_id`, `updated_at/by`, `published_at/by`; `articles.published_at`; trigger đóng băng nội dung revision đã rời DRAFT hoặc đang public (`STATE_CONFLICT`), không xóa revision (`APPEND_ONLY`); CHECK slug/title/body. Backfill public revision → PUBLISHED. Down từ chối nếu đã có revision được xuất bản | ADR-0005, FR-NEWS-002/005 |
 | 0321 | `validate_article_revisions` | `VALIDATE` các CHECK NOT VALID của 0320 (chạy sau backfill, như 0310) | AIR-024 |
-| 0322 | `article_review_workflow` | Hồ sơ duyệt trên revision: `submitted_by/at`, `reviewed_by/at`, `review_note`; trigger chặn bước chuyển trạng thái sai (`STATE_CONFLICT`), trả bài/từ chối thiếu lý do (`REASON_REQUIRED`), sửa lại hồ sơ duyệt; index hàng đợi duyệt. Down từ chối nếu đã có lịch sử duyệt | WBS-024, FR-CMS-002/010, FR-NEWS-004 |
-| 0323 | `validate_article_review` | `VALIDATE` các CHECK NOT VALID của 0322 | AIR-024 |
+| 0324 | `article_review_workflow` | Hồ sơ duyệt trên revision: `submitted_by/at`, `reviewed_by/at`, `review_note`; trigger chặn bước chuyển trạng thái sai (`STATE_CONFLICT`), trả bài/từ chối thiếu lý do (`REASON_REQUIRED`), sửa lại hồ sơ duyệt; index hàng đợi duyệt. Down từ chối nếu đã có lịch sử duyệt | WBS-024, FR-CMS-002/010, FR-NEWS-004 |
+| 0325 | `validate_article_review` | `VALIDATE` các CHECK NOT VALID của 0324 | AIR-024 |
 | 0312 | `site_registry` | `tt.sites` (đồng bộ từ `config/sites/sites.json` bằng `tools/sites/generate-db-sync.mjs`, không xóa, chỉ retired); `articles/videos.primary_site_key`, `categories.site_key` mặc định `www`; nội dung chỉ thuộc site public-web | ADR-0001 D8 |
 | 0311 | `optional/privacy_requests.LEGAL_PENDING` | Lưu yêu cầu dữ liệu cá nhân không cần tài khoản (email mã hóa ở tầng ứng dụng). **Chỉ chạy khi Legal chọn kênh API** | AIR-017 |
 
