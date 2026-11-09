@@ -41,14 +41,11 @@ public abstract record PublicArticleResult
 /// </summary>
 public sealed partial class PublicArticleService(ITinhteDatabase database, IOptions<NewsOptions> options, ILogger<PublicArticleService> logger)
 {
-    private const string Query = """
+    private const string Query = $"""
         SELECT a.id, a.slug, a.status, a.published_at, a.created_at,
-               a.rights_status = 'CLEARED' AND (a.rights_expires_at IS NULL OR a.rights_expires_at > now()) AS rights_ok,
+               {PublicArticleSql.RightsOk} AS rights_ok,
                r.id, r.title, r.summary, r.body::text, r.content_kind, r.published_at,
-               r.content_kind <> 'SPONSORED' OR (
-                   COALESCE((SELECT g.enabled FROM tt.feature_gates g WHERE g.key = @flag), false)
-                   AND r.sponsorship_approved_at IS NOT NULL
-                   AND now() >= r.sponsorship_valid_from AND now() < r.sponsorship_valid_to) AS sponsor_ok,
+               {PublicArticleSql.SponsorOk} AS sponsor_ok,
                c.slug, u.display_name
           FROM tt.articles a
           JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id

@@ -205,3 +205,22 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - `getPublicArticle`: ETag = `W/"<publicRevisionId>"`; bài từng public nhưng `UNPUBLISHED`/`RETRACTED`/hết quyền → 410 `CONTENT_WITHDRAWN`; slug cũ → 308 với `Location` tương đối.
 - Đề xuất (chưa sửa spec, chờ TL/PO): `summary` và `bodyBlocks` chưa có giới hạn độ dài/số phần tử; `sponsorLabel` cần câu chữ Legal duyệt (đang đọc từ cấu hình `News:SponsoredLabel`, thiếu thì không phục vụ bài tài trợ).
 - Kiểm lại: 34/34 test tĩnh PASS.
+
+## 12. Cập nhật Sprint 0 — tin nổi bật trang chủ do biên tập chọn (FR-DISC-003, WBS-027/051, 2026-11-09)
+
+- **Thao tác mới (2), tag `CmsHome`:** `getAdminHomeFeaturedArticles` và `putAdminHomeFeaturedArticles` tại `/admin/home/{siteKey}/featured-articles`.
+  - Tham số path mới `SiteKey`; schema mới `HomeFeaturedArticle`, `HomeFeaturedArticles`, `HomeFeaturedArticlesUpdate`.
+  - Quyền: đọc `content.read`; thay danh sách `content.publish` (cần MFA). Dùng quyền có sẵn, không đổi ma trận RBAC.
+  - PUT thay cả danh sách có thứ tự, bắt buộc `If-Match` (FR-CMS-007).
+  - `siteKey` không phải site public-web → 404, trả trước 428/412.
+  - Bài không thuộc site hoặc không hiển thị công khai → 422 `VALIDATION_FAILED`, lỗi theo từng phần tử `articleIds[i]`.
+- **`HomePage`:** chỉ thêm `description` ghi luật chọn bài; không đổi trường.
+  - Tin nổi bật = bài ghim theo thứ tự, bỏ bài không còn hiển thị, thiếu thì bù bằng bài mới nhất.
+  - Tin mới = bài mới nhất không trùng Tin nổi bật.
+  - Đã hiện thực `getHome` và `getCategories` (chuyên mục đang bật của site, sắp theo tên).
+- **Migration 0322_home_featured.** Inventory +2 dòng; FR84 dòng FR-DISC-003 thêm 2 API và migration.
+- Chưa làm:
+  - `featuredVideos` trả rỗng tới khi có feed video công khai (WBS-041/046).
+  - Màn hình CMS để ghim bài.
+  - Purge CDN khi gỡ bài (WBS-112); hiện cache `getHome` 30 giây, `getCategories` 300 giây.
+- Kiểm lại: 34/34 test tĩnh PASS; migration 197/197 PASS; backend 205/205 PASS (gồm test DB trên PGlite).

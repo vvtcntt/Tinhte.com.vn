@@ -39,6 +39,7 @@ tags:
 - name: AiOptional
 - name: MemberOptional
 - name: PublicHome
+- name: CmsHome
 - name: StaffAuth
 x-feature-flags:
   description: Single source of truth for feature flag keys (AIR-001). x-feature-gate and x-conditional-gate values MUST be keys of this registry.
@@ -1488,6 +1489,102 @@ paths:
       - FR-COM-009
       x-scope: P0
       x-error-codes: []
+  /admin/home/{siteKey}/featured-articles:
+    get:
+      tags:
+      - CmsHome
+      summary: Editorial featured articles of a site's home page
+      description: 'Access: Staff session (cmsSession) with permission content.read. siteKey must be a public-web site of the Site Registry,
+        otherwise 404. A site that was never curated returns an empty list with rowVersion 1. Items carry isPublic so the editor sees pinned
+        articles that are no longer publicly visible (they are skipped by getHome, never shown).'
+      operationId: getAdminHomeFeaturedArticles
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SiteKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeFeaturedArticles'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-DISC-003
+      x-scope: P0
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - NOT_FOUND
+    put:
+      tags:
+      - CmsHome
+      summary: Replace the ordered featured articles of a site's home page
+      description: 'Access: Staff session (cmsSession) with permission content.publish. Replaces the whole ordered list (position = array
+        index + 1). Every article must belong to siteKey and be publicly visible at save time (published, not withdrawn, rights cleared),
+        otherwise 422 VALIDATION_FAILED with field errors on articleIds. Each change is recorded in an append-only history (actor, time,
+        snapshot). Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: putAdminHomeFeaturedArticles
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SiteKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomeFeaturedArticlesUpdate'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomeFeaturedArticles'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-DISC-003
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
   /search/suggestions:
     get:
       tags:
@@ -5538,6 +5635,14 @@ components:
       schema:
         type: string
         format: uuid
+    SiteKey:
+      name: siteKey
+      in: path
+      required: true
+      description: Stable site key from the Site Registry (config/sites/sites.json), e.g. www. Must be a public-web site.
+      schema:
+        type: string
+        pattern: ^[a-z][a-z0-9-]{0,30}$
     PlacementId:
       name: placementId
       in: path
@@ -6994,8 +7099,79 @@ components:
       - shortsInstreamAdsEnabled
       - flagsVersion
       description: Generated from x-feature-flags.publicConfigField (AIR-001). UX hint only; never an authorization mechanism.
+    HomeFeaturedArticle:
+      type: object
+      required:
+      - position
+      - articleId
+      - slug
+      - title
+      - isPublic
+      properties:
+        position:
+          type: integer
+          minimum: 1
+          maximum: 10
+        articleId:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type:
+          - string
+          - 'null'
+          description: Title of the public revision (null when the article has never been published).
+        isPublic:
+          type: boolean
+          description: Currently visible to the public; false items are skipped by getHome.
+    HomeFeaturedArticles:
+      type: object
+      required:
+      - siteKey
+      - items
+      - rowVersion
+      properties:
+        siteKey:
+          type: string
+        items:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/HomeFeaturedArticle'
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        updatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        updatedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    HomeFeaturedArticlesUpdate:
+      type: object
+      required:
+      - articleIds
+      properties:
+        articleIds:
+          type: array
+          maxItems: 10
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: Ordered list; index 0 is the lead story. Empty array clears the curation.
     HomePage:
       type: object
+      description: 'Only publicly visible content of the request''s site. featuredArticles = editorial picks (putAdminHomeFeaturedArticles)
+        in position order, skipping items no longer visible, then topped up with the latest published articles; recentArticles = latest
+        published articles not already in featuredArticles. Sponsored items appear only when sponsorship is approved, in window and
+        ads.sponsored_publication is ON (same rules as getPublicArticle).'
       properties:
         featuredArticles:
           type: array

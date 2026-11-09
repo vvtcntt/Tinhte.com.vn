@@ -263,6 +263,27 @@ async function behaviour(sc, db) {
     DO $$ BEGIN IF (SELECT status FROM tt.sites WHERE key = 'game') <> 'retired' THEN RAISE EXCEPTION 'retire'; END IF; END $$;`);
   await expectError(sc, db, 'Z5 xóa site bị chặn (chỉ retired)', `${SYNC} DELETE FROM tt.sites WHERE key = 'media'`, /APPEND_ONLY/);
 
+  // Tin nổi bật trang chủ (0322, FR-DISC-003) — cần tt.sites (đồng bộ registry)
+  const LAYOUT = `${SYNC} INSERT INTO tt.home_layouts (site_key) VALUES ('www');`;
+  await expectOk(sc, db, 'H1 đổi danh sách ghim → row_version tăng, lịch sử có ảnh chụp + người thao tác', `${LAYOUT}
+    SET LOCAL tt.actor_id = '${U1}';
+    INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b2')}', 1), ('www', '${id('b1')}', 2);
+    UPDATE tt.home_layouts SET updated_by = '${U1}' WHERE site_key = 'www';
+    DO $$ BEGIN
+      IF (SELECT row_version FROM tt.home_layouts WHERE site_key = 'www') <> 2 THEN RAISE EXCEPTION 'row_version'; END IF;
+      IF (SELECT article_ids FROM tt.home_featured_history WHERE site_key = 'www' AND row_version = 2 AND actor_id = '${U1}')
+         IS DISTINCT FROM ARRAY['${id('b2')}', '${id('b1')}']::uuid[] THEN RAISE EXCEPTION 'history snapshot'; END IF;
+    END $$;`);
+  await expectError(sc, db, 'H2 ghim bài của site khác bị chặn', `${generateDbSync(withGame)} INSERT INTO tt.home_layouts (site_key) VALUES ('www');
+    UPDATE tt.articles SET primary_site_key = 'game' WHERE id = '${id('b2')}';
+    INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b2')}', 1);`, /VALIDATION_FAILED.*cannot be featured/);
+  await expectError(sc, db, 'H3 trang chủ cho site cms bị chặn', `${SYNC} INSERT INTO tt.home_layouts (site_key) VALUES ('cms')`, /VALIDATION_FAILED/);
+  await expectError(sc, db, 'H4 trùng vị trí bị chặn', `${LAYOUT}
+    INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b1')}', 1), ('www', '${id('b2')}', 1);`, /uq_home_featured_articles_position/);
+  await expectError(sc, db, 'H5 vị trí ngoài 1..10 bị chặn', `${LAYOUT}
+    INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b1')}', 11);`, /home_featured_articles_position_check/);
+  await expectError(sc, db, 'H6 lịch sử tin nổi bật chỉ thêm', `${LAYOUT} UPDATE tt.home_layouts SET updated_by = '${U1}'; DELETE FROM tt.home_featured_history`, /APPEND_ONLY/);
+
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
 }
