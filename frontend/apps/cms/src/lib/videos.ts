@@ -31,6 +31,15 @@ export interface AdminVideo {
   rowVersion: number;
   mediaId: string | null;
   summary?: string | null;
+  // WBS-040 (CHANGELOG mục 13): trạng thái working revision, hồ sơ duyệt, lần gỡ gần nhất.
+  revisionStatus?: string | null;
+  submittedBy?: string | null;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  unpublishedAt?: string | null;
+  unpublishReason?: string | null;
 }
 
 export interface MediaStatus {
@@ -402,6 +411,95 @@ export function videoPatchBody(video: AdminVideo, draft: VideoDraft): Record<str
   return body;
 }
 
+// ---------------------------------------------------------------- duyệt / xuất bản / gỡ (WBS-040)
+// Cùng quy tắc với VideoService.Workflow (C#). Chỉ để bật/tắt nút và gợi ý — API vẫn kiểm và trả lỗi.
+
+/** ActionReason.reason của hợp đồng: 5–2000 ký tự (API trả 422 REASON_REQUIRED nếu thiếu). */
+export const REASON_MIN = 5;
+export const REASON_MAX = 2000;
+
+export function reasonError(reason: string): string | null {
+  const text = reason.trim();
+  if (text.length < REASON_MIN) return `Nhập lý do (ít nhất ${REASON_MIN} ký tự).`;
+  if (text.length > REASON_MAX) return `Lý do tối đa ${REASON_MAX} ký tự.`;
+  return null;
+}
+
+/** Trạng thái video cho phép sửa/gửi duyệt (VideoStatuses.Editable). */
+const EDITABLE_STATUSES = new Set(['DRAFT', 'CHANGES_REQUESTED', 'REJECTED', 'PUBLISHED', 'UNPUBLISHED']);
+
+const REVISION_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Bản nháp',
+  IN_REVIEW: 'Chờ duyệt',
+  CHANGES_REQUESTED: 'Cần sửa',
+  REJECTED: 'Bị từ chối',
+  APPROVED: 'Đã duyệt, chờ xuất bản',
+  PUBLISHED: 'Đang công khai',
+  SUPERSEDED: 'Đã thay thế',
+};
+export const revisionStatusLabel = (s: string | null | undefined): string => (s ? REVISION_STATUS_LABEL[s] ?? s : '—');
+
+type WorkflowVideo = Pick<AdminVideo, 'status' | 'revisionStatus' | 'workingRevisionId' | 'publicRevisionId' | 'mediaId'>;
+
+/** Revision đang chờ quyết định (duyệt/xuất bản): không sửa nội dung/media cho tới khi có quyết định. */
+export const isPendingDecision = (v: Pick<AdminVideo, 'revisionStatus' | 'workingRevisionId' | 'publicRevisionId'>): boolean =>
+  (v.revisionStatus === 'IN_REVIEW' || v.revisionStatus === 'APPROVED') && v.workingRevisionId !== v.publicRevisionId;
+
+/** Gửi duyệt được: working revision DRAFT chưa public, có media, video ở trạng thái sửa được (khớp SubmitAsync). */
+export const canSubmitVideo = (v: WorkflowVideo): boolean =>
+  v.revisionStatus === 'DRAFT' && !!v.workingRevisionId && v.workingRevisionId !== v.publicRevisionId && !!v.mediaId && EDITABLE_STATUSES.has(v.status);
+
+/** Duyệt / yêu cầu sửa / từ chối: working revision IN_REVIEW (khớp RequirePendingReview). */
+export const isInReview = (v: WorkflowVideo): boolean => v.revisionStatus === 'IN_REVIEW' && v.status !== 'RETRACTED';
+
+/** Xuất bản: working revision APPROVED. */
+export const isApproved = (v: WorkflowVideo): boolean => v.revisionStatus === 'APPROVED' && v.status !== 'RETRACTED';
+
+/**
+ * Lý do chưa xuất bản được (chốt chặn WBS-040): media READY, quyền media + video CLEARED còn hạn. Rỗng = có thể thử.
+ * Quyền CLEARED do quy trình nguồn/giấy phép (WBS-023) đặt — CMS không tự đặt.
+ */
+export function publishBlockers(
+  video: Pick<AdminVideo, 'mediaId' | 'rightsStatus' | 'rightsExpiresAt'>,
+  media: Pick<MediaStatus, 'mediaId' | 'status' | 'mediaType' | 'rightsStatus' | 'rightsExpiresAt'> | null,
+  now: Date = new Date(),
+): string[] {
+  const expired = (iso: string | null | undefined) => !!iso && new Date(iso).getTime() <= now.getTime();
+  const out: string[] = [];
+  if (!video.mediaId) out.push('Video chưa có tệp.');
+  else if (media && media.mediaId === video.mediaId) {
+    if (media.status !== 'READY' || (media.mediaType && media.mediaType !== 'VIDEO')) out.push(`Tệp chưa sẵn sàng (${mediaStatusLabel(media.status)}).`);
+    if (media.rightsStatus !== 'CLEARED' || expired(media.rightsExpiresAt)) out.push(`Quyền của tệp: ${expired(media.rightsExpiresAt) ? 'hết hạn' : rightsLabel(media.rightsStatus)}.`);
+  }
+  if (video.rightsStatus !== 'CLEARED' || expired(video.rightsExpiresAt)) out.push(`Quyền của video: ${expired(video.rightsExpiresAt) ? 'hết hạn' : rightsLabel(video.rightsStatus)}.`);
+  return out;
+}
+
+/** Thông điệp cho lỗi của các thao tác duyệt/xuất bản/gỡ. */
+export function videoWorkflowErrorText(e: unknown): string {
+  if (e instanceof ApiError) {
+    switch (e.code) {
+      case 'SOD_VIOLATION':
+        return 'Bạn đã viết hoặc sửa phiên bản này nên không thể tự duyệt/xuất bản. Nhờ người duyệt khác.';
+      case 'RIGHTS_INVALID':
+        return `Chưa đủ quyền phát hành: ${e.problem.detail ?? 'quyền của video hoặc tệp chưa được xác nhận (CLEARED) hoặc đã hết hạn.'}`;
+      case 'MEDIA_NOT_READY':
+        return 'Tệp video chưa xử lý xong (hoặc đã hỏng). Chờ trạng thái “Sẵn sàng” rồi xuất bản.';
+      case 'REASON_REQUIRED':
+        return `Cần lý do ít nhất ${REASON_MIN} ký tự.`;
+      case 'FEATURE_DISABLED':
+        return 'Xuất bản nội dung tài trợ đang tắt (cờ ads.sponsored_publication).';
+      case 'SPONSORSHIP_EXPIRED':
+        return 'Thời hạn tài trợ chưa bắt đầu hoặc đã kết thúc.';
+      case 'STATE_CONFLICT':
+        return `Trạng thái video đã thay đổi: ${e.problem.detail ?? 'tải lại để xem bản mới nhất.'}`;
+      default:
+        return videoErrorText(e);
+    }
+  }
+  return videoErrorText(e);
+}
+
 // ---------------------------------------------------------------- lỗi
 
 const FIELD_LABEL: Record<string, string> = {
@@ -414,6 +512,8 @@ const FIELD_LABEL: Record<string, string> = {
   checksumSha256: 'Checksum',
   uploadToken: 'Mã tải lên',
   changeReason: 'Lý do sửa',
+  reason: 'Lý do',
+  revisionId: 'Phiên bản',
 };
 
 export function formatWait(seconds: number): string {

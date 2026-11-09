@@ -21,7 +21,7 @@ public static class VideoStatuses
     };
 
     /// <summary>
-    /// Trạng thái cho phép PATCH (giống bài viết, ADR-0005): đang chờ duyệt / đã duyệt / đã lên lịch / đã rút phải qua
+    /// Trạng thái cho phép PATCH và gửi duyệt (giống bài viết, ADR-0005): đang chờ duyệt / đã duyệt / đã lên lịch / đã rút phải qua
     /// workflow (WBS-040) trước — PATCH trả 409 để không âm thầm vô hiệu một quyết định duyệt.
     /// </summary>
     public static readonly IReadOnlySet<string> Editable = new HashSet<string>(StringComparer.Ordinal)
@@ -30,10 +30,22 @@ public static class VideoStatuses
     };
 }
 
-/// <summary>Vòng đời revision video (tt.video_revisions.status, migration 0331).</summary>
+/// <summary>
+/// Vòng đời revision video (tt.video_revisions.status, migration 0331; bước chuyển chặn ở DB bởi 0334):
+/// DRAFT → IN_REVIEW → APPROVED | CHANGES_REQUESTED | REJECTED; APPROVED → PUBLISHED → SUPERSEDED.
+/// </summary>
 public static class VideoRevisionStatuses
 {
     public const string Draft = "DRAFT";
+    public const string InReview = "IN_REVIEW";
+    public const string ChangesRequested = "CHANGES_REQUESTED";
+    public const string Rejected = "REJECTED";
+    public const string Approved = "APPROVED";
+    public const string Published = "PUBLISHED";
+    public const string Superseded = "SUPERSEDED";
+
+    /// <summary>Revision đang chờ quyết định duyệt/xuất bản: PATCH không được âm thầm thay nó bằng revision mới (409).</summary>
+    public static readonly IReadOnlySet<string> Pending = new HashSet<string>(StringComparer.Ordinal) { InReview, Approved };
 }
 
 public static class VideoContentKinds

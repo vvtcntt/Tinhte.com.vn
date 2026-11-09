@@ -34,7 +34,10 @@ public sealed record CreateVideoRequest(
     [RegularExpression(VideoContentKinds.Pattern)] string? ContentKind,
     VideoSponsorshipInput? Sponsorship);
 
-/// <summary>AdminVideo (+ summary, CHANGELOG mục 12).</summary>
+/// <summary>
+/// AdminVideo (+ summary, CHANGELOG mục 12; + revisionStatus, hồ sơ duyệt, lần gỡ gần nhất — mục 13).
+/// <c>mediaId</c> = media của working revision (bản đang soạn/duyệt); media đang phát công khai là media của public revision.
+/// </summary>
 public sealed record AdminVideo(
     Guid Id,
     string Title,
@@ -51,7 +54,24 @@ public sealed record AdminVideo(
     DateTimeOffset UpdatedAt,
     long RowVersion,
     Guid? MediaId,
-    string? Summary);
+    string? Summary,
+    string? RevisionStatus,
+    Guid? SubmittedBy,
+    DateTimeOffset? SubmittedAt,
+    Guid? ReviewedBy,
+    DateTimeOffset? ReviewedAt,
+    string? ReviewNote,
+    DateTimeOffset? UnpublishedAt,
+    string? UnpublishReason);
+
+/// <summary>ApproveRequest: duyệt đúng revision đang chờ (tránh duyệt nhầm bản đã bị thay trong lúc xem).</summary>
+public sealed record VideoApproveRequest([Required] Guid? RevisionId, [StringLength(1000)] string? Note);
+
+/// <summary>PublishRequest.</summary>
+public sealed record VideoPublishRequest([Required] Guid? RevisionId);
+
+/// <summary>ActionReason (request-changes/reject/unpublish). Kiểm ở service: thiếu hoặc &lt; 5 ký tự → 422 REASON_REQUIRED.</summary>
+public sealed record VideoActionReason(string? Reason);
 
 /// <summary>Bộ lọc getAdminVideos (sau khi đã kiểm tham số query).</summary>
 public sealed record AdminVideoFilter(

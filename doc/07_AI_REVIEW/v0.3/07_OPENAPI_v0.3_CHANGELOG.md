@@ -249,3 +249,16 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - **Ngoài hợp đồng, chỉ dev:** `PUT /api/v1/admin/media/{mediaId}/dev-upload?expires=&signature=` là đích `uploadUrl` của kho Local (ADR-0006); production client PUT thẳng lên URL ký sẵn của kho. Không thêm vào spec.
 - Đề xuất (chưa sửa spec, chờ TL/PO): `UpdateVideoRequest.mediaId` không nullable → chưa gỡ được media khỏi video; `AdminVideo` chưa có `slug`/`createdAt`; chưa có endpoint xem trước media private trong CMS (cần grant qua site `media`).
 - Kiểm lại: 34/34 test tĩnh PASS.
+
+## 13. Cập nhật Sprint 0 — duyệt/xuất bản/gỡ video, media theo revision (WBS-040, ADR-0006 §6, 2026-11-09)
+
+- `AdminVideo`: **thêm trường tùy chọn, chỉ đọc** `revisionStatus` (trạng thái working revision), `submittedBy/At`, `reviewedBy/At`, `reviewNote` (lý do trả/từ chối — FR-CMS-010), `unpublishedAt`, `unpublishReason` (lần gỡ gần nhất). `mediaId` **thêm mô tả**: media của working revision. Lý do: CMS cần biết revision đang ở bước nào (khác `status` sau khi gỡ) và hiện lý do cho tác giả. Chỉ bổ sung, không phá vỡ.
+- Mô tả `postAdminVideosVideoidSubmit/Approve/Publish/Unpublish` ghi rõ hành vi đã hiện thực. **Không đổi** đường dẫn, operationId, request, status hay `x-error-codes` → inventory không đổi.
+- Hành vi đã hiện thực (ghi rõ để TL/PO duyệt):
+  - Gửi duyệt: quyền sửa video (`content.write_own`/`write_any` theo chủ sở hữu); cần media dùng được (409). Duyệt (`content.approve`, MFA) / từ chối (`content.approve`) / yêu cầu sửa (`content.review`, 201): giống bài viết WBS-024 — SoD (tác giả/người sửa revision không duyệt/xuất bản, 403 `SOD_VIOLATION`), lý do 5–2000 ký tự (422 `REASON_REQUIRED`), người gửi duyệt thành `assigneeId`.
+  - Duyệt chốt thế hệ media (`MediaStatus.generation`); publish khi media đã xử lý lại → 409 `STATE_CONFLICT`.
+  - Publish (`content.publish`, MFA): 422 `MEDIA_NOT_READY` (media chưa READY/không phải VIDEO), 422 `RIGHTS_INVALID` (quyền media hoặc video chưa CLEARED/hết hạn), SPONSORED qua trigger 0307. Kiểm lại ở DB (trigger 0334).
+  - PATCH `mediaId` của video đã public: **không còn 409** — tạo revision mới, bản công khai giữ media cũ tới khi publish. PATCH khi working revision đang chờ duyệt/đã duyệt → 409 (kể cả video đã gỡ).
+  - Gỡ (`content.takedown`, MFA, If-Match tùy chọn): xóa publish pointer trong transaction; 409 khi không có bản công khai. Thu hồi playback grant/CDN/feed: WBS-039/128 + outbox WBS-020.
+- Chưa hiện thực: `postAdminVideosVideoidSchedule` (cần bộ lập lịch + job kiểm lại lúc chạy — WBS-025/020). Route chưa có → 404.
+- Kiểm lại: 34/34 test tĩnh PASS.

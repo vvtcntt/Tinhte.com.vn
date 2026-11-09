@@ -30,8 +30,8 @@ public sealed class VideoPatch
 
     public PatchField<string> ChangeReason { get; private init; }
 
-    /// <summary>Có đổi nội dung revision (khác với chỉ đổi media gắn với video).</summary>
-    public bool TouchesRevision => Title.IsSet || Summary.IsSet || ContentKind.IsSet || Sponsorship.IsSet || ChangeReason.IsSet;
+    /// <summary>Có đổi nội dung revision. Media cũng là nội dung của revision (WBS-040, migration 0334).</summary>
+    public bool TouchesRevision => Title.IsSet || Summary.IsSet || MediaId.IsSet || ContentKind.IsSet || Sponsorship.IsSet || ChangeReason.IsSet;
 
     public static VideoPatch Parse(JsonElement body)
     {

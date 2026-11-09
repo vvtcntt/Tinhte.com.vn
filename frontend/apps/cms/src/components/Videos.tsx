@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, apiFetch } from '../lib/api';
-import { access } from '../lib/rbac';
+import { access, type Access } from '../lib/rbac';
 import {
-  ANY_ACCEPT, CONTENT_STATUSES, VIDEO_ACCEPT, canAttachToVideo, contentStatusLabel, draftFromVideo, formatBytes, isMediaInFlight,
-  mediaErrorLabel, mediaListQuery, mediaTypeLabel, pollDelayMs, rightsLabel, titleFromFileName, videoErrorText, videoListQuery, videoPatchBody,
+  ANY_ACCEPT, CONTENT_STATUSES, REASON_MAX, VIDEO_ACCEPT, canAttachToVideo, canSubmitVideo, contentStatusLabel, draftFromVideo, formatBytes,
+  isApproved, isInReview, isMediaInFlight, isPendingDecision, mediaErrorLabel, mediaListQuery, mediaTypeLabel, pollDelayMs, publishBlockers,
+  reasonError, revisionStatusLabel, rightsLabel, titleFromFileName, videoErrorText, videoListQuery, videoPatchBody, videoWorkflowErrorText,
   type AdminVideo, type MediaListFilter, type MediaStatus, type Page, type VideoDraft, type VideoListFilter,
 } from '../lib/videos';
 import { RequirePermission } from './CmsApp';
@@ -310,6 +311,8 @@ function VideoDetail({ videoId }: { videoId: string }) {
   const [video, setVideo] = useState<AdminVideo | null>(null);
   const [etag, setEtag] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Trạng thái media của bản đang soạn: dùng chung cho khối Media và chốt chặn xuất bản (một vòng hỏi trạng thái).
+  const mediaState = useMediaStatus(video?.mediaId ?? null);
 
   const reload = useCallback(async () => {
     setLoadError(null);
@@ -356,11 +359,13 @@ function VideoDetail({ videoId }: { videoId: string }) {
         <RightsBadge status={video.rightsStatus} />
       </div>
       {!canEdit && <div className="banner warn">Bạn chỉ có quyền xem video này{isOwner ? '' : ' (video của người khác cần quyền sửa mọi nội dung)'}.</div>}
+      <ReviewBanner video={video} />
 
       <div className="grid wide">
         <VideoEditor video={video} etag={etag} canEdit={canEdit} onSaved={applied} reload={reload} />
         <div className="stack">
-          <MediaPanel video={video} etag={etag} canEdit={canEdit} onSaved={applied} reload={reload} />
+          <WorkflowPanel video={video} etag={etag} canEdit={canEdit} media={mediaState.media} onSaved={applied} reload={reload} />
+          <MediaPanel video={video} etag={etag} canEdit={canEdit} mediaState={mediaState} onSaved={applied} reload={reload} />
           <div className="card">
             <h2>Thông tin</h2>
             <dl className="facts">
@@ -371,9 +376,12 @@ function VideoDetail({ videoId }: { videoId: string }) {
               <dt>Người tạo</dt>
               <dd>{isOwner ? 'Bạn' : <code>{video.ownerId ?? '—'}</code>}</dd>
               <dt>Bản đang soạn</dt>
-              <dd>{video.workingRevisionId ? <code>{video.workingRevisionId}</code> : '—'}</dd>
+              <dd>
+                {video.workingRevisionId ? <code>{video.workingRevisionId}</code> : '—'}{' '}
+                {video.revisionStatus && <span className="muted small">({revisionStatusLabel(video.revisionStatus)})</span>}
+              </dd>
               <dt>Bản công khai</dt>
-              <dd>{video.publicRevisionId ? <code>{video.publicRevisionId}</code> : 'Chưa xuất bản'}</dd>
+              <dd>{video.publicRevisionId ? <code>{video.publicRevisionId}</code> : video.unpublishedAt ? 'Không có (đã gỡ)' : 'Chưa xuất bản'}</dd>
               <dt>Cập nhật</dt>
               <dd>
                 {formatTime(video.updatedAt)} <span className="muted">(phiên bản {video.rowVersion})</span>
@@ -444,10 +452,15 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
   };
 
   const sponsored = draft.contentKind === 'SPONSORED';
+  const pending = isPendingDecision(video);
+  const editable = canEdit && !pending;
   return (
     <form className="card stack-sm" onSubmit={submit}>
       <h2>Nội dung</h2>
-      <fieldset className="plain" disabled={!canEdit || busy}>
+      {canEdit && pending && (
+        <p className="muted small">Phiên bản này đang {video.revisionStatus === 'APPROVED' ? 'chờ xuất bản' : 'chờ duyệt'} — chưa sửa được cho tới khi có quyết định.</p>
+      )}
+      <fieldset className="plain" disabled={!editable || busy}>
         <label className="field">
           <span>Tiêu đề</span>
           <input value={draft.title} onChange={(e) => set('title', e.target.value)} maxLength={300} required />
@@ -511,7 +524,7 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
           )}
         </div>
       )}
-      {canEdit && (
+      {editable && (
         <div className="row-end">
           <button type="button" className="button" disabled={busy || !body} onClick={() => setDraft(draftFromVideo(video))}>
             Hoàn tác
@@ -522,6 +535,233 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
         </div>
       )}
     </form>
+  );
+}
+
+// ---------------------------------------------------------------- duyệt / xuất bản / gỡ (WBS-040)
+
+/** Banner cho tác giả: lý do bị trả/từ chối; video đã bị gỡ. */
+function ReviewBanner({ video }: { video: AdminVideo }) {
+  const staff = useStaff();
+  const returned = video.revisionStatus === 'CHANGES_REQUESTED' || video.revisionStatus === 'REJECTED';
+  return (
+    <>
+      {video.status === 'UNPUBLISHED' && video.unpublishedAt && (
+        <div className="banner warn" role="status">
+          <span>
+            Video đã bị gỡ lúc {formatTime(video.unpublishedAt)}
+            {video.unpublishReason ? `: ${video.unpublishReason}` : ''}. Sửa rồi gửi duyệt lại để đưa lên.
+          </span>
+        </div>
+      )}
+      {returned && (
+        <div className="banner warn" role="status">
+          <span>
+            {video.revisionStatus === 'REJECTED' ? 'Phiên bản bị từ chối' : 'Người duyệt yêu cầu sửa'}
+            {video.reviewNote ? `: “${video.reviewNote}”` : ''}.{' '}
+            {video.assigneeId === staff.userId ? 'Bạn là người phụ trách — ' : ''}sửa video để tạo bản nháp mới rồi gửi duyệt lại.
+          </span>
+        </div>
+      )}
+    </>
+  );
+}
+
+type WorkflowAction = 'submit' | 'approve' | 'request-changes' | 'reject' | 'publish' | 'unpublish';
+
+const ACTION_DONE: Record<WorkflowAction, string> = {
+  submit: 'Đã gửi duyệt.',
+  approve: 'Đã duyệt. Người có quyền xuất bản có thể đưa video lên.',
+  'request-changes': 'Đã trả về cho tác giả.',
+  reject: 'Đã từ chối phiên bản.',
+  publish: 'Đã xuất bản.',
+  unpublish: 'Đã gỡ video khỏi trang công khai.',
+};
+
+/** Nút theo quyền: không có quyền → ẩn; có quyền nhưng chưa MFA → hiện, tắt, kèm gợi ý. */
+function ActionButton({ allowed, onClick, busy, danger, children, disabled }: {
+  allowed: Access;
+  onClick: () => void;
+  busy: boolean;
+  danger?: boolean;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  if (allowed === 'denied') return null;
+  return (
+    <button type="button" className={danger ? 'button small danger' : 'button small'} disabled={busy || disabled || allowed !== 'allowed'}
+      title={allowed === 'mfa-required' ? 'Cần đăng nhập lại với MFA' : undefined} onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function WorkflowPanel({ video, etag, canEdit, media, onSaved, reload }: {
+  video: AdminVideo;
+  etag: string | null;
+  canEdit: boolean;
+  media: MediaStatus | null;
+  onSaved: (v: AdminVideo, etag: string | null) => void;
+  reload: Reload;
+}) {
+  const staff = useStaff();
+  const can = {
+    review: access(staff, 'content.review'),
+    approve: access(staff, 'content.approve'),
+    publish: access(staff, 'content.publish'),
+    takedown: access(staff, 'content.takedown'),
+  };
+  // Hộp nhập cho thao tác cần lý do/ghi chú.
+  const [form, setForm] = useState<'approve' | 'request-changes' | 'reject' | 'unpublish' | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  // Idempotency-Key: giữ nguyên khi thử lại đúng thao tác + nội dung sau lỗi mạng; yêu cầu mới thì khóa mới.
+  const lastAttempt = useRef<{ signature: string; key: string } | null>(null);
+
+  const run = async (action: WorkflowAction, body: Record<string, unknown> | undefined) => {
+    const signature = `${video.id}|${action}|${JSON.stringify(body ?? {})}|${etag}`;
+    const key = lastAttempt.current?.signature === signature ? lastAttempt.current.key : crypto.randomUUID();
+    lastAttempt.current = { signature, key };
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await apiFetch<AdminVideo>(`/admin/videos/${encodeURIComponent(video.id)}/${action}`, {
+        method: 'POST',
+        body: body ?? {},
+        idempotencyKey: key,
+        // Gỡ khẩn cấp: If-Match tùy chọn theo hợp đồng → không gửi để không bị chặn bởi một lần sửa khác.
+        ifMatch: action === 'unpublish' ? undefined : etag ?? undefined,
+      });
+      lastAttempt.current = null;
+      if (response.data) onSaved(response.data, response.etag);
+      setForm(null);
+      setText('');
+      setMessage({ kind: 'ok', text: ACTION_DONE[action] });
+    } catch (e) {
+      if (e instanceof ApiError) lastAttempt.current = null;   // API đã trả lời: lần sau là yêu cầu mới
+      setMessage({ kind: 'error', text: videoWorkflowErrorText(e) });
+      if (e instanceof ApiError && (e.code === 'REVISION_CONFLICT' || e.code === 'STATE_CONFLICT')) await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const open = (f: typeof form) => {
+    setForm(f);
+    setText('');
+    setMessage(null);
+  };
+
+  const submitForm = (e: FormEvent) => {
+    e.preventDefault();
+    if (!form) return;
+    if (form === 'approve') void run('approve', { revisionId: video.workingRevisionId, ...(text.trim() ? { note: text.trim() } : {}) });
+    else if (!reasonError(text)) void run(form, { reason: text.trim() });
+  };
+
+  const inReview = isInReview(video);
+  const approved = isApproved(video);
+  const blockers = approved ? publishBlockers(video, media) : [];
+  const needsMfa = Object.values(can).includes('mfa-required');
+  const formError = form && form !== 'approve' && text ? reasonError(text) : null;
+  const FORM_LABEL = {
+    approve: 'Ghi chú duyệt (tùy chọn)',
+    'request-changes': 'Cần sửa gì? (bắt buộc)',
+    reject: 'Lý do từ chối (bắt buộc)',
+    unpublish: 'Lý do gỡ (bắt buộc, lưu vào hồ sơ)',
+  } as const;
+
+  return (
+    <div className="card stack-sm">
+      <h2>Duyệt & xuất bản</h2>
+      <dl className="facts">
+        <dt>Phiên bản đang soạn</dt>
+        <dd>{revisionStatusLabel(video.revisionStatus)}</dd>
+        {video.submittedAt && (
+          <>
+            <dt>Gửi duyệt</dt>
+            <dd>{formatTime(video.submittedAt)}</dd>
+          </>
+        )}
+        {video.reviewedAt && (
+          <>
+            <dt>Quyết định</dt>
+            <dd>
+              {formatTime(video.reviewedAt)}
+              {video.reviewNote && <span className="muted small"> — {video.reviewNote}</span>}
+            </dd>
+          </>
+        )}
+      </dl>
+
+      {canEdit && video.revisionStatus === 'DRAFT' && !video.mediaId && <p className="muted small">Gắn tệp video trước khi gửi duyệt.</p>}
+      {approved && blockers.length > 0 && can.publish !== 'denied' && (
+        <div className="banner warn" role="status">
+          <span>Chưa xuất bản được: {blockers.join(' ')} Quyền phát hành do quy trình nguồn/giấy phép xác nhận.</span>
+        </div>
+      )}
+      {needsMfa && <p className="muted small">Duyệt, xuất bản và gỡ cần phiên đăng nhập có MFA.</p>}
+
+      {form && (
+        <form className="stack-sm" onSubmit={submitForm}>
+          <label className="field">
+            <span>{FORM_LABEL[form]}</span>
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={form === 'approve' ? 1000 : REASON_MAX} autoFocus />
+          </label>
+          {formError && <p className="field-error">{formError}</p>}
+          <div className="row-end">
+            <button type="button" className="button small" disabled={busy} onClick={() => open(null)}>
+              Hủy
+            </button>
+            <button type="submit" className={form === 'reject' || form === 'unpublish' ? 'button small danger' : 'button small primary'}
+              disabled={busy || (form !== 'approve' && !!reasonError(text))}>
+              {busy ? 'Đang gửi…' : form === 'approve' ? 'Duyệt' : form === 'request-changes' ? 'Trả về' : form === 'reject' ? 'Từ chối' : 'Gỡ video'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {message && (
+        <div className={message.kind === 'ok' ? 'banner ok' : 'banner error'} role={message.kind === 'ok' ? 'status' : 'alert'}>
+          <span>{message.text}</span>
+        </div>
+      )}
+
+      {!form && (
+        <div className="row-end">
+          {canEdit && canSubmitVideo(video) && (
+            <button type="button" className="button small primary" disabled={busy} onClick={() => void run('submit', undefined)}>
+              Gửi duyệt
+            </button>
+          )}
+          {inReview && (
+            <>
+              <ActionButton allowed={can.review} busy={busy} onClick={() => open('request-changes')}>
+                Yêu cầu sửa
+              </ActionButton>
+              <ActionButton allowed={can.approve} busy={busy} danger onClick={() => open('reject')}>
+                Từ chối
+              </ActionButton>
+              <ActionButton allowed={can.approve} busy={busy} onClick={() => open('approve')}>
+                Duyệt
+              </ActionButton>
+            </>
+          )}
+          {approved && (
+            <ActionButton allowed={can.publish} busy={busy} disabled={blockers.length > 0}
+              onClick={() => void run('publish', { revisionId: video.workingRevisionId })}>
+              Xuất bản
+            </ActionButton>
+          )}
+          {video.publicRevisionId && (
+            <ActionButton allowed={can.takedown} busy={busy} danger onClick={() => open('unpublish')}>
+              Gỡ khỏi trang công khai
+            </ActionButton>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -549,20 +789,22 @@ function MediaFacts({ media }: { media: MediaStatus }) {
   );
 }
 
-function MediaPanel({ video, etag, canEdit, onSaved, reload }: {
+function MediaPanel({ video, etag, canEdit, mediaState, onSaved, reload }: {
   video: AdminVideo;
   etag: string | null;
   canEdit: boolean;
+  mediaState: ReturnType<typeof useMediaStatus>;
   onSaved: (v: AdminVideo, etag: string | null) => void;
   reload: Reload;
 }) {
   const staff = useStaff();
-  const { media, error, refresh } = useMediaStatus(video.mediaId);
+  const { media, error, refresh } = mediaState;
   const [mode, setMode] = useState<'view' | 'upload' | 'pick'>('view');
   const [busy, setBusy] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
   const canUpload = access(staff, 'media.upload') === 'allowed';
-  const locked = video.publicRevisionId !== null;
+  // Media là nội dung của phiên bản (WBS-040): đổi được trừ khi phiên bản đang chờ duyệt/xuất bản.
+  const locked = isPendingDecision(video);
 
   const attach = useCallback(async (mediaId: string) => {
     if (mediaId === video.mediaId) return;
@@ -603,7 +845,10 @@ function MediaPanel({ video, etag, canEdit, onSaved, reload }: {
       </ErrorBanner>
       <ErrorBanner text={attachError} />
 
-      {canEdit && locked && <p className="muted small">Đổi media của video đã xuất bản chưa hỗ trợ (WBS-040).</p>}
+      {canEdit && locked && <p className="muted small">Phiên bản đang chờ duyệt/xuất bản: chưa đổi tệp được.</p>}
+      {canEdit && !locked && video.publicRevisionId && (
+        <p className="muted small">Video đã xuất bản: đổi tệp tạo bản nháp mới; bản công khai giữ tệp cũ cho tới khi bản mới được duyệt và xuất bản.</p>
+      )}
       {canEdit && !locked && mode === 'upload' && (
         <UploadBox accept={VIDEO_ACCEPT} hint={VIDEO_HINT} onMedia={onUploaded} disabled={busy} />
       )}

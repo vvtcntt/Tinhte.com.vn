@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Tinhte.Modules.Video.Application;
 using Tinhte.Modules.Video.Domain;
 using Tinhte.Platform.Errors;
@@ -85,6 +87,78 @@ public sealed class AdminVideosController(VideoService videos, ICursorCodec curs
         var expected = RequireIfMatch();
         var patch = VideoPatch.Parse(body);
         var video = await videos.PatchAsync(User, videoId, expected, patch, cancellationToken);
+        SetETag(video.RowVersion);
+        return Ok(video);
+    }
+
+    // ---------------------------------------------------------------- workflow (WBS-040, VideoService.Workflow.cs)
+
+    /// <summary>postAdminVideosVideoidSubmit: gửi working revision DRAFT (có media) đi duyệt — quyền sửa video theo dữ liệu, như PATCH.</summary>
+    [HttpPost("{videoId}/submit", Name = "postAdminVideosVideoidSubmit")]
+    [RequirePermission(Permissions.ContentWriteOwn)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> Submit(Guid videoId, CancellationToken cancellationToken) =>
+        WithETag(await videos.SubmitAsync(User, videoId, RequireIfMatch, cancellationToken));
+
+    /// <summary>postAdminVideosVideoidApprove: content.approve (MFA) + tách nhiệm vụ; chốt revision + thế hệ media đang gắn.</summary>
+    [HttpPost("{videoId}/approve", Name = "postAdminVideosVideoidApprove")]
+    [RequirePermission(Permissions.ContentApprove)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> Approve(Guid videoId, VideoApproveRequest request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentApprove);
+        return WithETag(await videos.ApproveAsync(actor, videoId, request.RevisionId!.Value, request.Note, RequireIfMatch, cancellationToken));
+    }
+
+    /// <summary>postAdminVideosVideoidRequestChanges: content.review; lý do bắt buộc (REASON_REQUIRED). Hợp đồng trả 201.</summary>
+    [HttpPost("{videoId}/request-changes", Name = "postAdminVideosVideoidRequestChanges")]
+    [RequirePermission(Permissions.ContentReview)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> RequestChanges(Guid videoId, VideoActionReason request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentReview);
+        var video = await videos.ReturnAsync(actor, videoId, request.Reason, reject: false, RequireIfMatch, cancellationToken);
+        SetETag(video.RowVersion);
+        return StatusCode(StatusCodes.Status201Created, video);
+    }
+
+    /// <summary>postAdminVideosVideoidReject: content.approve (MFA); lý do bắt buộc.</summary>
+    [HttpPost("{videoId}/reject", Name = "postAdminVideosVideoidReject")]
+    [RequirePermission(Permissions.ContentApprove)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> Reject(Guid videoId, VideoActionReason request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentApprove);
+        return WithETag(await videos.ReturnAsync(actor, videoId, request.Reason, reject: true, RequireIfMatch, cancellationToken));
+    }
+
+    /// <summary>
+    /// postAdminVideosVideoidPublish: content.publish (MFA) + SoD. Chỉ revision APPROVED, media READY, quyền media + video CLEARED còn hạn
+    /// (422 MEDIA_NOT_READY / RIGHTS_INVALID); SPONSORED do trigger 0307 chặn (403 FEATURE_DISABLED / 422 SPONSORSHIP_*).
+    /// </summary>
+    [HttpPost("{videoId}/publish", Name = "postAdminVideosVideoidPublish")]
+    [RequirePermission(Permissions.ContentPublish)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> Publish(Guid videoId, VideoPublishRequest request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentPublish);
+        return WithETag(await videos.PublishAsync(actor, videoId, request.RevisionId!.Value, RequireIfMatch, cancellationToken));
+    }
+
+    /// <summary>postAdminVideosVideoidUnpublish: gỡ khẩn cấp (content.takedown, MFA); If-Match tùy chọn; lý do bắt buộc.</summary>
+    [HttpPost("{videoId}/unpublish", Name = "postAdminVideosVideoidUnpublish")]
+    [RequirePermission(Permissions.ContentTakedown)]
+    [Idempotent]
+    public async Task<ActionResult<AdminVideo>> Unpublish(Guid videoId, VideoActionReason request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentTakedown);
+        await videos.GetAsync(videoId, cancellationToken);   // 404 trước 412
+        long? ifMatch = Request.Headers.ContainsKey(HeaderNames.IfMatch) ? RequireIfMatch() : null;
+        return WithETag(await videos.UnpublishAsync(actor, videoId, request.Reason, ifMatch, cancellationToken));
+    }
+
+    private OkObjectResult WithETag(AdminVideo video)
+    {
         SetETag(video.RowVersion);
         return Ok(video);
     }
