@@ -60,7 +60,8 @@ internal static class TestHost
     public static WebApplicationFactory<Program> WithProbes(this WebApplicationFactory<Program> factory, string? connectionString = null) =>
         factory.WithWebHostBuilder(builder =>
         {
-            if (connectionString is not null) builder.UseSetting("ConnectionStrings:Tinhte", connectionString);
+            // Luôn đặt tường minh: test "không có DB" không được lấy nhầm ConnectionStrings__Tinhte từ biến môi trường của máy.
+            builder.UseSetting("ConnectionStrings:Tinhte", connectionString ?? "");
             builder.ConfigureTestServices(services =>
             {
                 services.AddControllers().AddApplicationPart(typeof(TestHost).Assembly);
