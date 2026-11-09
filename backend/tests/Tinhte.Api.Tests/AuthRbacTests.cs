@@ -219,6 +219,21 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
         Assert.Equal("/", ReturnTo.Sanitize(value));
     }
 
+    [Theory]
+    [InlineData("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", true)]
+    [InlineData("text/html", true)]
+    [InlineData("application/json", false)]
+    [InlineData("application/problem+json", false)]
+    [InlineData("text/html;q=0.5, application/json", false)]
+    [InlineData("*/*", false)]
+    [InlineData("", false)]
+    public void Callback_errors_redirect_only_browsers(string accept, bool expected)
+    {
+        var context = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+        if (accept.Length > 0) context.Request.Headers.Accept = accept;
+        Assert.Equal(expected, CallbackErrors.PrefersHtml(context.Request));
+    }
+
     [Fact]
     public async Task Oidc_start_rejects_absolute_return_to_with_400()
     {

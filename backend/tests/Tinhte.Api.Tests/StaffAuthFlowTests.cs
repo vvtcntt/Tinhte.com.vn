@@ -80,7 +80,9 @@ public sealed class StaffAuthFlowTests : IClassFixture<WebApplicationFactory<Pro
         await tx.CommitAsync();
     }
 
-    private async Task<LoginResult> LoginAsync(HttpClient client, string subject, string[] amr, string returnTo = "/articles", Func<string, string>? tamperState = null, IDictionary<string, string>? existingCookies = null)
+    private const string BrowserAccept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+
+    private async Task<LoginResult> LoginAsync(HttpClient client, string subject, string[] amr, string returnTo = "/articles", Func<string, string>? tamperState = null, IDictionary<string, string>? existingCookies = null, bool browser = false)
     {
         using var start = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/staff/oidc/start?returnTo=" + Uri.EscapeDataString(returnTo));
         using var startResponse = await client.SendAsync(start);
@@ -101,6 +103,7 @@ public sealed class StaffAuthFlowTests : IClassFixture<WebApplicationFactory<Pro
         var sendCookies = new Dictionary<string, string>(flowCookies);
         foreach (var c in existingCookies ?? new Dictionary<string, string>()) sendCookies[c.Key] = c.Value;
         callback.Headers.Add("Cookie", CookieHeader(sendCookies));
+        if (browser) callback.Headers.TryAddWithoutValidation("Accept", BrowserAccept);
         var response = await client.SendAsync(callback);
         var setCookies = response.Headers.TryGetValues("Set-Cookie", out var raw) ? raw.ToList() : [];
         return new LoginResult(response, CookiesOf(response), setCookies);
@@ -219,6 +222,43 @@ public sealed class StaffAuthFlowTests : IClassFixture<WebApplicationFactory<Pro
         callback.Headers.Add("Cookie", CookieHeader(CookiesOf(start)));
         using var response = await client.SendAsync(callback);
         await ProblemAsync(response, HttpStatusCode.Forbidden, ErrorCodes.Forbidden);
+    }
+
+    // ---------------------------------------------------------------- lỗi callback cho trình duyệt (x-browser-error-redirect, ADR-0004 A-4)
+
+    [DbFact]
+    public async Task Browser_without_role_is_redirected_to_cms_login_with_reason_and_return_to()
+    {
+        using var client = Cms();
+        var login = await LoginAsync(client, Guid.NewGuid().ToString(), ["mfa"], "/articles?status=DRAFT", browser: true);
+        Assert.Equal(HttpStatusCode.Redirect, login.Callback.StatusCode);
+        Assert.Equal("/login?error=FORBIDDEN&reason=no_role&returnTo=%2Farticles%3Fstatus%3DDRAFT", login.Callback.Headers.Location?.OriginalString);
+        Assert.False(login.Cookies.ContainsKey(StaffAuthDefaults.SessionCookie));
+    }
+
+    [DbFact]
+    public async Task Browser_with_tampered_state_is_redirected_without_return_to()
+    {
+        var subject = Guid.NewGuid().ToString();
+        await SeedStaffAsync(subject, StaffRoles.Editor);
+        using var client = Cms();
+        var login = await LoginAsync(client, subject, ["mfa"], tamperState: s => s[..^4] + "AAAA", browser: true);
+        Assert.Equal(HttpStatusCode.Redirect, login.Callback.StatusCode);
+        Assert.Equal("/login?error=OIDC_STATE_INVALID&reason=state_invalid", login.Callback.Headers.Location?.OriginalString);
+    }
+
+    [DbFact]
+    public async Task Browser_access_denied_is_redirected_with_denied_reason()
+    {
+        using var client = Cms();
+        using var start = await client.GetAsync("/api/v1/auth/staff/oidc/start?returnTo=%2Fvideos");
+        var query = HttpUtility.ParseQueryString(start.Headers.Location!.Query);
+        using var callback = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/auth/staff/oidc/callback?error=access_denied&state={Uri.EscapeDataString(query["state"]!)}");
+        callback.Headers.Add("Cookie", CookieHeader(CookiesOf(start)));
+        callback.Headers.TryAddWithoutValidation("Accept", BrowserAccept);
+        using var response = await client.SendAsync(callback);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login?error=FORBIDDEN&reason=denied&returnTo=%2Fvideos", response.Headers.Location?.OriginalString);
     }
 
     // ---------------------------------------------------------------- phiên: cô lập site, CSRF, thu hồi, hết hạn

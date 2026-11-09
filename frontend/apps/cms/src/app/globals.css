@@ -95,6 +95,8 @@ a { color: inherit; }
 }
 .banner.warn { background: var(--warn-bg); color: var(--warn-text); }
 .banner.error { background: var(--error-bg); color: var(--error-text); }
+.banner.stacked { flex-direction: column; align-items: flex-start; gap: 4px; margin: 12px 0 4px; }
+.fine-code { font-size: 12px; opacity: 0.8; }
 
 /* Khung làm việc: thanh trên + thanh bên; dưới 760px thanh bên thành hàng tab cuộn ngang. */
 .shell {

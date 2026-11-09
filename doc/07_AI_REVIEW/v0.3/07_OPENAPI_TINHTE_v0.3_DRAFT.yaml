@@ -3303,7 +3303,10 @@ paths:
       - StaffAuth
       summary: Staff OIDC callback creates secure session
       description: 'Verifies state, nonce and PKCE, rotates the session and redirects to the allow-listed returnTo. Staff: requires MFA (acr/amr)
-        for privileged roles. Access: Public, no session.'
+        for privileged roles. Access: Public, no session. Error presentation (ADR-0004 A-4): this URL is reached by browser navigation, so when
+        the request Accept header prefers text/html the error is returned as 302 to the CMS login page /login?error={code}&reason={reason}[&returnTo={path}]
+        instead of a Problem body; code is the same catalog code (OIDC_STATE_INVALID, BAD_REQUEST, FORBIDDEN) and no session cookie is set. Other
+        clients (Accept application/json or application/problem+json) receive the Problem with status 400/403 as listed.'
       operationId: getAuthStaffOidcCallback
       security: []
       parameters:
@@ -3324,6 +3327,16 @@ paths:
       - BAD_REQUEST
       - OIDC_STATE_INVALID
       - FORBIDDEN
+      x-browser-error-redirect:
+        when: Accept prefers text/html over application/json
+        location: /login?error={code}&reason={reason}&returnTo={returnTo}
+        returnTo: Present only when the original returnTo is known (state verified); same pattern as parameter ReturnTo
+        reasons:
+          state_invalid: OIDC_STATE_INVALID — state, nonce or PKCE verification failed
+          idp_error: BAD_REQUEST — the identity provider returned an error
+          denied: FORBIDDEN — the identity provider denied the sign-in (access_denied)
+          no_role: FORBIDDEN — signed in at the IdP but no CMS role has been granted yet
+          inactive: FORBIDDEN — the account is suspended or inactive
   /auth/staff/logout:
     post:
       tags:

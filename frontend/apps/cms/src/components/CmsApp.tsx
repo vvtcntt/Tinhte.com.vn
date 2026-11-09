@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { describeLoginError, type LoginError } from '../lib/loginErrors';
 import { SECTIONS, sectionFor } from '../lib/nav';
 import { access, hasLockedPermissions, roleLabel, type PermissionKey } from '../lib/rbac';
 import { SessionProvider, useSession, useStaff } from './session';
@@ -47,16 +48,26 @@ function Gate({ siteLabel, children }: { siteLabel: string; children: ReactNode 
 
 function LoginScreen({ siteLabel }: { siteLabel: string }) {
   const { signIn } = useSession();
+  // Lỗi do API chuyển về /login?error=&reason= (đọc sau khi mount để không lệch HTML giữa server và trình duyệt).
+  const [failure, setFailure] = useState<{ error: LoginError; code: string } | null>(null);
+  useEffect(() => setFailure(describeLoginError(window.location.search)), []);
   return (
     <div className="center-screen">
       <div className="card narrow">
         <p className="eyebrow">{siteLabel}</p>
         <h1>Đăng nhập</h1>
+        {failure && (
+          <div className="banner error stacked" role="alert">
+            <strong>{failure.error.title}</strong>
+            <span>{failure.error.message}</span>
+            <span className="fine-code">Mã lỗi: {failure.code}</span>
+          </div>
+        )}
         <p className="muted">
           Dùng tài khoản công ty (đăng nhập một lần). Vai trò biên tập, duyệt và xuất bản được quản trị viên cấp trong hệ thống.
         </p>
-        <button type="button" className="button primary block" onClick={signIn}>
-          Đăng nhập
+        <button type="button" className={failure && !failure.error.retry ? 'button block' : 'button primary block'} onClick={signIn}>
+          {failure ? 'Đăng nhập lại' : 'Đăng nhập'}
         </button>
         <p className="fine-print">
           Quyền cao (duyệt, xuất bản, gỡ bài, quản lý tài khoản) yêu cầu xác thực nhiều lớp (MFA).

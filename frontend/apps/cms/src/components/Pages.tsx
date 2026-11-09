@@ -1,5 +1,8 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { returnToFor } from '../lib/loginErrors';
 import { SECTIONS } from '../lib/nav';
 import { grantedPermissions, permissionLabel, roleLabel } from '../lib/rbac';
 import { RequirePermission } from './CmsApp';
@@ -62,4 +65,13 @@ export function SectionPlaceholder({ href }: { href: string }) {
     </section>
   );
   return section.permission ? <RequirePermission permission={section.permission}>{body}</RequirePermission> : body;
+}
+
+/** Đã đăng nhập mà vẫn ở /login (ví dụ mở lại tab cũ): chuyển về returnTo. */
+export function LoginRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace(returnToFor('/login', window.location.search));
+  }, [router]);
+  return <p className="muted">Đang chuyển trang…</p>;
 }

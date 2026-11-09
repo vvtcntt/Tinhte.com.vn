@@ -87,8 +87,8 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Hạng mục | Kết quả |
 |---|---|
 | `@tinhte/sites` (node:test) | 11/11 PASS, gồm test "thêm subdomain chỉ bằng registry" và bộ ca dùng chung với C# |
-| Backend `dotnet test` | PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem, RBAC + CSRF, đăng nhập OIDC đầu-cuối với IdP giả. 153/153 với DB; không có DB: 129 PASS + 24 SKIP. Build 0 cảnh báo |
-| CMS (`@tinhte/cms`) | 7/7 test thư viện (RBAC, CSRF cookie, returnTo, Problem); chạy thật trên trình duyệt: đăng nhập qua dev IdP → tổng quan → điều hướng theo quyền → màn không đủ quyền / cần MFA → đăng xuất; 375px không cuộn ngang |
+| Backend `dotnet test` | PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem, RBAC + CSRF, đăng nhập OIDC đầu-cuối với IdP giả, redirect lỗi callback cho trình duyệt. 163/163 với DB; không có DB: 136 PASS + 27 SKIP. Build 0 cảnh báo |
+| CMS (`@tinhte/cms`) | 9/9 test thư viện (RBAC, CSRF cookie, returnTo, Problem, thông điệp lỗi đăng nhập khớp spec); chạy thật trên trình duyệt: đăng nhập qua dev IdP → tổng quan → điều hướng theo quyền → màn không đủ quyền / cần MFA → đăng xuất; lỗi đăng nhập (chưa có vai trò, bị từ chối) về `/login` có thông báo và giữ `returnTo`; 375px không cuộn ngang |
 | Next.js `web`, `cms` | `next build` OK; chạy production và kiểm HTTP theo Host: 200/308/400/404, header bảo mật, robots/sitemap theo môi trường |
 | Script registry | validate, plan, db-sync, Caddyfile `--check`, chặn hostname viết cứng: OK |
 | Contract tĩnh v0.3 | 34/34 PASS |

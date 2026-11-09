@@ -35,6 +35,10 @@ related: ADR-0001 (D4/D5), ADR-0003, WBS-017, WBS-018, FR-ID-002, FR-ID-004, FR-
   | IdP từ chối (`access_denied`) | 403 `FORBIDDEN` |
   | User chưa có vai trò hoặc bị khóa | 403 `FORBIDDEN` |
 
+- **Trình duyệt** (`Accept` ưu tiên `text/html`) không nhận các Problem trên. Thay vào đó API trả 302 về `/login?error={code}&reason={reason}[&returnTo=]` để CMS hiện thông báo dễ hiểu (A-4, đã đưa vào spec v0.3 ở `x-browser-error-redirect`, CHANGELOG §10).
+  - Giá trị `reason`: `state_invalid`, `idp_error`, `denied`, `no_role`, `inactive`.
+  - `returnTo` chỉ được gắn khi state đã xác minh được.
+
 ### 2. Vai trò lấy từ DB, không lấy từ IdP
 
 - Đăng nhập lần đầu: tạo `tt.users` và liên kết `(issuer, subject)` trong `tt.user_identities`.
@@ -103,7 +107,7 @@ Muốn nhiều quyền thì cấp nhiều vai trò, ví dụ EDITOR + APPROVER. 
 | A-1 | `XCsrfToken` ghi "final scheme depends on auth ADR" | Ghi rõ: token lấy từ cookie `__Host-tt_cms_csrf`, cấp lúc đăng nhập, gắn với phiên |
 | A-2 | Chưa có enum vai trò (`RoleAssignment.roles`, `StaffSession.roles`) | Thêm enum `StaffRole` gồm 5 giá trị trên sau khi BA/PO duyệt ma trận |
 | A-3 | Callback khi user chưa có vai trò | Ghi rõ 403 `FORBIDDEN` (đã có trong `x-error-codes`) và lý do |
-| A-4 | Callback luôn do trình duyệt điều hướng tới, nên lỗi (chưa có vai trò, state sai, IdP từ chối) hiện ra dưới dạng JSON thô | Khi `Accept` ưu tiên `text/html`: 302 về trang CMS `/login?error=<code>` để hiển thị thân thiện; client API vẫn nhận Problem. Cần sửa spec trước khi làm (contract-first) |
+| A-4 | Callback luôn do trình duyệt điều hướng tới, nên lỗi (chưa có vai trò, state sai, IdP từ chối) hiện ra dưới dạng JSON thô | **Đã sửa spec v0.3 và làm (09/11/2026):** khi `Accept` ưu tiên `text/html` → 302 về CMS `/login?error=&reason=[&returnTo=]`; client API vẫn nhận Problem. Spec vẫn là DRAFT, chờ TL/PO duyệt |
 
 ## Kiểm chứng (09/11/2026)
 

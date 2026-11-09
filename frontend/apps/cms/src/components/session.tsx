@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, apiFetch, loginUrl } from '../lib/api';
+import { returnToFor } from '../lib/loginErrors';
 import type { StaffSession } from '../lib/rbac';
 
 export type SessionState =
@@ -47,7 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = useCallback(() => {
-    window.location.assign(loginUrl(window.location.pathname + window.location.search));
+    window.location.assign(loginUrl(returnToFor(window.location.pathname, window.location.search)));
   }, []);
 
   useEffect(() => {

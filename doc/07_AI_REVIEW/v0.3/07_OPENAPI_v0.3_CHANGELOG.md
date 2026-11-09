@@ -187,3 +187,10 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - Bề mặt `admin` (`/admin/*`, `/auth/staff/*`) chỉ phục vụ trên site `cms`; các thao tác công khai chỉ phục vụ trên site `public-web`.
 - Cookie: `__Host-tt_cms_session`, `__Host-tt_member_session`, chỉ thuộc host, không bao giờ đặt `Domain` cha. **Thay đổi phá vỡ** so với tên cookie trước đó.
 - Không đổi đường dẫn, schema hay mã lỗi. Kiểm chứng lại: 34/34 test tĩnh PASS; test backend `ContractConsistencyTests` PASS.
+
+## 10. Cập nhật Sprint 0 — lỗi đăng nhập staff hiển thị trong CMS (ADR-0004 A-4, 2026-11-09)
+
+- `GET /auth/staff/oidc/callback`: trình duyệt tự điều hướng tới URL này, nên khi `Accept` ưu tiên `text/html`, lỗi trả về **302 tới trang CMS** `/login?error={code}&reason={reason}[&returnTo={path}]` thay vì body Problem. Client khác (`Accept: application/json` hoặc `application/problem+json`) vẫn nhận Problem 400/403 như trước.
+- Mã lỗi giữ nguyên theo catalog (`OIDC_STATE_INVALID`, `BAD_REQUEST`, `FORBIDDEN`). Thêm `reason` để CMS hiển thị đúng thông điệp: `state_invalid`, `idp_error`, `denied`, `no_role`, `inactive`. Lỗi không tạo phiên, không đặt cookie phiên.
+- `returnTo` chỉ được gắn khi đã xác minh state (biết `returnTo` gốc) và theo cùng mẫu của tham số `ReturnTo`.
+- Mô tả máy đọc được ở extension `x-browser-error-redirect` của operation. Không đổi đường dẫn, schema, mã lỗi hay status. Kiểm lại: 34/34 test tĩnh PASS.
