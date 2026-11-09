@@ -31,6 +31,8 @@ public sealed class IdentityModule : IModule
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<StaffAccessStore>();
         services.AddSingleton<StaffSignInService>();
+        services.AddSingleton<AdminUserStore>();
+        services.AddSingleton<AdminUserService>();
         services.AddScoped<StaffOidcEvents>();
 
         var auth = services.AddAuthentication(o => o.DefaultScheme = StaffAuthDefaults.SessionScheme)

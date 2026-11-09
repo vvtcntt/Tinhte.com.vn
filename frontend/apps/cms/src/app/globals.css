@@ -133,6 +133,38 @@ a { color: inherit; }
 .perm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .perm-list li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 
+/* Form, bảng, thao tác (màn Tài khoản) */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.field.grow { flex: 1 1 240px; }
+.field input, .field select, .field textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; min-height: 36px; width: 100%;
+}
+.field textarea { resize: vertical; }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card.flush { padding: 0; overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { text-align: left; padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table th { color: var(--muted); font-weight: 600; font-size: 13px; }
+.table tr:last-child td { border-bottom: 0; }
+.table a { font-weight: 600; text-decoration: none; }
+.table a:hover { text-decoration: underline; }
+.center { text-align: center; }
+.row-end { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.back { color: var(--muted); text-decoration: none; font-size: 14px; }
+.title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.title-row h1 { margin: 0; }
+.stack-sm { display: grid; gap: 12px; align-content: start; }
+.stack-sm h2, .stack-sm p { margin: 0; }
+.checks { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+.check { display: flex; gap: 10px; align-items: flex-start; }
+.check input { margin-top: 4px; }
+.button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--surface); }
+.button:disabled { opacity: 0.5; cursor: not-allowed; }
+.banner.ok { background: var(--ok-bg); color: var(--ok-text); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 @media (max-width: 760px) {
   .shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "side" "main"; }
   .topbar { padding: 10px 16px; }

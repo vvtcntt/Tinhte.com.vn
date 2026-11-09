@@ -42,6 +42,7 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | 0309 | `lookup_row_versions` | `row_version` + trigger cho `categories/topics/users` | AIR-004 |
 | 0310 | `validate_constraints` | `VALIDATE CONSTRAINT` mọi CHECK NOT VALID. **Chạy riêng sau backfill** | AIR-024 |
 | 0313 | `staff_access` | `user_identities` (issuer, subject → user), `user_roles` (CHECK 5 vai trò DRAFT), `user_role_history` chỉ thêm (trigger ghi GRANT/REVOKE, thu hồi bắt buộc `tt.reason` → `REASON_REQUIRED`), `staff_sessions` (sha256 token, csrf_hash, MFA, hạn tuyệt đối, thu hồi). Down từ chối nếu đã có lịch sử vai trò | ADR-0004, FR-ID-002/004/006/007 |
+| 0314 | `user_status_history` | Lịch sử đình chỉ/kích hoạt tài khoản (chỉ thêm); trigger trên `tt.users.status` bắt buộc `tt.reason` → `REASON_REQUIRED`. Down từ chối nếu đã có lịch sử | WBS-115, FR-ID-004/007 |
 | 0312 | `site_registry` | `tt.sites` (đồng bộ từ `config/sites/sites.json` bằng `tools/sites/generate-db-sync.mjs`, không xóa, chỉ retired); `articles/videos.primary_site_key`, `categories.site_key` mặc định `www`; nội dung chỉ thuộc site public-web | ADR-0001 D8 |
 | 0311 | `optional/privacy_requests.LEGAL_PENDING` | Lưu yêu cầu dữ liệu cá nhân không cần tài khoản (email mã hóa ở tầng ứng dụng). **Chỉ chạy khi Legal chọn kênh API** | AIR-017 |
 

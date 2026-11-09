@@ -379,7 +379,7 @@ public sealed class StaffAuthFlowTests : IClassFixture<WebApplicationFactory<Pro
         // Đăng nhập lại rồi bị đình chỉ → phiên mất hiệu lực ngay.
         var again = await LoginAsync(client, subject, ["mfa"]);
         await using (var c = await _db.DataSource.OpenConnectionAsync())
-        await using (var suspend = new NpgsqlCommand($"UPDATE tt.users SET status = 'SUSPENDED' WHERE id = '{userId}'", c))
+        await using (var suspend = new NpgsqlCommand($"BEGIN; SELECT set_config('tt.reason', 'test suspension', true); UPDATE tt.users SET status = 'SUSPENDED' WHERE id = '{userId}'; COMMIT;", c))
         {
             await suspend.ExecuteNonQueryAsync();
         }

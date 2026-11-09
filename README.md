@@ -110,5 +110,6 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 015 | Khung Next.js SSR | Có (web + cms, đa site) |
 | 016 | Design system | Chưa (chờ UX 03) |
 | 017–018 | Staff auth, RBAC | Có: OIDC (IdP bất kỳ) + PKCE, phiên phía server thu hồi được, MFA theo amr/acr, CSRF double-submit, ma trận quyền (DRAFT chờ BA/PO); migration 0313; UI CMS: đăng nhập, khung, menu theo quyền, cảnh báo MFA, đăng xuất. Chưa: IdP thật, màn hình nghiệp vụ |
+| 115 | Quản trị tài khoản | Có: `GET /admin/users` (lọc trạng thái/vai trò/tìm, cursor), chi tiết + ETag, đình chỉ/kích hoạt lại (lý do, Idempotency-Key, thu hồi phiên), `PUT …/roles` (If-Match, lý do, chống tự bỏ ADMIN); lịch sử trạng thái (migration 0314) + vai trò (0313); màn CMS Tài khoản |
 | 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |

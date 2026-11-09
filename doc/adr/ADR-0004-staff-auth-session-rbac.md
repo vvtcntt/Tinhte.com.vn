@@ -101,6 +101,16 @@ Muốn nhiều quyền thì cấp nhiều vai trò, ví dụ EDITOR + APPROVER. 
 - Thêm `user_identities`, `user_roles`, `user_role_history` (chỉ thêm dòng), `staff_sessions`, kèm trigger ghi lịch sử. Viết theo helper `tt_migration.*`; bản down từ chối chạy nếu đã có lịch sử vai trò.
 - Giả định thêm **A-10**: schema 04 có `tt.users(id, display_name, status)`. Nếu schema 04 thật đã có bảng vai trò/phiên, DBA đối chiếu và sửa 0313 để dùng bảng có sẵn, tránh tồn tại hai bảng song song.
 
+### 7. Quản trị tài khoản (WBS-115, bổ sung 09/11/2026)
+
+- `/admin/users*` theo đúng hợp đồng v0.3. Xem cần `users.read`; đình chỉ, kích hoạt lại, đổi vai trò cần `users.manage` (có MFA). Service kiểm lại quyền bằng `User.RequirePermission`.
+- Mỗi thay đổi chạy trong **một transaction có khóa dòng user** (`FOR UPDATE`), đặt `tt.actor_id` và `tt.reason`. Trigger tự ghi lịch sử: 0313 cho vai trò, 0314 cho trạng thái. Đổi trạng thái hay thu hồi vai trò mà thiếu lý do thì DB từ chối với `REASON_REQUIRED`, kể cả khi sửa thẳng bằng SQL.
+- **Lý do** (`ActionReason`): thiếu hoặc rỗng → 422 `REASON_REQUIRED`; ngoài 5–2000 ký tự → 422 `VALIDATION_FAILED`.
+- **Đình chỉ:** chỉ từ ACTIVE và thu hồi mọi phiên staff ngay (`revoked_reason = SUSPENDED`). **Kích hoạt lại:** chỉ từ SUSPENDED. Sai trạng thái → 409 `STATE_CONFLICT`. Cả hai bắt buộc `Idempotency-Key`.
+- **Đổi vai trò:** bắt buộc `If-Match` theo `row_version` của user. Nếu có thay đổi thì tăng `row_version`, nên ETag cũ không dùng lại được.
+- **Chống tự khóa:** admin không tự đình chỉ mình, không tự bỏ vai trò ADMIN của mình → 409 `STATE_CONFLICT`.
+- `verificationStatus` của `AdminUser` để trống, vì xác minh thành viên thuộc WBS-059.
+
 ## Đề xuất bổ sung hợp đồng (chờ TL/PO duyệt, chưa sửa spec)
 
 | # | Vấn đề | Đề xuất |

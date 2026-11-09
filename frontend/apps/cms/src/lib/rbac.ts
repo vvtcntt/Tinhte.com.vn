@@ -16,6 +16,7 @@ const permissions = rbacJson.permissions as Record<string, { label: string; mfa:
 const roles = rbacJson.roles as Record<string, { label: string; permissions: string[] }>;
 
 export const ALL_PERMISSIONS = Object.keys(permissions) as PermissionKey[];
+export const ROLES = Object.keys(roles) as RoleKey[];
 
 export function roleLabel(role: string): string {
   return roles[role]?.label ?? role;

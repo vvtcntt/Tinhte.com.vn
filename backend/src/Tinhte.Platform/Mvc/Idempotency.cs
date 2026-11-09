@@ -149,14 +149,9 @@ public sealed class IdempotencyFilter(IIdempotencyStore store) : IAsyncResourceF
         var envelope = new JsonObject { ["contentType"] = http.Response.ContentType, ["headers"] = headers };
         if (body.Length > 0)
         {
-            try
-            {
-                envelope["body"] = JsonNode.Parse(body);
-            }
-            catch (JsonException)
-            {
-                envelope["bodyText"] = Encoding.UTF8.GetString(body);
-            }
+            // Lưu nguyên văn dạng chuỗi: cột jsonb sắp xếp lại khóa của object lồng nhau, nên lưu body dạng JSON
+            // sẽ phát lại một body khác thứ tự trường so với response gốc.
+            envelope["bodyText"] = Encoding.UTF8.GetString(body);
         }
 
         return envelope.ToJsonString();
