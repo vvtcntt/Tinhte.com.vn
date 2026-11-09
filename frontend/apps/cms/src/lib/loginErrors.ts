@@ -29,6 +29,11 @@ const BY_REASON: Record<string, LoginError> = {
     message: 'Bạn đã đăng nhập thành công nhưng chưa được cấp vai trò trên CMS. Liên hệ quản trị viên để được cấp quyền, sau đó đăng nhập lại.',
     retry: false,
   },
+  unavailable: {
+    title: 'Đăng nhập tạm thời không dùng được',
+    message: 'Hệ thống đăng nhập hoặc cơ sở dữ liệu đang không sẵn sàng (chưa cấu hình hoặc mất kết nối). Thử lại sau ít phút; nếu vẫn lỗi, báo cho đội kỹ thuật.',
+    retry: true,
+  },
   inactive: {
     title: 'Tài khoản đang bị đình chỉ',
     message: 'Tài khoản của bạn đang bị đình chỉ hoặc ngừng hoạt động. Liên hệ quản trị viên nếu bạn cho rằng đây là nhầm lẫn.',
@@ -39,6 +44,7 @@ const BY_REASON: Record<string, LoginError> = {
 const BY_CODE: Record<string, LoginError> = {
   OIDC_STATE_INVALID: BY_REASON.state_invalid,
   BAD_REQUEST: BY_REASON.idp_error,
+  DEPENDENCY_UNAVAILABLE: BY_REASON.unavailable,
   FORBIDDEN: { title: 'Không thể đăng nhập', message: 'Tài khoản không được phép truy cập CMS.', retry: false },
 };
 

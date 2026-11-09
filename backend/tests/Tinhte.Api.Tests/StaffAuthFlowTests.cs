@@ -261,6 +261,28 @@ public sealed class StaffAuthFlowTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal("/login?error=FORBIDDEN&reason=denied&returnTo=%2Fvideos", response.Headers.Location?.OriginalString);
     }
 
+    [DbFact]
+    public async Task Unreachable_idp_is_503_or_login_redirect_instead_of_500()
+    {
+        using var app = _app.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.Configure<OpenIdConnectOptions>(StaffAuthDefaults.OidcScheme, o => o.BackchannelHttpHandler = new UnreachableHandler())));
+        using var client = app.Client(TestHost.Cms);
+        using var api = await client.GetAsync("/api/v1/auth/staff/oidc/start");
+        await ProblemAsync(api, HttpStatusCode.ServiceUnavailable, ErrorCodes.DependencyUnavailable);
+
+        using var browser = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/staff/oidc/start?returnTo=%2Fusers");
+        browser.Headers.TryAddWithoutValidation("Accept", BrowserAccept);
+        using var redirected = await client.SendAsync(browser);
+        Assert.Equal(HttpStatusCode.Redirect, redirected.StatusCode);
+        Assert.Equal("/login?error=DEPENDENCY_UNAVAILABLE&reason=unavailable&returnTo=%2Fusers", redirected.Headers.Location?.OriginalString);
+    }
+
+    private sealed class UnreachableHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            throw new HttpRequestException("No connection could be made (simulated).");
+    }
+
     // ---------------------------------------------------------------- phiên: cô lập site, CSRF, thu hồi, hết hạn
 
     [DbFact]

@@ -3282,7 +3282,8 @@ paths:
       - StaffAuth
       summary: Begin staff OIDC login with MFA policy
       description: 'Redirects to the IdP. Server generates state, nonce and PKCE verifier and stores them in a short-lived __Host- cookie. Access:
-        Public, no session.'
+        Public, no session. When staff sign-in is not configured or the identity provider is unreachable, returns 503 DEPENDENCY_UNAVAILABLE;
+        a browser (Accept prefers text/html) instead gets 302 to /login?error=DEPENDENCY_UNAVAILABLE&reason=unavailable[&returnTo={path}].'
       operationId: getAuthStaffOidcStart
       security: []
       parameters:
@@ -3292,11 +3293,20 @@ paths:
           $ref: '#/components/responses/Found'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       x-requirements:
       - FR-ID-006
       x-scope: P0
       x-error-codes:
       - BAD_REQUEST
+      - DEPENDENCY_UNAVAILABLE
+      x-browser-error-redirect:
+        when: Accept prefers text/html over application/json
+        location: /login?error={code}&reason={reason}&returnTo={returnTo}
+        returnTo: The requested returnTo when it matches parameter ReturnTo
+        reasons:
+          unavailable: DEPENDENCY_UNAVAILABLE — staff sign-in is not configured or the identity provider is unreachable
   /auth/staff/oidc/callback:
     get:
       tags:
@@ -3305,8 +3315,9 @@ paths:
       description: 'Verifies state, nonce and PKCE, rotates the session and redirects to the allow-listed returnTo. Staff: requires MFA (acr/amr)
         for privileged roles. Access: Public, no session. Error presentation (ADR-0004 A-4): this URL is reached by browser navigation, so when
         the request Accept header prefers text/html the error is returned as 302 to the CMS login page /login?error={code}&reason={reason}[&returnTo={path}]
-        instead of a Problem body; code is the same catalog code (OIDC_STATE_INVALID, BAD_REQUEST, FORBIDDEN) and no session cookie is set. Other
-        clients (Accept application/json or application/problem+json) receive the Problem with status 400/403 as listed.'
+        instead of a Problem body; code is the same catalog code (OIDC_STATE_INVALID, BAD_REQUEST, FORBIDDEN, DEPENDENCY_UNAVAILABLE) and no session
+        cookie is set. Other clients (Accept application/json or application/problem+json) receive the Problem with status 400/403/503 as listed.
+        503 DEPENDENCY_UNAVAILABLE when the session store (database) or token endpoint cannot be reached.'
       operationId: getAuthStaffOidcCallback
       security: []
       parameters:
@@ -3320,6 +3331,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       x-requirements:
       - FR-ID-006
       x-scope: P0
@@ -3327,6 +3340,7 @@ paths:
       - BAD_REQUEST
       - OIDC_STATE_INVALID
       - FORBIDDEN
+      - DEPENDENCY_UNAVAILABLE
       x-browser-error-redirect:
         when: Accept prefers text/html over application/json
         location: /login?error={code}&reason={reason}&returnTo={returnTo}
@@ -3337,6 +3351,7 @@ paths:
           denied: FORBIDDEN — the identity provider denied the sign-in (access_denied)
           no_role: FORBIDDEN — signed in at the IdP but no CMS role has been granted yet
           inactive: FORBIDDEN — the account is suspended or inactive
+          unavailable: DEPENDENCY_UNAVAILABLE — the session store or identity provider is unavailable; retry later
   /auth/staff/logout:
     post:
       tags:

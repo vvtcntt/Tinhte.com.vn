@@ -1,7 +1,11 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Tinhte.Modules.Identity.Application;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Tinhte.Api.Tests.Support;
 using Tinhte.Modules.Identity.Infrastructure;
@@ -246,6 +250,32 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     public async Task Oidc_start_without_configured_idp_is_503()
     {
         using var client = Cms();
+        using var response = await client.GetAsync("/api/v1/auth/staff/oidc/start");
+        await ProblemAsync(response, HttpStatusCode.ServiceUnavailable, ErrorCodes.DependencyUnavailable);
+    }
+
+    [Fact]
+    public async Task Oidc_start_without_configured_idp_redirects_browser_to_login()
+    {
+        using var client = Cms();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/staff/oidc/start?returnTo=%2Fvideos");
+        request.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal("/login?error=DEPENDENCY_UNAVAILABLE&reason=unavailable&returnTo=%2Fvideos", response.Headers.Location?.OriginalString);
+    }
+
+    [Fact]
+    public async Task Oidc_start_with_unreachable_database_is_503_before_going_to_the_idp()
+    {
+        using var idp = new FakeOidcProvider();
+        using var app = factory.WithProbes("Host=127.0.0.1;Port=1;Database=x;Username=x;Timeout=2").WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Auth:Staff:Authority", FakeOidcProvider.Issuer);
+            b.UseSetting("Auth:Staff:ClientId", FakeOidcProvider.ClientId);
+            b.ConfigureTestServices(s => s.Configure<OpenIdConnectOptions>(StaffAuthDefaults.OidcScheme, o => o.BackchannelHttpHandler = idp));
+        });
+        using var client = app.Client(TestHost.Cms);
         using var response = await client.GetAsync("/api/v1/auth/staff/oidc/start");
         await ProblemAsync(response, HttpStatusCode.ServiceUnavailable, ErrorCodes.DependencyUnavailable);
     }

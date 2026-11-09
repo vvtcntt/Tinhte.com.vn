@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 using Tinhte.Modules.Identity.Application;
 using Tinhte.Platform.Errors;
 
@@ -28,7 +29,20 @@ public sealed partial class StaffOidcEvents(StaffSignInService signIn, IOptions<
     public override async Task TicketReceived(TicketReceivedContext context)
     {
         context.HandleResponse(); // tự xử lý: không SignIn bằng scheme cookie của ASP.NET
-        var result = await signIn.SignInAsync(context.Principal!, context.HttpContext, context.HttpContext.RequestAborted);
+        StaffSignInResult result;
+        try
+        {
+            result = await signIn.SignInAsync(context.Principal!, context.HttpContext, context.HttpContext.RequestAborted);
+        }
+        catch (Exception e) when (e is DomainProblemException { Code: ErrorCodes.DependencyUnavailable } or NpgsqlException)
+        {
+            // Sự kiện OIDC nằm ngoài MVC (không có DomainExceptionFilter): tự trả 503 thay vì để thành 500.
+            LogSessionStoreUnavailable(logger, e);
+            await CallbackErrors.WriteAsync(context.HttpContext, ErrorCodes.DependencyUnavailable, CallbackErrors.Unavailable,
+                "Staff sign-in unavailable", "The session store is unavailable. Try again later.", context.ReturnUri);
+            return;
+        }
+
         switch (result)
         {
             case StaffSignInResult.Success success:
@@ -58,6 +72,13 @@ public sealed partial class StaffOidcEvents(StaffSignInService signIn, IOptions<
     {
         context.HandleResponse();
         LogFailure(logger, context.Failure);
+        if (IsUnreachable(context.Failure))
+        {
+            await CallbackErrors.WriteAsync(context.HttpContext, ErrorCodes.DependencyUnavailable, CallbackErrors.Unavailable,
+                "Staff sign-in unavailable", "The identity provider cannot be reached. Try again later.", context.Properties?.RedirectUri);
+            return;
+        }
+
         if (context.Request.Query.ContainsKey("error"))
         {
             await CallbackErrors.WriteAsync(context.HttpContext, ErrorCodes.BadRequest, CallbackErrors.IdpError, "Sign-in failed",
@@ -70,8 +91,22 @@ public sealed partial class StaffOidcEvents(StaffSignInService signIn, IOptions<
             "The sign-in response could not be verified (state, nonce or PKCE). Start the sign-in again.", null);
     }
 
+    /// <summary>Không gọi được token endpoint / discovery của IdP (mạng, DNS, timeout) — khác với phản hồi sai.</summary>
+    private static bool IsUnreachable(Exception? failure)
+    {
+        for (var e = failure; e is not null; e = e.InnerException)
+        {
+            if (e is HttpRequestException or TaskCanceledException or System.Net.Sockets.SocketException) return true;
+        }
+
+        return false;
+    }
+
     [LoggerMessage(EventId = 4201, Level = LogLevel.Warning, Message = "Staff OIDC callback failed")]
     private static partial void LogFailure(ILogger logger, Exception? exception);
+
+    [LoggerMessage(EventId = 4203, Level = LogLevel.Error, Message = "Staff session store unavailable during sign-in")]
+    private static partial void LogSessionStoreUnavailable(ILogger logger, Exception exception);
 }
 
 /// <summary>
@@ -85,6 +120,7 @@ public static class CallbackErrors
     public const string Denied = "denied";
     public const string NoRole = "no_role";
     public const string Inactive = "inactive";
+    public const string Unavailable = "unavailable";
 
     public static Task WriteAsync(HttpContext http, string code, string reason, string title, string detail, string? returnTo)
     {

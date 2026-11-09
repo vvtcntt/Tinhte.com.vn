@@ -73,7 +73,7 @@ test('login: thông điệp theo reason/code mà API chuyển về /login', asyn
   assert.equal(describeLoginError('?error=OIDC_STATE_INVALID&reason=state_invalid')?.error.retry, true);
   assert.equal(describeLoginError('?error=OIDC_STATE_INVALID')?.error.retry, true);           // thiếu reason → theo code
   assert.ok(describeLoginError('?error=WHATEVER&reason=nope')?.error.title);                  // mã lạ → thông điệp chung
-  for (const reason of ['state_invalid', 'idp_error', 'denied', 'no_role', 'inactive']) {
+  for (const reason of ['state_invalid', 'idp_error', 'denied', 'no_role', 'inactive', 'unavailable']) {
     assert.ok(describeLoginError(`?error=X&reason=${reason}`)?.error.message, reason);
   }
   assert.equal(returnToFor('/login', '?error=FORBIDDEN&returnTo=%2Fvideos'), '/videos');
@@ -83,9 +83,9 @@ test('login: thông điệp theo reason/code mà API chuyển về /login', asyn
 
 test('login: các reason khớp x-browser-error-redirect của hợp đồng', async () => {
   const spec = readFileSync(new URL('../../../../doc/07_AI_REVIEW/v0.3/07_OPENAPI_TINHTE_v0.3_DRAFT.yaml', import.meta.url), 'utf8');
-  const block = spec.slice(spec.indexOf('x-browser-error-redirect:'), spec.indexOf('/auth/staff/logout:'));
-  const reasons = [...block.matchAll(/^ {10}([a-z_]+):/gm)].map((m) => m[1]).sort();
+  const block = spec.slice(spec.indexOf('/auth/staff/oidc/start:'), spec.indexOf('/auth/staff/logout:'));
+  const reasons = [...new Set([...block.matchAll(/^ {10}([a-z_]+):/gm)].map((m) => m[1]))].sort();
   const { describeLoginError } = await import('../src/lib/loginErrors.ts');
-  assert.deepEqual(reasons, ['denied', 'idp_error', 'inactive', 'no_role', 'state_invalid']);
+  assert.deepEqual(reasons, ['denied', 'idp_error', 'inactive', 'no_role', 'state_invalid', 'unavailable']);
   for (const r of reasons) assert.notEqual(describeLoginError(`?error=X&reason=${r}`)?.error.title, 'Không thể đăng nhập', r);
 });

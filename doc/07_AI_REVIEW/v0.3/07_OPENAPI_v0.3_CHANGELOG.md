@@ -194,3 +194,4 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - Mã lỗi giữ nguyên theo catalog (`OIDC_STATE_INVALID`, `BAD_REQUEST`, `FORBIDDEN`). Thêm `reason` để CMS hiển thị đúng thông điệp: `state_invalid`, `idp_error`, `denied`, `no_role`, `inactive`. Lỗi không tạo phiên, không đặt cookie phiên.
 - `returnTo` chỉ được gắn khi đã xác minh state (biết `returnTo` gốc) và theo cùng mẫu của tham số `ReturnTo`.
 - Mô tả máy đọc được ở extension `x-browser-error-redirect` của operation. Không đổi đường dẫn, schema, mã lỗi hay status. Kiểm lại: 34/34 test tĩnh PASS.
+- (bổ sung) `GET /auth/staff/oidc/start` và `/callback` thêm **503 `DEPENDENCY_UNAVAILABLE`** khi chưa cấu hình đăng nhập staff, IdP không truy cập được hoặc DB phiên không dùng được (trước đó rơi thành 500). Trình duyệt nhận 302 về `/login?error=DEPENDENCY_UNAVAILABLE&reason=unavailable`. Inventory cập nhật status/mã lỗi. Test tĩnh 34/34 PASS.

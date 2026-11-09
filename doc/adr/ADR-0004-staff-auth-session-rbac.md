@@ -36,7 +36,8 @@ related: ADR-0001 (D4/D5), ADR-0003, WBS-017, WBS-018, FR-ID-002, FR-ID-004, FR-
   | User chưa có vai trò hoặc bị khóa | 403 `FORBIDDEN` |
 
 - **Trình duyệt** (`Accept` ưu tiên `text/html`) không nhận các Problem trên. Thay vào đó API trả 302 về `/login?error={code}&reason={reason}[&returnTo=]` để CMS hiện thông báo dễ hiểu (A-4, đã đưa vào spec v0.3 ở `x-browser-error-redirect`, CHANGELOG §10).
-  - Giá trị `reason`: `state_invalid`, `idp_error`, `denied`, `no_role`, `inactive`.
+  - Giá trị `reason`: `state_invalid`, `idp_error`, `denied`, `no_role`, `inactive`, `unavailable`.
+  - Thiếu cấu hình IdP, IdP không truy cập được hoặc DB phiên không dùng được → 503 `DEPENDENCY_UNAVAILABLE` (trình duyệt: `reason=unavailable`). `oidc/start` kiểm trước cả ba thứ để báo lỗi ngay, không để người dùng đăng nhập ở IdP xong mới lỗi.
   - `returnTo` chỉ được gắn khi state đã xác minh được.
 
 ### 2. Vai trò lấy từ DB, không lấy từ IdP
