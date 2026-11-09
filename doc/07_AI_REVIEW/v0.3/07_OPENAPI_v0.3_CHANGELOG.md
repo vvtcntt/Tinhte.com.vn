@@ -205,3 +205,13 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - `getPublicArticle`: ETag = `W/"<publicRevisionId>"`; bài từng public nhưng `UNPUBLISHED`/`RETRACTED`/hết quyền → 410 `CONTENT_WITHDRAWN`; slug cũ → 308 với `Location` tương đối.
 - Đề xuất (chưa sửa spec, chờ TL/PO): `summary` và `bodyBlocks` chưa có giới hạn độ dài/số phần tử; `sponsorLabel` cần câu chữ Legal duyệt (đang đọc từ cấu hình `News:SponsoredLabel`, thiếu thì không phục vụ bài tài trợ).
 - Kiểm lại: 34/34 test tĩnh PASS.
+
+## 12. Cập nhật Sprint 0 — quy trình duyệt bài (WBS-024, 2026-11-09)
+
+- `ArticleRevision`: **thêm trường tùy chọn** `submittedBy`, `submittedAt`, `reviewedBy`, `reviewedAt`, `reviewNote` (hồ sơ duyệt — FR-CMS-010 "ghi và hiển thị reason"). Chỉ bổ sung.
+- Đã hiện thực `submitArticleForReview`, `approveArticleRevision`, `postAdminArticlesArticleidRequestChanges`, `postAdminArticlesArticleidReject` đúng path/operationId/schema/mã lỗi. Hành vi cần TL/PO duyệt:
+  - Quyền: gửi duyệt = quyền sửa bài (`content.write_own` bài mình / `content.write_any` bài người khác); yêu cầu sửa = `content.review`; duyệt và từ chối = `content.approve` (MFA).
+  - `SOD_VIOLATION` khi người duyệt/xuất bản là tác giả hoặc đã sửa revision đó (áp cho cả `publishArticle`).
+  - Yêu cầu sửa / từ chối: `reason` thiếu hoặc < 5 ký tự → 422 `REASON_REQUIRED`; `assigneeId` của bài = người đã gửi duyệt (người phụ trách tiếp theo).
+  - Trạng thái bài đi theo working revision (bài đang công khai vẫn hiển thị bản public khi bản sửa đi duyệt).
+- Kiểm lại: test tĩnh hợp đồng.

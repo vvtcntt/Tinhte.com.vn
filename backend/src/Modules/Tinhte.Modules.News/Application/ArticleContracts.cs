@@ -34,6 +34,12 @@ public sealed record CreateArticleRequest(
     [RegularExpression(ContentKinds.Pattern)] string? ContentKind,
     SponsorshipInput? Sponsorship);
 
+/// <summary>ApproveRequest: duyệt đúng revision đang chờ (tránh duyệt nhầm bản đã bị thay trong lúc xem).</summary>
+public sealed record ApproveRequest([Required] Guid? RevisionId, [StringLength(1000)] string? Note);
+
+/// <summary>ActionReason (request-changes/reject). Kiểm ở service: thiếu hoặc &lt; 5 ký tự → 422 REASON_REQUIRED.</summary>
+public sealed record ActionReason(string? Reason);
+
 /// <summary>PublishRequest.</summary>
 public sealed record PublishRequest([Required] Guid? RevisionId);
 
@@ -72,7 +78,12 @@ public sealed record ArticleRevision(
     Guid? CategoryId,
     DateTimeOffset UpdatedAt,
     DateTimeOffset? PublishedAt,
-    Guid? PublishedBy)
+    Guid? PublishedBy,
+    Guid? SubmittedBy,
+    DateTimeOffset? SubmittedAt,
+    Guid? ReviewedBy,
+    DateTimeOffset? ReviewedAt,
+    string? ReviewNote)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RevisionDiff? Diff { get; init; }

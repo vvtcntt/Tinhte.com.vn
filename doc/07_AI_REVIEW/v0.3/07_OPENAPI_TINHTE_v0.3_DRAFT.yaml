@@ -6527,6 +6527,34 @@ components:
           - string
           - 'null'
           format: uuid
+        submittedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Who submitted this revision for review (WBS-024)
+        submittedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        reviewedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Who approved, rejected or requested changes; one review per revision (edits after review create a new revision)
+        reviewedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        reviewNote:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Approval note, or the mandatory reason for CHANGES_REQUESTED / REJECTED (FR-CMS-010)
       required:
       - revisionId
       - articleId

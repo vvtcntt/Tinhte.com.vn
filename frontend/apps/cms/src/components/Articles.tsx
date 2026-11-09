@@ -8,6 +8,9 @@ import {
   ARTICLE_STATUSES,
   blocksToText,
   canEditArticle,
+  canSubmit,
+  isPendingReview,
+  reasonError,
   diffValue,
   EDITABLE_STATUSES,
   formatTime,
@@ -489,7 +492,16 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       )}
       {permitted && !editableState && (
         <div className="banner warn" role="status">
-          Bài đang ở trạng thái “{statusLabel(article.status)}”: không sửa trực tiếp được. Cần bước duyệt (yêu cầu sửa / từ chối) — thuộc WBS-024, chưa làm.
+          Bài đang ở trạng thái “{statusLabel(article.status)}”: không sửa trực tiếp được. Người duyệt cần duyệt, yêu cầu sửa hoặc từ chối trước.
+        </div>
+      )}
+      {revision?.reviewNote && (revision.status === 'CHANGES_REQUESTED' || revision.status === 'REJECTED') && (
+        <div className="banner warn stacked" role="status">
+          <strong>
+            {revision.status === 'REJECTED' ? 'Phiên bản bị từ chối' : 'Người duyệt yêu cầu sửa'} · {formatTime(revision.reviewedAt)}
+          </strong>
+          <span>{revision.reviewNote}</span>
+          {article.assigneeId === staff.userId && <span className="small">Bạn là người phụ trách tiếp theo: sửa bài rồi gửi duyệt lại.</span>}
         </div>
       )}
       {!bodySupported && (
@@ -590,6 +602,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
               <dd>{formatTime(article.updatedAt)}</dd>
             </dl>
           </div>
+          <WorkflowPanel article={article} revision={revision} etag={etag} dirty={dirty} canEdit={permitted} onChanged={load} />
           <PublishPanel article={article} etag={etag} dirty={dirty} onPublished={load} />
           <RevisionHistory key={historyKey} articleId={article.id} />
         </aside>
@@ -610,6 +623,159 @@ function BlocksPreview({ blocks }: { blocks: Block[] }) {
         ) : (
           <p key={i}>{b.text}</p>
         ),
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- quy trình duyệt (WBS-024)
+
+type ReviewAction = 'submit' | 'approve' | 'request-changes' | 'reject';
+
+const DONE: Record<ReviewAction, string> = {
+  submit: 'Đã gửi duyệt.',
+  approve: 'Đã duyệt. Người có quyền xuất bản có thể xuất bản phiên bản này.',
+  'request-changes': 'Đã trả bài cho tác giả kèm lý do.',
+  reject: 'Đã từ chối phiên bản.',
+};
+
+function WorkflowPanel({ article, revision, etag, dirty, canEdit, onChanged }: {
+  article: AdminArticle;
+  revision: ArticleRevision | null;
+  etag: string | null;
+  dirty: boolean;
+  canEdit: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const staff = useStaff();
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState<ReviewAction | null>(null);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [reasonProblem, setReasonProblem] = useState<string | null>(null);
+
+  const submittable = canEdit && canSubmit(article, revision);
+  const pending = isPendingReview(article, revision);
+  const review = access(staff, 'content.review');
+  const approve = access(staff, 'content.approve');
+  // Tách nhiệm vụ: API còn chặn cả người đã sửa revision (SOD_VIOLATION); ở đây chỉ biết tác giả.
+  const ownRevision = !!revision?.authorId && revision.authorId === staff.userId;
+  const canAct = pending && (review !== 'denied' || approve !== 'denied');
+
+  if (!submittable && !canAct && !message) {
+    return article.status === 'IN_REVIEW' ? (
+      <div className="card stack-sm">
+        <h2>Duyệt bài</h2>
+        <p className="muted small">Đang chờ duyệt{revision?.submittedAt ? ` từ ${formatTime(revision.submittedAt)}` : ''}.</p>
+      </div>
+    ) : null;
+  }
+
+  const run = async (action: ReviewAction) => {
+    if (action === 'request-changes' || action === 'reject') {
+      const problem = reasonError(reason);
+      setReasonProblem(problem);
+      if (problem) return;
+    }
+    if (action === 'reject' && !window.confirm('Từ chối phiên bản này? Tác giả phải sửa và gửi lại thành phiên bản mới.')) return;
+    setBusy(action);
+    setMessage(null);
+    const body = action === 'approve' ? { revisionId: revision!.revisionId } : action === 'submit' ? {} : { reason: reason.trim() };
+    try {
+      await apiFetch<AdminArticle>(`/admin/articles/${encodeURIComponent(article.id)}/${action}`, {
+        method: 'POST',
+        body,
+        ifMatch: etag ?? undefined,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      setReason('');
+      await onChanged();
+      setMessage({ kind: 'ok', text: DONE[action] });
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'REASON_REQUIRED') setReasonProblem(reasonError(''));
+      setMessage({
+        kind: 'error',
+        text: err instanceof ApiError && err.code === 'SOD_VIOLATION'
+          ? 'Bạn đã viết hoặc sửa phiên bản này nên không tự duyệt được. Nhờ người duyệt khác.'
+          : errorText(err),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="card stack-sm">
+      <h2>Duyệt bài</h2>
+      {submittable && (
+        <>
+          <p className="muted small">Gửi phiên bản #{revision?.number} cho người duyệt. Trong lúc chờ duyệt bài không sửa được.</p>
+          <button
+            type="button"
+            className="button primary"
+            disabled={busy !== null || dirty}
+            title={dirty ? 'Lưu thay đổi trước khi gửi duyệt' : undefined}
+            onClick={() => void run('submit')}
+          >
+            {busy === 'submit' ? 'Đang gửi…' : 'Gửi duyệt'}
+          </button>
+        </>
+      )}
+      {canAct && (
+        <>
+          <p className="muted small">
+            Phiên bản #{revision?.number} chờ duyệt{revision?.submittedAt ? ` từ ${formatTime(revision.submittedAt)}` : ''}.
+          </p>
+          {approve !== 'denied' &&
+            (ownRevision ? (
+              <p className="muted small">Bạn là tác giả phiên bản này nên không tự duyệt được.</p>
+            ) : approve === 'mfa-required' ? (
+              <p className="muted small">Duyệt và từ chối cần đăng nhập lại với MFA.</p>
+            ) : (
+              <button type="button" className="button primary" disabled={busy !== null} onClick={() => void run('approve')}>
+                {busy === 'approve' ? 'Đang duyệt…' : 'Duyệt phiên bản này'}
+              </button>
+            ))}
+          {(review === 'allowed' || approve === 'allowed') && (
+            <>
+              <label className="field">
+                <span>Lý do trả bài / từ chối</span>
+                <textarea
+                  value={reason}
+                  onChange={(e) => {
+                    setReason(e.target.value);
+                    setReasonProblem(null);
+                  }}
+                  rows={3}
+                  maxLength={2000}
+                  aria-invalid={!!reasonProblem}
+                  aria-describedby={reasonProblem ? 'reason-error' : undefined}
+                />
+                {reasonProblem && (
+                  <span id="reason-error" className="field-error">
+                    {reasonProblem}
+                  </span>
+                )}
+              </label>
+              <div className="row-end">
+                {review === 'allowed' && (
+                  <button type="button" className="button" disabled={busy !== null} onClick={() => void run('request-changes')}>
+                    {busy === 'request-changes' ? 'Đang gửi…' : 'Yêu cầu sửa'}
+                  </button>
+                )}
+                {approve === 'allowed' && (
+                  <button type="button" className="button danger" disabled={busy !== null} onClick={() => void run('reject')}>
+                    {busy === 'reject' ? 'Đang từ chối…' : 'Từ chối'}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {message && (
+        <div className={message.kind === 'ok' ? 'banner ok' : 'banner error'} role={message.kind === 'ok' ? 'status' : 'alert'}>
+          {message.text}
+        </div>
       )}
     </div>
   );
@@ -650,10 +816,11 @@ function PublishPanel({ article, etag, dirty, onPublished }: { article: AdminArt
     <div className="card stack-sm">
       <h2>Xuất bản</h2>
       <p className="muted small">
-        Chỉ xuất bản được phiên bản đã được duyệt và bài đã xác minh quyền nội dung. Bước duyệt (WBS-024) và quyền nguồn (WBS-023) chưa làm, nên hiện API sẽ
-        từ chối và nêu lý do.
+        Chỉ xuất bản được phiên bản đã được duyệt và bài đã xác minh quyền nội dung. Quyền nguồn (WBS-023) chưa làm: API nêu lý do nếu chưa đủ. Người viết
+        hoặc sửa phiên bản không tự xuất bản được.
       </p>
       {decision === 'mfa-required' && <p className="muted small">Cần đăng nhập lại với MFA để xuất bản.</p>}
+      {decision === 'allowed' && article.status !== 'APPROVED' && <p className="muted small">Chưa có phiên bản nào được duyệt để xuất bản.</p>}
       {message && (
         <div className={message.kind === 'ok' ? 'banner ok' : 'banner error'} role={message.kind === 'ok' ? 'status' : 'alert'}>
           {message.text}
@@ -663,8 +830,8 @@ function PublishPanel({ article, etag, dirty, onPublished }: { article: AdminArt
         type="button"
         className="button primary"
         onClick={() => void publish()}
-        disabled={busy || decision !== 'allowed' || dirty || !article.workingRevisionId}
-        title={dirty ? 'Lưu thay đổi trước khi xuất bản' : undefined}
+        disabled={busy || decision !== 'allowed' || dirty || !article.workingRevisionId || article.status !== 'APPROVED'}
+        title={dirty ? 'Lưu thay đổi trước khi xuất bản' : article.status !== 'APPROVED' ? 'Phiên bản đang sửa chưa được duyệt' : undefined}
       >
         {busy ? 'Đang xuất bản…' : 'Xuất bản phiên bản đang sửa'}
       </button>

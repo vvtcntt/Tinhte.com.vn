@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Tinhte.Modules.News.Application;
 using Tinhte.Modules.News.Domain;
@@ -101,6 +102,51 @@ public sealed class AdminArticlesController(ArticleService articles, ICursorCode
     public async Task<ActionResult<ArticleRevision>> Revision(Guid articleId, Guid revisionId, [FromQuery(Name = "compareTo")] Guid? compareTo,
         CancellationToken cancellationToken) =>
         Ok(await articles.GetRevisionAsync(articleId, revisionId, compareTo, cancellationToken));
+
+    /// <summary>submitArticleForReview: gửi working revision DRAFT đi duyệt (quyền sửa bài theo dữ liệu, như PATCH).</summary>
+    [HttpPost("{articleId}/submit", Name = "submitArticleForReview")]
+    [RequirePermission(Permissions.ContentWriteOwn)]
+    [Idempotent]
+    public async Task<ActionResult<AdminArticle>> Submit(Guid articleId, CancellationToken cancellationToken) =>
+        WithETag(await articles.SubmitAsync(User, articleId, RequireIfMatch, cancellationToken));
+
+    /// <summary>approveArticleRevision: content.approve (MFA) + tách nhiệm vụ (không tự duyệt bài mình viết/sửa).</summary>
+    [HttpPost("{articleId}/approve", Name = "approveArticleRevision")]
+    [RequirePermission(Permissions.ContentApprove)]
+    [Idempotent]
+    public async Task<ActionResult<AdminArticle>> Approve(Guid articleId, ApproveRequest request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentApprove);
+        return WithETag(await articles.ApproveAsync(actor, articleId, request.RevisionId!.Value, request.Note, RequireIfMatch, cancellationToken));
+    }
+
+    /// <summary>postAdminArticlesArticleidRequestChanges: content.review; lý do bắt buộc (REASON_REQUIRED). Hợp đồng trả 201.</summary>
+    [HttpPost("{articleId}/request-changes", Name = "postAdminArticlesArticleidRequestChanges")]
+    [RequirePermission(Permissions.ContentReview)]
+    [Idempotent]
+    public async Task<ActionResult<AdminArticle>> RequestChanges(Guid articleId, ActionReason request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentReview);
+        var article = await articles.ReturnAsync(actor, articleId, request.Reason, reject: false, RequireIfMatch, cancellationToken);
+        SetETag(article.RowVersion);
+        return StatusCode(StatusCodes.Status201Created, article);
+    }
+
+    /// <summary>postAdminArticlesArticleidReject: content.approve (MFA); lý do bắt buộc.</summary>
+    [HttpPost("{articleId}/reject", Name = "postAdminArticlesArticleidReject")]
+    [RequirePermission(Permissions.ContentApprove)]
+    [Idempotent]
+    public async Task<ActionResult<AdminArticle>> Reject(Guid articleId, ActionReason request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.ContentApprove);
+        return WithETag(await articles.ReturnAsync(actor, articleId, request.Reason, reject: true, RequireIfMatch, cancellationToken));
+    }
+
+    private OkObjectResult WithETag(AdminArticle article)
+    {
+        SetETag(article.RowVersion);
+        return Ok(article);
+    }
 
     /// <summary>
     /// publishArticle: đặt publish pointer sang revision APPROVED (content.publish, cần MFA). Trigger 0307 chặn SPONSORED
