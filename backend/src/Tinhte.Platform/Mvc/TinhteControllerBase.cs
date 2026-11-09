@@ -18,6 +18,15 @@ public abstract class TinhteControllerBase : ControllerBase
     /// <summary>Trả application/problem+json với mã lỗi của hợp đồng; HTTP status lấy từ ErrorCatalog.</summary>
     protected ObjectResult Problem(string code, string title, string detail) =>
         ProblemFactory.Create(HttpContext, code, title, detail);
+
+    /// <summary>Scope cursor của danh sách trên site hiện tại (WBS-014): cursor không dùng chéo giữa danh sách/subdomain.</summary>
+    protected string CursorScope(string list, string? filter = null) => CursorPaging.Scope(Site.Key, list, filter);
+
+    /// <summary>Row version mà client gửi trong If-Match. Gọi sau khi đã nạp tài nguyên (404 đánh giá trước 428/412).</summary>
+    protected long RequireIfMatch() => ETags.RequireIfMatch(HttpContext);
+
+    /// <summary>Gắn ETag W/"rowVersion" vào response.</summary>
+    protected void SetETag(long rowVersion) => ETags.Set(Response, rowVersion);
 }
 
 public static class ApiRoutes

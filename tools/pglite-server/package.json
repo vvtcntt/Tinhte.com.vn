@@ -1,0 +1,13 @@
+{
+  "name": "tinhte-pglite-server",
+  "private": true,
+  "type": "module",
+  "description": "PostgreSQL (PGlite/WASM) qua giao thức wire cho dev/test khi máy không có Docker/PostgreSQL. MỘT kết nối.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.10",
+    "@electric-sql/pglite-socket": "0.2.13"
+  }
+}

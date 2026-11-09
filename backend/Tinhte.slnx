@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Tinhte.Api/Tinhte.Api.csproj" />
+    <Project Path="src/Tinhte.DbMigrator/Tinhte.DbMigrator.csproj" />
     <Project Path="src/Tinhte.Platform/Tinhte.Platform.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">

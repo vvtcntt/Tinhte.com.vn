@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Tinhte.Platform.Data;
 using Tinhte.Platform.Flags;
 using Tinhte.Platform.Http;
 using Tinhte.Platform.Modules;
@@ -33,6 +34,13 @@ public static class PlatformExtensions
         });
         services.AddSingleton<IFeatureFlagReader, ConfigurationFeatureFlagReader>();
 
+        // WBS-013: PostgreSQL (chưa cấu hình ConnectionStrings:Tinhte thì API vẫn chạy, endpoint cần DB trả 503).
+        services.AddSingleton<ITinhteDatabase, TinhteDatabase>();
+        services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
+
+        // WBS-014: hợp đồng chung — cursor ký HMAC, lỗi nghiệp vụ/DB → Problem.
+        services.AddSingleton<ICursorCodec, HmacCursorCodec>();
+
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -48,7 +56,7 @@ public static class PlatformExtensions
             }
         });
 
-        var mvc = services.AddControllers()
+        var mvc = services.AddControllers(options => options.Filters.Add<DomainExceptionFilter>())
             .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = ProblemFactory.FromInvalidModelState);
 
         foreach (var module in modules)
@@ -64,6 +72,9 @@ public static class PlatformExtensions
     /// <summary>Pipeline: lỗi chưa xử lý → forwarded headers → phân giải site → chặn Origin → header bảo mật.</summary>
     public static WebApplication UseTinhtePlatform(this WebApplication app)
     {
+        // Cấu hình bắt buộc (khóa ký cursor ngoài Development…) phải lỗi ngay lúc khởi động, không đợi request đầu tiên.
+        _ = app.Services.GetRequiredService<ICursorCodec>();
+
         app.UseExceptionHandler(handler => handler.Run(WriteUnhandledProblemAsync));
         app.UseForwardedHeaders();
         app.UseMiddleware<SiteResolutionMiddleware>();
@@ -98,19 +109,6 @@ public static class PlatformExtensions
     private static string DefaultSiteEnvironment(IHostEnvironment env) =>
         env.IsDevelopment() ? "local" : env.IsStaging() ? "staging" : "production";
 
-    private static string ResolveRegistryPath(IConfiguration configuration, IHostEnvironment env)
-    {
-        var configured = configuration["Sites:RegistryPath"] ?? Path.Combine("config", "sites", "sites.json");
-        if (Path.IsPathRooted(configured)) return configured;
-        foreach (var start in new[] { AppContext.BaseDirectory, env.ContentRootPath })
-        {
-            for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
-            {
-                var candidate = Path.Combine(dir.FullName, configured);
-                if (File.Exists(candidate)) return candidate;
-            }
-        }
-
-        throw new FileNotFoundException($"Site registry '{configured}' not found (set Sites:RegistryPath).");
-    }
+    private static string ResolveRegistryPath(IConfiguration configuration, IHostEnvironment env) =>
+        ContentPaths.Resolve(configuration["Sites:RegistryPath"] ?? Path.Combine("config", "sites", "sites.json"), env);
 }

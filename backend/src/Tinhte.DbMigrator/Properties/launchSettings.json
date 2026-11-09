@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "Tinhte.DbMigrator": {
+      "commandName": "Project",
+      "commandLineArgs": "up",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

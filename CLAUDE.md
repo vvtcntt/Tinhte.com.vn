@@ -20,6 +20,16 @@
 - Route tường minh theo đường dẫn hợp đồng: `[Route(ApiRoutes.Prefix + "/...")]`. Controller mỏng gọi service; response là DTO `record` có kiểu.
 - Lỗi nghiệp vụ dùng `Problem(code, title, detail)` với mã trong `x-error-catalog`. Không đặt `[Produces("application/json")]` ở base. Attribute validation của record đặt trên tham số.
 
+## 2b. DB và hợp đồng dùng chung (ADR-0003)
+
+- Truy cập DB qua `ITinhteDatabase`; ghi dùng `InTransactionAsync(actorId, …)` (đặt `tt.actor_id`).
+- Service ném `DomainProblemException(code, …)`. Lỗi trigger/CHECK được tự đổi thành Problem: **không** tự bắt `PostgresException` rồi trả 500.
+- Danh sách: `[FromQuery] PageRequest` → `CursorPage<T>`, scope cursor lấy từ `CursorScope("tên-danh-sách", bộ-lọc)`.
+- Sửa có `If-Match`: nạp tài nguyên (404 trước) → `RequireIfMatch()` → UPDATE `WHERE row_version = @expected` → `SetETag(...)`.
+- POST mà hợp đồng yêu cầu `IdempotencyKey`: gắn `[Idempotent]`.
+- Migration áp bằng `Tinhte.DbMigrator` (bước deploy riêng, không chạy lúc API khởi động). **Không sửa migration đã áp** (checksum lệch sẽ chặn), viết migration mới. Stub schema 04 chỉ dùng ở Development.
+- Test cần DB dùng `[DbFact]` và biến `TT_TEST_PG`. Máy không có Docker: `tools/pglite-server` với `Pooling=false`.
+
 ## 3. Hợp đồng, phạm vi, pháp lý
 
 - **Tài liệu gốc** ở `doc/` (gói 07 v0.2): **không sửa**. Đề xuất v0.3 (OpenAPI, migration, truy vết) ở `doc/07_AI_REVIEW/v0.3/` là DRAFT chờ TL/PO/Legal duyệt.
@@ -41,7 +51,7 @@
 ```bash
 node tools/sites/validate.mjs && node tools/check-hardcoded-hosts.mjs && node tools/sites/generate-caddyfile.mjs --check
 node --test "frontend/packages/sites/test/*.test.ts"
-dotnet test backend/Tinhte.slnx
+dotnet test backend/Tinhte.slnx      # đặt TT_TEST_PG để chạy cả test DB
 cd frontend && npm test && npm run build && npm run typecheck
 ```
 

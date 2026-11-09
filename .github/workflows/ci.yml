@@ -23,15 +23,43 @@ jobs:
       - run: node --test "frontend/packages/sites/test/*.test.ts"
 
   backend:
-    name: Backend (.NET 10)
+    name: Backend (.NET 10 + PostgreSQL)
     runs-on: ubuntu-latest
+    services:
+      # PostgreSQL thật cho test DB (WBS-013): migration runner, trigger → Problem, idempotency.
+      # Mật khẩu chỉ dùng trong container CI tạm thời, không phải bí mật.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: tinhte_test
+          POSTGRES_USER: tinhte
+          POSTGRES_PASSWORD: ci-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tinhte -d tinhte_test"
+          --health-interval 5s
+          --health-retries 10
+    env:
+      TT_TEST_PG: Host=127.0.0.1;Port=5432;Username=tinhte;Password=ci-only;Database=tinhte_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4   # MigrationTests so khớp SQL đồng bộ tt.sites với tools/sites/generate-db-sync.mjs
+        with:
+          node-version: 24
       - run: dotnet build backend/Tinhte.slnx -nologo
       - run: dotnet test backend/Tinhte.slnx --no-build -nologo
+      - name: DbMigrator smoke (up twice + status)
+        env:
+          DOTNET_ENVIRONMENT: Development
+          ConnectionStrings__Tinhte: ${{ env.TT_TEST_PG }}
+        run: |
+          dotnet backend/src/Tinhte.DbMigrator/bin/Debug/net10.0/Tinhte.DbMigrator.dll up
+          dotnet backend/src/Tinhte.DbMigrator/bin/Debug/net10.0/Tinhte.DbMigrator.dll up
+          dotnet backend/src/Tinhte.DbMigrator/bin/Debug/net10.0/Tinhte.DbMigrator.dll status
 
   frontend:
     name: Frontend (Next.js)
