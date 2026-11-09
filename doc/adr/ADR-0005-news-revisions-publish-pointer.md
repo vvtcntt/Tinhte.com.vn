@@ -43,7 +43,7 @@ related: ADR-0001 (D8), ADR-0003, WBS-022, WBS-023, WBS-024, WBS-025, FR-NEWS-00
 
 | Việc | WBS |
 |---|---|
-| Gửi duyệt / duyệt / từ chối / yêu cầu sửa, SoD (người duyệt ≠ tác giả), đặt `APPROVED` | WBS-024 |
+| ~~Gửi duyệt / duyệt / từ chối / yêu cầu sửa, SoD~~ — đã làm (migration 0324, `ArticleService.Workflow`); còn hàng đợi duyệt | WBS-024 ✔, WBS-031 |
 | Nguồn/giấy phép, đặt `rights_status = CLEARED`; PATCH `sourceId`/`licenseId` hiện trả 422 | WBS-023 |
 | Lên lịch, preview token | WBS-025 |
 | Sự kiện `ContentPublished` qua outbox trong transaction publish; audit chung | WBS-020, WBS-019 |

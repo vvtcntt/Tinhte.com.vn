@@ -81,13 +81,14 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 - CMS (site `cms`): `GET/POST /admin/articles`, `GET/PATCH /admin/articles/{id}` (If-Match), `GET /admin/articles/{id}/revisions[/{revisionId}?compareTo=]`, `POST /admin/articles/{id}/publish` (`content.publish` + MFA, Idempotency-Key).
 - Công khai (site `public-web`): `GET /articles/{slug}` — chỉ public revision; slug cũ → 308; đã gỡ/hết quyền → 410.
 - Revision rời `DRAFT` hoặc đang public bị DB đóng băng (migration 0320): sửa bài đang public tạo revision mới, bản công khai giữ nguyên tới lần publish sau.
-- Chưa có: duyệt (WBS-024 — publish cần revision `APPROVED`), rights/nguồn (WBS-023 — publish cần quyền `CLEARED`), lịch/preview (WBS-025), outbox (WBS-020). Bài tài trợ chỉ hiển thị khi cờ `ads.sponsored_publication` ON **và** đã cấu hình `News:SponsoredLabel` (câu chữ Legal duyệt).
+- Duyệt (WBS-024): `POST /admin/articles/{id}/submit|approve|request-changes|reject` — tách nhiệm vụ (người viết/sửa revision không tự duyệt hay xuất bản: 403 `SOD_VIOLATION`), trả bài/từ chối bắt buộc lý do (422 `REASON_REQUIRED`), người gửi duyệt thành người phụ trách tiếp theo; migration 0324/0325 chặn ở DB bước chuyển sai và sửa hồ sơ duyệt. CMS: nút Gửi duyệt / Duyệt / Yêu cầu sửa / Từ chối, banner lý do cho tác giả.
+- Chưa có: rights/nguồn (WBS-023 — publish cần quyền `CLEARED`), lịch/preview (WBS-025), outbox (WBS-020). Bài tài trợ chỉ hiển thị khi cờ `ads.sponsored_publication` ON **và** đã cấu hình `News:SponsoredLabel` (câu chữ Legal duyệt).
 
 **Màn Bài viết trên CMS** (WBS-030, phần danh sách của WBS-031): `/articles` có danh sách (lọc trạng thái, "bài của tôi", tìm, xem thêm) và nút "Bài mới"; `/articles/{id}` gồm:
 - trình soạn tạm: đoạn cách bằng dòng trống, `##` / `###` là tiêu đề, `>` là trích dẫn, có nút xem trước;
 - lưu bằng If-Match; khi người khác vừa lưu thì báo xung đột kèm nút tải lại;
 - lịch sử phiên bản, so sánh với phiên bản trước;
-- nút xuất bản (`content.publish` + MFA). API sẽ từ chối cho tới khi có bước duyệt (WBS-024) và quyền nguồn (WBS-023).
+- nút xuất bản (`content.publish` + MFA). Chỉ bật khi bài đã được duyệt; quyền nguồn (WBS-023) chưa có nên trên máy dev phải đặt `rights_status = CLEARED` bằng SQL.
 
 Form chọn chuyên mục dùng `GET /admin/categories` (chỉ đọc; tạo/sửa chuyên mục thuộc WBS-023/032). Trên máy dev, thêm chuyên mục bằng SQL trong pgAdmin (DB `tinhte`):
 
@@ -134,3 +135,4 @@ INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('d
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |
 | 030 | CMS editor bài viết | Có (tạm): danh sách, tạo nháp, soạn/sửa với If-Match + xung đột, xem trước, lịch sử + so sánh, nút xuất bản; `GET /admin/categories`. Chưa: editor rich-text theo UX-CMS-02 (ảnh/nhúng), autosave/offline |
 | 022 | Content type, article revision, publish pointer | Có (API, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md)): tạo/sửa/đọc/danh sách bài CMS, lịch sử + diff revision, publish pointer, đọc công khai theo slug + redirect 308; migration 0320/0321. `dotnet test` sau khi gộp với WBS-115: 194/194 PASS với DB (PGlite), 151 PASS + 43 SKIP không DB. Chưa: duyệt (024), rights (023), lịch (025), outbox (020), UI CMS (030) |
+| 024 | Draft/review/approve/reject state machine | Có (API + nút CMS): gửi duyệt, duyệt (MFA), yêu cầu sửa, từ chối; SoD cả khi xuất bản; lý do bắt buộc; migration 0324/0325. `dotnet test` 203/203 với DB; đã chạy trên trình duyệt với 2 người dùng (tác giả gửi → người duyệt trả bài kèm lý do → tác giả thấy lý do). Chưa: hàng đợi duyệt `GET /admin/work-queue` (WBS-031), thông báo cho người phụ trách |

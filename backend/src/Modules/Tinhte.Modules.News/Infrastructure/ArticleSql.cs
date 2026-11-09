@@ -27,7 +27,8 @@ internal static class ArticleSql
         SELECT r.id, r.article_id, r.number, r.author_id, r.status, r.created_at, r.body::text, r.title, r.content_kind,
                r.sponsor_name, r.sponsor_reference, r.sponsorship_evidence_ref, r.sponsorship_valid_from, r.sponsorship_valid_to,
                r.sponsorship_approved_by, r.sponsorship_approved_at,
-               r.change_reason, r.summary, r.category_id, r.updated_at, r.published_at, r.published_by
+               r.change_reason, r.summary, r.category_id, r.updated_at, r.published_at, r.published_by,
+               r.submitted_by, r.submitted_at, r.reviewed_by, r.reviewed_at, r.review_note
           FROM tt.article_revisions r
         """;
 
@@ -68,7 +69,12 @@ internal static class ArticleSql
         CategoryId: NullableGuid(r, 18),
         UpdatedAt: Time(r, 19),
         PublishedAt: NullableTime(r, 20),
-        PublishedBy: NullableGuid(r, 21));
+        PublishedBy: NullableGuid(r, 21),
+        SubmittedBy: NullableGuid(r, 22),
+        SubmittedAt: NullableTime(r, 23),
+        ReviewedBy: NullableGuid(r, 24),
+        ReviewedAt: NullableTime(r, 25),
+        ReviewNote: r.IsDBNull(26) ? null : r.GetString(26));
 
     /// <summary>body NULL (dữ liệu cũ) đọc thành mảng rỗng.</summary>
     public static JsonElement ParseBody(string? json)

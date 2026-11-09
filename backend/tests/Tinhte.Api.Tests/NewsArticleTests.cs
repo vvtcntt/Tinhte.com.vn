@@ -100,7 +100,7 @@ public sealed class NewsArticleUnitTests(WebApplicationFactory<Program> factory)
     public void Diff_lists_changed_fields_and_blocks()
     {
         static ArticleRevision Rev(string title, string body) => new(Guid.NewGuid(), Guid.NewGuid(), 1, null, "DRAFT", DateTimeOffset.UnixEpoch,
-            JsonDocument.Parse(body).RootElement, title, ContentKinds.Editorial, null, null, null, null, DateTimeOffset.UnixEpoch, null, null);
+            JsonDocument.Parse(body).RootElement, title, ContentKinds.Editorial, null, null, null, null, DateTimeOffset.UnixEpoch, null, null, null, null, null, null, null);
         var a = Rev("A", """[{"t":"p","x":1},{"t":"p","x":2}]""");
         var b = Rev("B", """[{"x":1,"t":"p"},{"t":"p","x":3},{"t":"img"}]""");
         var diff = RevisionDiffer.Compare(a, b);

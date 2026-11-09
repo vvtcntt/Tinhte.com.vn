@@ -32,6 +32,11 @@ export interface ArticleRevision {
   categoryId: string | null;
   updatedAt: string;
   publishedAt: string | null;
+  submittedBy?: string | null;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
   diff?: { compareTo: string; changes: { path: string; before: unknown; after: unknown }[] };
 }
 
@@ -113,6 +118,33 @@ export function blocksToText(blocks: readonly Block[]): { text: string; supporte
     })
     .join('\n\n');
   return { text, supported: true };
+}
+
+/** ActionReason.reason của hợp đồng: 5–2000 ký tự (API trả 422 REASON_REQUIRED nếu thiếu). */
+export const REASON_MIN = 5;
+export const REASON_MAX = 2000;
+
+export function reasonError(reason: string): string | null {
+  const text = reason.trim();
+  if (text.length < REASON_MIN) return `Nhập lý do (ít nhất ${REASON_MIN} ký tự) để tác giả biết cần sửa gì.`;
+  if (text.length > REASON_MAX) return `Lý do tối đa ${REASON_MAX} ký tự.`;
+  return null;
+}
+
+/** Revision đang chờ duyệt: bài IN_REVIEW và working revision IN_REVIEW (khớp RequirePendingReview ở backend). */
+export function isPendingReview(
+  article: Pick<AdminArticle, 'status' | 'workingRevisionId'>,
+  revision: Pick<ArticleRevision, 'revisionId' | 'status'> | null,
+): boolean {
+  return article.status === 'IN_REVIEW' && !!revision && revision.status === 'IN_REVIEW' && revision.revisionId === article.workingRevisionId;
+}
+
+/** Gửi duyệt được: working revision còn DRAFT, chưa public, bài ở trạng thái sửa được (khớp SubmitAsync). */
+export function canSubmit(
+  article: Pick<AdminArticle, 'status' | 'publicRevisionId'>,
+  revision: Pick<ArticleRevision, 'revisionId' | 'status'> | null,
+): boolean {
+  return !!revision && revision.status === 'DRAFT' && revision.revisionId !== article.publicRevisionId && EDITABLE_STATUSES.has(article.status);
 }
 
 export function formatTime(value: string | null | undefined): string {

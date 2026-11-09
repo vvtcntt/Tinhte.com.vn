@@ -35,6 +35,9 @@ public static class ArticleStatuses
 public static class RevisionStatuses
 {
     public const string Draft = "DRAFT";
+    public const string InReview = "IN_REVIEW";
+    public const string ChangesRequested = "CHANGES_REQUESTED";
+    public const string Rejected = "REJECTED";
     public const string Approved = "APPROVED";
     public const string Published = "PUBLISHED";
     public const string Superseded = "SUPERSEDED";

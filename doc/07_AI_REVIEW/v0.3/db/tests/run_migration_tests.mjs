@@ -237,13 +237,22 @@ async function behaviour(sc, db) {
     DO $$ BEGIN IF (SELECT updated_at < now() - interval '1 hour' FROM tt.article_revisions WHERE id = '${id('f5')}') THEN RAISE EXCEPTION 'touch'; END IF; END $$;`);
   await expectError(sc, db, 'N2 revision đã gửi duyệt không sửa được nội dung → STATE_CONFLICT', `${REV('f5', `status = 'IN_REVIEW'`)} ${REV('f5', `title = 'Lén sửa'`)}`, /STATE_CONFLICT.*immutable/);
   await expectError(sc, db, 'N3 public revision không sửa được nội dung (kể cả status DRAFT) → STATE_CONFLICT', `${PUB('f1')} ${REV('f1', `summary = 'đổi sapo'`)}`, /STATE_CONFLICT.*public and immutable/);
-  await expectOk(sc, db, 'N4 revision đã đóng băng vẫn đổi được trạng thái + thông tin xuất bản', `${REV('f5', `status = 'APPROVED'`)} ${REV('f5', `status = 'PUBLISHED', published_at = now(), published_by = '${U1}'`)}`);
-  await expectError(sc, db, 'N5 revision đã rời DRAFT không quay lại DRAFT', `${REV('f5', `status = 'REJECTED'`)} ${REV('f5', `status = 'DRAFT'`)}`, /STATE_CONFLICT.*cannot return to DRAFT/);
+  await expectOk(sc, db, 'N4 revision đã đóng băng vẫn đổi được trạng thái + thông tin xuất bản', `${REV('f5', `status = 'IN_REVIEW'`)} ${REV('f5', `status = 'APPROVED'`)} ${REV('f5', `status = 'PUBLISHED', published_at = now(), published_by = '${U1}'`)}`);
+  await expectError(sc, db, 'N5 revision đã rời DRAFT không quay lại DRAFT', `${REV('f5', `status = 'IN_REVIEW'`)} ${REV('f5', `status = 'REJECTED', review_note = 'Thiếu nguồn'`)} ${REV('f5', `status = 'DRAFT'`)}`, /STATE_CONFLICT.*cannot return to DRAFT/);
   await expectError(sc, db, 'N6 revision không xóa được (lịch sử sửa bài)', `DELETE FROM tt.article_revisions WHERE id = '${id('f5')}'`, /APPEND_ONLY/);
-  await expectError(sc, db, 'N7 status revision ngoài vòng đời bị chặn', REV('f5', `status = 'LIVE'`), /ck_article_revisions_status/);
+  await expectError(sc, db, 'N7 status revision ngoài vòng đời bị chặn (CHECK khi INSERT; UPDATE còn bị trigger 0324 chặn trước)', `INSERT INTO tt.article_revisions (article_id, number, title, status) VALUES ('${id('b2')}', 9, 'x', 'LIVE')`, /ck_article_revisions_status/);
   await expectError(sc, db, 'N8 slug sai định dạng bị chặn', `UPDATE tt.articles SET slug = 'Bai Mot' WHERE id = '${id('b2')}'`, /ck_articles_slug_format/);
   await expectError(sc, db, 'N9 body revision phải là mảng block', REV('f5', `body = '{"type":"p"}'`), /ck_article_revisions_body_array/);
   await expectError(sc, db, 'N10 published_by thiếu published_at bị chặn', REV('f5', `published_by = '${U1}'`), /ck_article_revisions_published_pair/);
+
+  // Quy trình duyệt (0324/0325, WBS-024, FR-CMS-002/010)
+  const REVIEW = `${REV('f5', `status = 'IN_REVIEW', submitted_by = '${U2}', submitted_at = now()`)}`;
+  await expectError(sc, db, 'W1 không nhảy cóc DRAFT → APPROVED (phải qua IN_REVIEW)', REV('f5', `status = 'APPROVED'`), /STATE_CONFLICT.*from DRAFT to APPROVED/);
+  await expectError(sc, db, 'W2 yêu cầu sửa không có lý do → REASON_REQUIRED', `${REVIEW} ${REV('f5', `status = 'CHANGES_REQUESTED', review_note = ' ok '`)}`, /REASON_REQUIRED/);
+  await expectOk(sc, db, 'W3 gửi duyệt → yêu cầu sửa có lý do; ghi người duyệt', `${REVIEW} ${REV('f5', `status = 'CHANGES_REQUESTED', reviewed_by = '${U1}', reviewed_at = now(), review_note = 'Thiếu nguồn ảnh'`)}`);
+  await expectError(sc, db, 'W4 lý do duyệt đã ghi không sửa được', `${REVIEW} ${REV('f5', `status = 'REJECTED', reviewed_by = '${U1}', reviewed_at = now(), review_note = 'Sai sự thật'`)} ${REV('f5', `review_note = 'Sửa lại lý do'`)}`, /STATE_CONFLICT.*immutable/);
+  await expectError(sc, db, 'W5 bị từ chối thì không duyệt lại được (sửa → revision mới)', `${REVIEW} ${REV('f5', `status = 'REJECTED', review_note = 'Sai sự thật'`)} ${REV('f5', `status = 'APPROVED'`)}`, /STATE_CONFLICT.*from REJECTED to APPROVED/);
+  await expectError(sc, db, 'W6 người gửi chỉ có cả hai cột hoặc không', REV('f5', `submitted_by = '${U2}'`), /ck_article_revisions_submitted_pair/);
 
   // Site Registry trong DB (0312, ADR-0001 D8) — SQL đồng bộ sinh từ config/sites/sites.json
   const SYNC = generateDbSync(siteRegistry);

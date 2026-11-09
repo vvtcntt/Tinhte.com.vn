@@ -23,7 +23,7 @@ namespace Tinhte.Modules.News.Application;
 ///   <item>Mọi lệnh ghi khóa dòng bài (<c>FOR UPDATE</c>) rồi UPDATE <c>WHERE row_version = @expected</c> (ADR-0003 §5).</item>
 /// </list>
 /// </summary>
-public sealed class ArticleService(ITinhteDatabase database)
+public sealed partial class ArticleService(ITinhteDatabase database)
 {
     // ---------------------------------------------------------------- đọc
 
@@ -235,6 +235,7 @@ public sealed class ArticleService(ITinhteDatabase database)
             ETags.EnsureMatches(article.RowVersion, expectedRowVersion);
             var revision = await LoadRevisionAsync(connection, tx, articleId, revisionId, ct)
                 ?? throw Invalid("revisionId", "The revision does not belong to this article.");
+            await RequireSeparationOfDutiesAsync(connection, tx, revisionId, actorId, "publish", ct);
 
             if (article.Status == ArticleStatuses.Retracted)
             {

@@ -162,6 +162,7 @@ a { color: inherit; }
 .check input { margin-top: 4px; }
 .button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--surface); }
 .button:disabled { opacity: 0.5; cursor: not-allowed; }
+.field-error { color: var(--error-text); font-size: 13px; }
 .banner.ok { background: var(--ok-bg); color: var(--ok-text); }
 /* Màn Bài viết */
 .title-row.spread { justify-content: space-between; align-items: flex-start; }
@@ -192,7 +193,7 @@ a.button { text-decoration: none; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (max-width: 760px) {
-  .shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "side" "main"; }
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; grid-template-areas: "top" "side" "main"; }
   .topbar { padding: 10px 16px; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 16px; overflow-x: auto; }
   .sidebar ul { display: flex; gap: 4px; }
