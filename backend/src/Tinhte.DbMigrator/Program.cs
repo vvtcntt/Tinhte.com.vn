@@ -10,6 +10,7 @@ using Tinhte.Platform.Sites;
 // Áp migration SQL + đồng bộ tt.sites (WBS-013). Chạy như một bước deploy riêng, KHÔNG chạy lúc API khởi động.
 //   dotnet run --project backend/src/Tinhte.DbMigrator -- up       (mặc định)
 //   dotnet run --project backend/src/Tinhte.DbMigrator -- status
+//   dotnet run --project backend/src/Tinhte.DbMigrator -- grant-role --issuer <iss> --subject <sub> --role ADMIN --reason "..." [--name "..."]
 // Cấu hình: ConnectionStrings__Tinhte (biến môi trường / secret), Database:Migrations:Directory, Sites:RegistryPath.
 // Content root = thư mục chứa bản build để luôn đọc appsettings*.json của migrator, dù chạy từ thư mục nào.
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = args, ContentRootPath = AppContext.BaseDirectory });
@@ -41,8 +42,13 @@ try
             Console.WriteLine($"synced tt.sites ({registry.Document.Sites.Count} site(s))");
             break;
 
+        case "grant-role":
+            var c = builder.Configuration;
+            Console.WriteLine(await StaffBootstrap.GrantRoleAsync(dataSource, c["issuer"], c["subject"], c["role"], c["reason"], c["name"]));
+            break;
+
         default:
-            Console.Error.WriteLine($"unknown command '{command}' (use: up | status)");
+            Console.Error.WriteLine($"unknown command '{command}' (use: up | status | grant-role)");
             return 2;
     }
 

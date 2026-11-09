@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -13,6 +14,7 @@ using Tinhte.Platform.Flags;
 using Tinhte.Platform.Http;
 using Tinhte.Platform.Modules;
 using Tinhte.Platform.Mvc;
+using Tinhte.Platform.Security;
 using Tinhte.Platform.Sites;
 
 namespace Tinhte.Platform;
@@ -40,6 +42,12 @@ public static class PlatformExtensions
 
         // WBS-014: hợp đồng chung — cursor ký HMAC, lỗi nghiệp vụ/DB → Problem.
         services.AddSingleton<ICursorCodec, HmacCursorCodec>();
+
+        // WBS-017/018: khung xác thực + RBAC. Scheme phiên (staff/member) do module Identity đăng ký.
+        services.AddAuthentication();
+        services.AddAuthorization();
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemAuthorizationResultHandler>();
 
         services.Configure<ForwardedHeadersOptions>(options =>
         {
@@ -69,7 +77,7 @@ public static class PlatformExtensions
         return mvc;
     }
 
-    /// <summary>Pipeline: lỗi chưa xử lý → forwarded headers → phân giải site → chặn Origin → header bảo mật.</summary>
+    /// <summary>Pipeline: lỗi chưa xử lý → forwarded headers → phân giải site → chặn Origin → header bảo mật → xác thực → CSRF → phân quyền.</summary>
     public static WebApplication UseTinhtePlatform(this WebApplication app)
     {
         // Cấu hình bắt buộc (khóa ký cursor ngoài Development…) phải lỗi ngay lúc khởi động, không đợi request đầu tiên.
@@ -85,6 +93,11 @@ public static class PlatformExtensions
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             await next(context);
         });
+
+        // Xác thực phiên → CSRF lớp 2 (X-CSRF-Token) → phân quyền. Thứ tự lỗi catalog: 401 → 403 CSRF_INVALID → 403 FORBIDDEN.
+        app.UseAuthentication();
+        app.UseMiddleware<CsrfMiddleware>();
+        app.UseAuthorization();
         return app;
     }
 

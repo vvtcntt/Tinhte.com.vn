@@ -50,6 +50,18 @@ TT_TEST_PG="$ConnectionStrings__Tinhte" dotnet test backend/Tinhte.slnx   # gồ
 `Pooling=false` chỉ cần với PGlite. Stub schema 04 chỉ áp ở Development; staging/production dùng schema 04 thật của DBA.
 Ngoài Development, API cần `Pagination:CursorSigningKey` (base64 ≥ 32 byte, từ secret manager) — thiếu thì không khởi động.
 
+### Đăng nhập staff + RBAC (WBS-017/018, [ADR-0004](doc/adr/ADR-0004-staff-auth-session-rbac.md))
+
+CMS đăng nhập qua OIDC với IdP bất kỳ (chưa chọn IdP). Cấu hình `Auth:Staff:Authority`, `Auth:Staff:ClientId`, `Auth__Staff__ClientSecret` (secret); ngoài Development thiếu thì API không khởi động. Redirect URI cần đăng ký ở IdP: `https://{host cms}/api/v1/auth/staff/oidc/callback`.
+
+Vai trò lưu trong DB, không lấy từ IdP. Cấp ADMIN đầu tiên:
+
+```bash
+dotnet run --project backend/src/Tinhte.DbMigrator -- grant-role --issuer https://idp.example --subject <sub-của-người-đó> --role ADMIN --reason "bootstrap"
+```
+
+CMS gọi API admin bằng cookie `__Host-tt_cms_session`; request ghi gửi kèm header `X-CSRF-Token` lấy từ cookie `__Host-tt_cms_csrf`.
+
 Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa file hosts. Khi chạy Next trực tiếp, `/api/v1/*` được rewrite sang API (`TT_API_ORIGIN`). Qua edge (Caddy hoặc CDN) thì edge route `/api/*`.
 
 ## Đa subdomain (tóm tắt ADR-0001)
@@ -63,7 +75,7 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Hạng mục | Kết quả |
 |---|---|
 | `@tinhte/sites` (node:test) | 11/11 PASS, gồm test "thêm subdomain chỉ bằng registry" và bộ ca dùng chung với C# |
-| Backend `dotnet test` | 97/97 PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem. Không có DB: 84 PASS + 13 SKIP. Build 0 cảnh báo |
+| Backend `dotnet test` | 152/152 PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem, RBAC + CSRF, đăng nhập OIDC đầu-cuối với IdP giả. Không có DB: 128 PASS + 24 SKIP. Build 0 cảnh báo |
 | Next.js `web`, `cms` | `next build` OK; chạy production và kiểm HTTP theo Host: 200/308/400/404, header bảo mật, robots/sitemap theo môi trường |
 | Script registry | validate, plan, db-sync, Caddyfile `--check`, chặn hostname viết cứng: OK |
 | Contract tĩnh v0.3 | 34/34 PASS |
@@ -83,5 +95,6 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 014 | API conventions | Có: problem+json, error catalog, lỗi DB → Problem, cursor HMAC, ETag/If-Match, Idempotency-Key, phân giải site, chặn Origin |
 | 015 | Khung Next.js SSR | Có (web + cms, đa site) |
 | 016 | Design system | Chưa (chờ UX 03) |
-| 017–019 | Staff auth, RBAC, audit | Chưa (chờ chọn IdP); audit DB có trong migration |
+| 017–018 | Staff auth, RBAC | Có: OIDC (IdP bất kỳ) + PKCE, phiên phía server thu hồi được, MFA theo amr/acr, CSRF double-submit, ma trận quyền (DRAFT chờ BA/PO); migration 0313. Chưa: IdP thật, UI đăng nhập CMS |
+| 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |

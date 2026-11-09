@@ -30,6 +30,13 @@
 - Migration áp bằng `Tinhte.DbMigrator` (bước deploy riêng, không chạy lúc API khởi động). **Không sửa migration đã áp** (checksum lệch sẽ chặn), viết migration mới. Stub schema 04 chỉ dùng ở Development.
 - Test cần DB dùng `[DbFact]` và biến `TT_TEST_PG`. Máy không có Docker: `tools/pglite-server` với `Pooling=false`.
 
+## 2c. Xác thực staff + RBAC (ADR-0004)
+
+- Endpoint admin: `[RequirePermission(Permissions.X)]`. Chỉ cần đăng nhập: `[RequireStaffSession]`. Quyết định phụ thuộc dữ liệu: `User.RequirePermission(...)` trong service. **Kiểm quyền, không kiểm tên vai trò.**
+- Vai trò/quyền mới: sửa `StaffRoles`/`Permissions`/`PermissionMatrix` **và** CHECK `ck_user_roles_role` bằng migration mới. Ma trận là DRAFT: đổi phải có BA/PO duyệt.
+- Không tin vai trò từ IdP; không dùng cookie auth/JWT cho CMS; không đặt cookie có `Domain`.
+- Request ghi bằng cookie phiên phải có `X-CSRF-Token` (do `CsrfMiddleware` kiểm) — đừng tắt cho endpoint riêng.
+
 ## 3. Hợp đồng, phạm vi, pháp lý
 
 - **Tài liệu gốc** ở `doc/` (gói 07 v0.2): **không sửa**. Đề xuất v0.3 (OpenAPI, migration, truy vết) ở `doc/07_AI_REVIEW/v0.3/` là DRAFT chờ TL/PO/Legal duyệt.

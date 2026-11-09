@@ -16,7 +16,7 @@ created_at: 2026-11-09
 | Hạng mục | Kết quả |
 |---|---|
 | Chạy thật trên PostgreSQL | **Có**, PostgreSQL 18.6 qua PGlite 0.5.10 (WASM), dùng stub schema 04 |
-| Test tự động | **151/151 PASS** (`tests/migration_test_run_2026-11-09.txt`), gồm 0312 site registry |
+| Test tự động | **157/157 PASS** (chạy lại 09/11/2026 sau khi thêm 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
 | Kịch bản A: DB sạch | up → up lần 2 không đổi schema → 50+ test hành vi → down toàn bộ → schema **trùng khớp baseline** → up lại |
 | Kịch bản B: DB đã áp SQL v0.2 | SQL v0.2 chạy được (lần đầu được thử) → up → 0310 **dừng đúng** vì dữ liệu cũ → backfill → 0310 → down → schema và khóa cờ **trở về đúng v0.2** |
 | Kịch bản C: thiếu bảng tiên quyết | migration dừng, kèm thông báo rõ bảng còn thiếu |
@@ -41,6 +41,7 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | 0308 | `slug_redirects_idempotency` | `article_slug_redirects` tự sinh khi đổi slug và chặn bài khác chiếm slug cũ; `idempotency_keys` (24h) | FR-NEWS-002, AIR-023 |
 | 0309 | `lookup_row_versions` | `row_version` + trigger cho `categories/topics/users` | AIR-004 |
 | 0310 | `validate_constraints` | `VALIDATE CONSTRAINT` mọi CHECK NOT VALID. **Chạy riêng sau backfill** | AIR-024 |
+| 0313 | `staff_access` | `user_identities` (issuer, subject → user), `user_roles` (CHECK 5 vai trò DRAFT), `user_role_history` chỉ thêm (trigger ghi GRANT/REVOKE, thu hồi bắt buộc `tt.reason` → `REASON_REQUIRED`), `staff_sessions` (sha256 token, csrf_hash, MFA, hạn tuyệt đối, thu hồi). Down từ chối nếu đã có lịch sử vai trò | ADR-0004, FR-ID-002/004/006/007 |
 | 0312 | `site_registry` | `tt.sites` (đồng bộ từ `config/sites/sites.json` bằng `tools/sites/generate-db-sync.mjs`, không xóa, chỉ retired); `articles/videos.primary_site_key`, `categories.site_key` mặc định `www`; nội dung chỉ thuộc site public-web | ADR-0001 D8 |
 | 0311 | `optional/privacy_requests.LEGAL_PENDING` | Lưu yêu cầu dữ liệu cá nhân không cần tài khoản (email mã hóa ở tầng ứng dụng). **Chỉ chạy khi Legal chọn kênh API** | AIR-017 |
 
@@ -59,6 +60,7 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | A-07 | `tt.comments(...)`: không có thì guard bị bỏ qua kèm NOTICE | 0307 |
 | A-08 | `tt.moderation_cases(id uuid, entity_type, status)` | 0304 |
 | A-09 | `tt.categories`, `tt.topics`: không có thì bỏ qua | 0309 |
+| A-10 | `tt.users(id, display_name, status)`; status `ACTIVE` = được đăng nhập. Nếu schema 04 đã có bảng vai trò/phiên → sửa 0313 dùng bảng sẵn có | 0313 |
 
 Nếu schema 04 dùng **tên cột khác nhưng cùng nghĩa** (ví dụ `rights_state` thay cho `rights_status`), sửa migration để dùng cột có sẵn; đừng để tồn tại hai cột song song.
 
@@ -114,7 +116,7 @@ PGlite được ghim ở `0.5.10` (phát hành ngày 14/10/2026). Thư mục `no
 
 ## 9. Việc còn mở
 
-- DBA đối chiếu A-01…A-09 với schema 04 thật, rồi chạy lại test trên PostgreSQL bản production (Docker/CI).
+- DBA đối chiếu A-01…A-10 với schema 04 thật, rồi chạy lại test trên PostgreSQL bản production (Docker/CI).
 - Test đồng thời nhiều kết nối: tắt cờ trong lúc đang ghi bình luận/publish (cần PostgreSQL thật; PGlite không hỗ trợ).
 - Đo thời gian `ALTER TABLE ... ADD COLUMN ... DEFAULT` và `VALIDATE` trên dữ liệu cỡ production.
 - Guard cho like/report bình luận (bảng chưa rõ trong schema 04); khóa ngoại `license_id` khi có bảng giấy phép.
