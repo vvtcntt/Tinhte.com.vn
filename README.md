@@ -1,7 +1,7 @@
 # Tinhte.com.vn
 
 Nền tảng tin tức công nghệ: News, Shorts video, CMS biên tập, SEO; cộng đồng (P0*) và quảng cáo tài trợ (P0-ADS) nằm sau release gate.
-Stack: **ASP.NET Core 10** (modular monolith) · **Next.js 16** · **PostgreSQL**.
+Stack: **ASP.NET Core 10 Web API dạng Controller** (modular monolith, [ADR-0002](doc/adr/ADR-0002-aspnetcore-controller-web-api.md)) · **Next.js 16** · **PostgreSQL**.
 
 > **Trạng thái:** khung Sprint 0, DRAFT. Kiến trúc **đa subdomain** theo [ADR-0001](doc/adr/ADR-0001-multi-subdomain-site-registry.md). Quy tắc làm việc: [CLAUDE.md](CLAUDE.md).
 
@@ -9,7 +9,7 @@ Stack: **ASP.NET Core 10** (modular monolith) · **Next.js 16** · **PostgreSQL*
 
 ```
 config/sites/        Site Registry — nguồn sự thật cho mọi subdomain (+ schema, ca kiểm thử phân giải dùng chung)
-backend/             ASP.NET Core 10: Tinhte.Api (host), Tinhte.Platform (site, lỗi, cờ, module), Modules/* (News, Video, Community, Ads, Identity)
+backend/             ASP.NET Core 10 Web API (Controllers): Tinhte.Api (host + Controllers/), Tinhte.Platform (site, lỗi, cờ, base controller), Modules/* (News, Video, Community, Ads, Identity — mỗi module có Controllers/)
 frontend/            npm workspaces: apps/web (site công khai, đa subdomain), apps/cms (CMS), packages/sites (@tinhte/sites)
 tools/               Script sinh từ registry: validate, plan (DNS/TLS/edge), db-sync, Caddyfile; chặn hostname viết cứng
 infra/local/         Caddyfile sinh tự động (edge local)
@@ -43,7 +43,7 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Hạng mục | Kết quả |
 |---|---|
 | `@tinhte/sites` (node:test) | 11/11 PASS, gồm test "thêm subdomain chỉ bằng registry" và bộ ca dùng chung với C# |
-| Backend `dotnet test` | 30/30 PASS (registry, định tuyến theo host, chặn Origin, khớp spec, ranh giới module); build 0 cảnh báo (warnings-as-errors) |
+| Backend `dotnet test` | 38/38 PASS (registry, định tuyến theo host, chặn Origin, khớp spec, ranh giới module, quy ước controller, 400/422/409/500 theo Problem, OpenAPI dev); build 0 cảnh báo (warnings-as-errors) |
 | Next.js `web`, `cms` | `next build` OK; chạy production và kiểm HTTP theo Host: 200/308/400/404, header bảo mật, robots/sitemap theo môi trường |
 | Script registry | validate, plan, db-sync, Caddyfile `--check`, chặn hostname viết cứng: OK |
 | Contract tĩnh v0.3 | 34/34 PASS |
@@ -57,7 +57,7 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 009 | Repo, cấu trúc, quy ước | Có khung (chưa `git init`/branch protection: chờ quyết định repo) |
 | 010 | IaC | Kế hoạch DNS/TLS/edge sinh từ registry; Terraform/CDN thật: TBD vendor |
 | 011 | CI/CD | Workflow CI (chưa chạy trên GitHub); CD: TBD |
-| 012 | Khung ASP.NET Core modular | Có |
+| 012 | Khung ASP.NET Core Web API (Controller) modular | Có |
 | 013 | DB schema/migration | Draft v0.3 + 0312 tại `doc/07_AI_REVIEW/v0.3/db` (chờ DBA, chưa có migrator chạy trong app) |
 | 014 | API conventions | Một phần: problem+json, error catalog, phân giải site, chặn Origin |
 | 015 | Khung Next.js SSR | Có (web + cms, đa site) |

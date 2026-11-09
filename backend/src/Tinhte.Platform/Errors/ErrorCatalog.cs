@@ -78,18 +78,19 @@ public static class Problems
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
+    /// <summary>Dùng trong middleware (trước MVC). Controller dùng TinhteControllerBase.Problem — cùng schema TinhteProblem.</summary>
     public static Task WriteAsync(HttpContext context, string code, string title, string detail)
     {
         var status = ErrorCatalog.StatusOf(code);
         context.Response.StatusCode = status;
-        var problem = new
+        var problem = new Mvc.TinhteProblem
         {
-            type = $"urn:tinhte:error:{code.ToLowerInvariant()}",
-            title,
-            status,
-            code,
-            detail,
-            traceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier,
+            Type = $"urn:tinhte:error:{code.ToLowerInvariant()}",
+            Title = title,
+            Status = status,
+            Code = code,
+            Detail = detail,
+            TraceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier,
         };
         return context.Response.WriteAsJsonAsync(problem, Options, "application/problem+json", context.RequestAborted);
     }

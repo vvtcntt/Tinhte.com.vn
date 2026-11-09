@@ -14,7 +14,13 @@
 - **Hạ tầng:** DNS/TLS/edge lấy từ `node tools/sites/plan.mjs <env>`; Caddyfile local sinh bằng `node tools/sites/generate-caddyfile.mjs`. Không sửa tay `infra/local/Caddyfile`.
 - **Runbook thêm subdomain:** `doc/adr/ADR-0001-multi-subdomain-site-registry.md` mục "Thêm một subdomain mới".
 
-## 2. Hợp đồng, phạm vi, pháp lý
+## 2. Backend: ASP.NET Core Web API dạng Controller (ADR-0002)
+
+- Endpoint mới **luôn** là controller: kế thừa `TinhteControllerBase`, `sealed`, đặt trong `Controllers/` của module (hoặc `Tinhte.Api/Controllers/` cho endpoint nền tảng). **Không** dùng Minimal API (`MapGet`/`MapPost`).
+- Route tường minh theo đường dẫn hợp đồng: `[Route(ApiRoutes.Prefix + "/...")]`. Controller mỏng gọi service; response là DTO `record` có kiểu.
+- Lỗi nghiệp vụ dùng `Problem(code, title, detail)` với mã trong `x-error-catalog`. Không đặt `[Produces("application/json")]` ở base. Attribute validation của record đặt trên tham số.
+
+## 3. Hợp đồng, phạm vi, pháp lý
 
 - **Tài liệu gốc** ở `doc/` (gói 07 v0.2): **không sửa**. Đề xuất v0.3 (OpenAPI, migration, truy vết) ở `doc/07_AI_REVIEW/v0.3/` là DRAFT chờ TL/PO/Legal duyệt.
 - **Contract-first:** đổi API thì sửa spec v0.3 trước.
@@ -30,7 +36,7 @@
   - dùng helper `tt_migration.*` để bản down chỉ gỡ đúng phần đã tạo;
   - CHECK trên bảng cũ thêm ở dạng `NOT VALID`, rồi VALIDATE ở 0310.
 
-## 3. Lệnh kiểm tra trước khi xong việc
+## 4. Lệnh kiểm tra trước khi xong việc
 
 ```bash
 node tools/sites/validate.mjs && node tools/check-hardcoded-hosts.mjs && node tools/sites/generate-caddyfile.mjs --check

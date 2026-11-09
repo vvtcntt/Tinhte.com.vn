@@ -1,22 +1,28 @@
+using System.Diagnostics;
 using System.Net;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Tinhte.Platform.Flags;
 using Tinhte.Platform.Http;
 using Tinhte.Platform.Modules;
+using Tinhte.Platform.Mvc;
 using Tinhte.Platform.Sites;
 
 namespace Tinhte.Platform;
 
 public static class PlatformExtensions
 {
-    public const string ApiPrefix = "/api/v1";
-
-    public static IServiceCollection AddTinhtePlatform(this IServiceCollection services, IConfiguration configuration, IEnumerable<IModule> modules)
+    /// <summary>
+    /// Đăng ký nền tảng + MVC controllers (ADR-0002). Controller của Tinhte.Api được MVC tự phát hiện;
+    /// controller của module được thêm qua ApplicationPart từ assembly của từng module.
+    /// </summary>
+    public static IMvcBuilder AddTinhtePlatform(this IServiceCollection services, IConfiguration configuration, IEnumerable<IModule> modules)
     {
         // Registry tạo lười (sau khi host build) để test/override cấu hình "Sites:*" có hiệu lực.
         services.AddSingleton(sp =>
@@ -42,17 +48,23 @@ public static class PlatformExtensions
             }
         });
 
+        var mvc = services.AddControllers()
+            .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = ProblemFactory.FromInvalidModelState);
+
         foreach (var module in modules)
         {
             module.AddServices(services, configuration);
             services.AddSingleton(module);
+            mvc.AddApplicationPart(module.GetType().Assembly);
         }
 
-        return services;
+        return mvc;
     }
 
+    /// <summary>Pipeline: lỗi chưa xử lý → forwarded headers → phân giải site → chặn Origin → header bảo mật.</summary>
     public static WebApplication UseTinhtePlatform(this WebApplication app)
     {
+        app.UseExceptionHandler(handler => handler.Run(WriteUnhandledProblemAsync));
         app.UseForwardedHeaders();
         app.UseMiddleware<SiteResolutionMiddleware>();
         app.UseMiddleware<OriginGuardMiddleware>();
@@ -65,15 +77,22 @@ public static class PlatformExtensions
         return app;
     }
 
-    public static IEndpointRouteBuilder MapTinhteModules(this IEndpointRouteBuilder app)
+    /// <summary>
+    /// 500 không lộ chi tiết lỗi. Lưu ý hợp đồng: x-error-catalog v0.3 chưa có mã cho 500 →
+    /// tạm dùng INTERNAL_ERROR, đề xuất bổ sung vào catalog (xem ADR-0002).
+    /// </summary>
+    private static Task WriteUnhandledProblemAsync(HttpContext context)
     {
-        var api = app.MapGroup(ApiPrefix);
-        foreach (var module in app.ServiceProvider.GetServices<IModule>())
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        var problem = new TinhteProblem
         {
-            module.MapEndpoints(api);
-        }
-
-        return app;
+            Type = "urn:tinhte:error:internal_error",
+            Title = "Internal server error",
+            Status = StatusCodes.Status500InternalServerError,
+            Code = "INTERNAL_ERROR",
+            TraceId = Activity.Current?.TraceId.ToString() ?? context.TraceIdentifier,
+        };
+        return context.Response.WriteAsJsonAsync(problem, JsonSerializerOptions.Web, "application/problem+json");
     }
 
     private static string DefaultSiteEnvironment(IHostEnvironment env) =>
