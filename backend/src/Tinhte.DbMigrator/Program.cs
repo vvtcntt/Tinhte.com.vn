@@ -59,6 +59,19 @@ catch (MigrationException e)
     Console.Error.WriteLine("migration failed: " + e.Message);
     return 1;
 }
+catch (NpgsqlException e)
+{
+    // Lỗi kết nối/xác thực là lỗi cấu hình thường gặp: báo gọn một dòng thay vì stack trace.
+    var hint = (e as PostgresException)?.SqlState switch
+    {
+        "28P01" => " — check the password in ConnectionStrings__Tinhte (case-sensitive).",
+        "3D000" => " — the database does not exist; create it first (README: Database).",
+        "28000" => " — the role cannot log in; check the Username in ConnectionStrings__Tinhte.",
+        _ => " — check that PostgreSQL is running and ConnectionStrings__Tinhte (Host/Port) is correct.",
+    };
+    Console.Error.WriteLine("cannot connect to the database: " + ((e as PostgresException)?.MessageText ?? e.Message) + hint);
+    return 1;
+}
 
 namespace Tinhte.DbMigrator
 {
