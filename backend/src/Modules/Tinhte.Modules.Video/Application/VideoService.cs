@@ -13,9 +13,9 @@ namespace Tinhte.Modules.Video.Application;
 /// <summary>
 /// Video trong CMS (WBS-046; FR-CMS-001/006, FR-VID-008): tạo bản nháp + working revision, sửa working revision, gắn media.
 /// Cùng mô hình revision với bài viết (ADR-0005, migration 0331): revision DRAFT chưa public sửa tại chỗ, ngược lại PATCH tạo
-/// revision mới. Gửi duyệt/duyệt/publish/lịch (WBS-040) chưa có: video luôn ở DRAFT qua API này.
+/// revision mới. Media là nội dung của revision (migration 0334). Gửi duyệt/duyệt/xuất bản/gỡ: VideoService.Workflow.cs (WBS-040).
 /// </summary>
-public sealed class VideoService(ITinhteDatabase database)
+public sealed partial class VideoService(ITinhteDatabase database)
 {
     // ---------------------------------------------------------------- đọc
 
@@ -98,14 +98,16 @@ public sealed class VideoService(ITinhteDatabase database)
             var revisionId = Guid.CreateVersion7();
             if (request.MediaId is { } media) await EnsureBindableMediaAsync(connection, tx, media, videoId, ct);
 
+            // tt.videos.media_id = media của public revision (trigger 0334): media của bản nháp nằm trên revision.
             await using (var insert = VideoSql.Command(connection, tx, """
-                INSERT INTO tt.videos (id, slug, status, media_id, owner_id) VALUES (@id, @slug, 'DRAFT', @media, @actor)
-                """).WithUuid("id", videoId).WithText("slug", VideoSlug.For(request.Title, videoId)).WithUuid("media", request.MediaId).WithUuid("actor", actorId))
+                INSERT INTO tt.videos (id, slug, status, owner_id) VALUES (@id, @slug, 'DRAFT', @actor)
+                """).WithUuid("id", videoId).WithText("slug", VideoSlug.For(request.Title, videoId)).WithUuid("actor", actorId))
             {
                 await insert.ExecuteNonQueryAsync(ct);
             }
 
-            await InsertRevisionAsync(connection, tx, new RevisionContent(videoId, revisionId, 1, request.Title, request.Summary, kind, sponsorship, null), actorId, ct);
+            await InsertRevisionAsync(connection, tx,
+                new RevisionContent(videoId, revisionId, 1, request.Title, request.Summary, request.MediaId, kind, sponsorship, null), actorId, ct);
 
             await using (var link = VideoSql.Command(connection, tx, "UPDATE tt.videos SET working_revision_id = @rev WHERE id = @id")
                 .WithUuid("rev", revisionId).WithUuid("id", videoId))
@@ -137,57 +139,45 @@ public sealed class VideoService(ITinhteDatabase database)
                     $"A video in status {video.Status} cannot be edited; finish or withdraw the editorial workflow first.");
             }
 
-            var mediaChanged = patch.MediaId.IsSet && patch.MediaId.Value != video.MediaId;
-            if (mediaChanged)
-            {
-                // Đổi media của video từng public = đổi nội dung đang phát mà không qua revision/duyệt → để WBS-040 (media revision).
-                if (video.PublicRevisionId is not null)
-                {
-                    throw new DomainProblemException(ErrorCodes.StateConflict, "State conflict",
-                        "The media of a video that has been published cannot be replaced yet (media revisions are delivered by WBS-040).");
-                }
+            var baseRevisionId = video.WorkingRevisionId ?? video.PublicRevisionId ?? await LatestRevisionAsync(connection, tx, videoId, ct)
+                ?? throw new DomainProblemException(ErrorCodes.StateConflict, "State conflict", "The video has no revision to edit.");
+            var current = (await LoadRevisionAsync(connection, tx, baseRevisionId, ct))!;
 
-                await EnsureBindableMediaAsync(connection, tx, patch.MediaId.Value, videoId, ct);
+            // Revision đang chờ quyết định duyệt/xuất bản (cả khi video đã bị gỡ — UNPUBLISHED vẫn sửa được): quyết định trước, sửa sau.
+            if (VideoRevisionStatuses.Pending.Contains(current.Status) && current.RevisionId != video.PublicRevisionId)
+            {
+                throw new DomainProblemException(ErrorCodes.StateConflict, "State conflict",
+                    $"Revision {current.Number} is {current.Status}: wait for the review/publish decision before editing.");
             }
+
+            // Media là nội dung của revision (0334): đổi media của video đã public = revision mới, bản công khai giữ media cũ tới khi publish.
+            var next = Apply(current, patch);
+            if (next.MediaId != current.MediaId && next.MediaId is { } media) await EnsureBindableMediaAsync(connection, tx, media, videoId, ct);
 
             var workingRevisionId = video.WorkingRevisionId;
             var status = video.Status;
-            if (patch.TouchesRevision)
+            var editInPlace = current.Status == VideoRevisionStatuses.Draft && current.RevisionId == video.WorkingRevisionId
+                && current.RevisionId != video.PublicRevisionId;
+            if (editInPlace)
             {
-                var baseRevisionId = video.WorkingRevisionId ?? video.PublicRevisionId ?? await LatestRevisionAsync(connection, tx, videoId, ct)
-                    ?? throw new DomainProblemException(ErrorCodes.StateConflict, "State conflict", "The video has no revision to edit.");
-                var current = (await LoadRevisionAsync(connection, tx, baseRevisionId, ct))!;
-                var next = Apply(current, patch);
-
-                var editInPlace = current.Status == VideoRevisionStatuses.Draft && current.RevisionId == video.WorkingRevisionId
-                    && current.RevisionId != video.PublicRevisionId;
-                if (editInPlace)
-                {
-                    await UpdateRevisionAsync(connection, tx, next, sponsorshipChanged: !SameSponsorship(current.Sponsorship, next.Sponsorship), actorId, ct);
-                }
-                else
-                {
-                    // Revision đã đóng băng (đang duyệt/đã duyệt/đang public): tạo revision mới, bản công khai giữ nguyên.
-                    var number = await NextRevisionNumberAsync(connection, tx, videoId, ct);
-                    next = next with { RevisionId = Guid.CreateVersion7(), Number = number, ChangeReason = patch.ChangeReason.IsSet ? patch.ChangeReason.Value : null };
-                    await InsertRevisionAsync(connection, tx, next, actorId, ct);
-                    workingRevisionId = next.RevisionId;
-                    if (status is VideoStatuses.ChangesRequested or VideoStatuses.Rejected) status = VideoStatuses.Draft;
-                }
+                await UpdateRevisionAsync(connection, tx, next, sponsorshipChanged: !SameSponsorship(current.Sponsorship, next.Sponsorship), actorId, ct);
+            }
+            else
+            {
+                // Revision đã đóng băng (bị trả/từ chối/đang public/đã thay): tạo revision mới, bản công khai giữ nguyên.
+                var number = await NextRevisionNumberAsync(connection, tx, videoId, ct);
+                next = next with { RevisionId = Guid.CreateVersion7(), Number = number, ChangeReason = patch.ChangeReason.IsSet ? patch.ChangeReason.Value : null };
+                await InsertRevisionAsync(connection, tx, next, actorId, ct);
+                workingRevisionId = next.RevisionId;
+                if (status is VideoStatuses.ChangesRequested or VideoStatuses.Rejected) status = VideoStatuses.Draft;
             }
 
             await using var update = VideoSql.Command(connection, tx, """
-                UPDATE tt.videos
-                   SET media_id = CASE WHEN @set_media THEN @media ELSE media_id END,
-                       working_revision_id = @working,
-                       status = @status
-                 WHERE id = @id AND row_version = @expected
+                UPDATE tt.videos SET working_revision_id = @working, status = @status WHERE id = @id AND row_version = @expected
                 """)
-                .WithUuid("media", patch.MediaId.IsSet ? patch.MediaId.Value : null)
                 .WithUuid("working", workingRevisionId)
                 .WithText("status", status)
                 .WithUuid("id", videoId);
-            update.Parameters.AddWithValue("set_media", mediaChanged);
             update.Parameters.AddWithValue("expected", expectedRowVersion);
             if (await update.ExecuteNonQueryAsync(ct) == 0) throw ETags.RevisionConflict();
 
@@ -197,13 +187,16 @@ public sealed class VideoService(ITinhteDatabase database)
 
     // ---------------------------------------------------------------- nội bộ
 
-    private sealed record LockedVideo(string Status, long RowVersion, Guid? OwnerId, Guid? WorkingRevisionId, Guid? PublicRevisionId, Guid? MediaId);
+    private sealed record LockedVideo(
+        string Status, long RowVersion, Guid? OwnerId, Guid? WorkingRevisionId, Guid? PublicRevisionId, string RightsStatus, DateTimeOffset? RightsExpiresAt,
+        bool RightsValid);
 
     private sealed record RevisionContent(
-        Guid VideoId, Guid RevisionId, int Number, string Title, string? Summary, string ContentKind, VideoSponsorshipInput? Sponsorship, string? ChangeReason);
+        Guid VideoId, Guid RevisionId, int Number, string Title, string? Summary, Guid? MediaId, string ContentKind, VideoSponsorshipInput? Sponsorship,
+        string? ChangeReason);
 
-    private sealed record CurrentRevision(Guid RevisionId, Guid VideoId, int Number, string Status, string Title, string? Summary, string ContentKind,
-        VideoSponsorshipInput? Sponsorship, string? ChangeReason);
+    private sealed record CurrentRevision(Guid RevisionId, Guid VideoId, int Number, string Status, string Title, string? Summary, Guid? MediaId,
+        string ContentKind, VideoSponsorshipInput? Sponsorship, string? ChangeReason, Guid? AuthorId, Guid? SubmittedBy, int? ApprovedMediaGeneration);
 
     private static DomainProblemException NotFound() => new(ErrorCodes.NotFound, "Video not found", "No video with this id.");
 
@@ -236,20 +229,22 @@ public sealed class VideoService(ITinhteDatabase database)
         return new RevisionContent(current.VideoId, current.RevisionId, current.Number,
             patch.Title.IsSet ? patch.Title.Value : current.Title,
             patch.Summary.IsSet ? patch.Summary.Value : current.Summary,
+            patch.MediaId.IsSet ? patch.MediaId.Value : current.MediaId,
             kind, sponsorship,
             patch.ChangeReason.IsSet ? patch.ChangeReason.Value : current.ChangeReason);
     }
 
     /// <summary>
     /// Media gắn được vào video (FR-CMS-009): tải lên qua intent, loại VIDEO, chưa hỏng/bị từ chối, quyền chưa bị hạn chế/thu hồi/hết hạn,
-    /// chưa gắn với video khác. UNVERIFIED vẫn gắn được vào bản nháp — chặn publish khi chưa CLEARED là việc của WBS-040.
+    /// chưa gắn với video khác (ở bất kỳ revision nào). UNVERIFIED vẫn gắn được vào bản nháp — publish mới đòi CLEARED (WBS-040).
+    /// Khóa FOR UPDATE dòng media để hai video không cùng lúc giành một media.
     /// </summary>
     private static async Task EnsureBindableMediaAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid mediaId, Guid videoId, CancellationToken ct)
     {
         await using var command = VideoSql.Command(connection, tx, """
             SELECT m.media_type, m.status, m.rights_status, m.rights_expires_at IS NOT NULL AND m.rights_expires_at <= now(),
-                   EXISTS (SELECT 1 FROM tt.videos v WHERE v.media_id = m.id AND v.id <> @video)
-              FROM tt.media_assets m WHERE m.id = @id AND m.storage_key IS NOT NULL FOR SHARE OF m
+                   EXISTS (SELECT 1 FROM tt.video_revisions r WHERE r.media_id = m.id AND r.video_id <> @video)
+              FROM tt.media_assets m WHERE m.id = @id AND m.storage_key IS NOT NULL FOR UPDATE OF m
             """).WithUuid("id", mediaId).WithUuid("video", videoId);
         await using var r = await command.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) throw Invalid("mediaId", "Unknown media.");
@@ -266,9 +261,9 @@ public sealed class VideoService(ITinhteDatabase database)
     private static async Task InsertRevisionAsync(NpgsqlConnection connection, NpgsqlTransaction tx, RevisionContent c, Guid actorId, CancellationToken ct)
     {
         await using var command = VideoSql.Command(connection, tx, """
-            INSERT INTO tt.video_revisions (id, video_id, number, title, summary, author_id, updated_by, status,
+            INSERT INTO tt.video_revisions (id, video_id, number, title, summary, media_id, author_id, updated_by, status,
                 content_kind, sponsor_name, sponsor_reference, sponsorship_evidence_ref, sponsorship_valid_from, sponsorship_valid_to, change_reason)
-            VALUES (@id, @video, @number, @title, @summary, @actor, @actor, 'DRAFT',
+            VALUES (@id, @video, @number, @title, @summary, @media, @actor, @actor, 'DRAFT',
                 @kind, @sponsor_name, @sponsor_reference, @evidence, @valid_from, @valid_to, @reason)
             """);
         command.Parameters.AddWithValue("number", c.Number);
@@ -280,7 +275,7 @@ public sealed class VideoService(ITinhteDatabase database)
     {
         await using var command = VideoSql.Command(connection, tx, """
             UPDATE tt.video_revisions
-               SET title = @title, summary = @summary, content_kind = @kind,
+               SET title = @title, summary = @summary, media_id = @media, content_kind = @kind,
                    sponsor_name = @sponsor_name, sponsor_reference = @sponsor_reference, sponsorship_evidence_ref = @evidence,
                    sponsorship_valid_from = @valid_from, sponsorship_valid_to = @valid_to, change_reason = @reason, updated_by = @actor,
                    sponsorship_approved_by = CASE WHEN @reset_approval THEN NULL ELSE sponsorship_approved_by END,
@@ -294,6 +289,7 @@ public sealed class VideoService(ITinhteDatabase database)
     private static NpgsqlCommand BindContent(NpgsqlCommand command, RevisionContent c) => command
         .WithText("title", c.Title)
         .WithText("summary", c.Summary)
+        .WithUuid("media", c.MediaId)
         .WithText("kind", c.ContentKind)
         .WithText("sponsor_name", c.Sponsorship?.SponsorName)
         .WithText("sponsor_reference", c.Sponsorship?.SponsorReference)
@@ -313,7 +309,8 @@ public sealed class VideoService(ITinhteDatabase database)
     {
         await using var command = VideoSql.Command(connection, tx, """
             SELECT id, video_id, number, status, title, summary, content_kind,
-                   sponsor_name, sponsor_reference, sponsorship_evidence_ref, sponsorship_valid_from, sponsorship_valid_to, change_reason
+                   sponsor_name, sponsor_reference, sponsorship_evidence_ref, sponsorship_valid_from, sponsorship_valid_to, change_reason,
+                   media_id, author_id, submitted_by, approved_media_generation
               FROM tt.video_revisions WHERE id = @id
             """).WithUuid("id", revisionId);
         await using var r = await command.ExecuteReaderAsync(ct);
@@ -321,18 +318,22 @@ public sealed class VideoService(ITinhteDatabase database)
         var sponsorship = r.IsDBNull(7) || r.IsDBNull(8) || r.IsDBNull(9) || r.IsDBNull(10) || r.IsDBNull(11)
             ? null
             : new VideoSponsorshipInput(r.GetString(7), r.GetString(8), r.GetString(9), VideoSql.Time(r, 10), VideoSql.Time(r, 11));
-        return new CurrentRevision(r.GetGuid(0), r.GetGuid(1), r.GetInt32(2), r.GetString(3), r.GetString(4), r.IsDBNull(5) ? null : r.GetString(5),
-            r.GetString(6), sponsorship, r.IsDBNull(12) ? null : r.GetString(12));
+        return new CurrentRevision(r.GetGuid(0), r.GetGuid(1), r.GetInt32(2), r.GetString(3), r.GetString(4), VideoSql.NullableText(r, 5),
+            VideoSql.NullableGuid(r, 13), r.GetString(6), sponsorship, VideoSql.NullableText(r, 12), VideoSql.NullableGuid(r, 14), VideoSql.NullableGuid(r, 15),
+            r.IsDBNull(16) ? null : r.GetInt32(16));
     }
 
     private static async Task<LockedVideo?> LockAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid videoId, CancellationToken ct)
     {
         await using var command = VideoSql.Command(connection, tx, """
-            SELECT status, row_version, owner_id, working_revision_id, public_revision_id, media_id FROM tt.videos WHERE id = @id FOR UPDATE
+            SELECT status, row_version, owner_id, working_revision_id, public_revision_id, rights_status, rights_expires_at,
+                   rights_status = 'CLEARED' AND (rights_expires_at IS NULL OR rights_expires_at > now())
+              FROM tt.videos WHERE id = @id FOR UPDATE
             """).WithUuid("id", videoId);
         await using var r = await command.ExecuteReaderAsync(ct);
         if (!await r.ReadAsync(ct)) return null;
-        return new LockedVideo(r.GetString(0), r.GetInt64(1), VideoSql.NullableGuid(r, 2), VideoSql.NullableGuid(r, 3), VideoSql.NullableGuid(r, 4), VideoSql.NullableGuid(r, 5));
+        return new LockedVideo(r.GetString(0), r.GetInt64(1), VideoSql.NullableGuid(r, 2), VideoSql.NullableGuid(r, 3), VideoSql.NullableGuid(r, 4),
+            r.GetString(5), VideoSql.NullableTime(r, 6), r.GetBoolean(7));
     }
 
     private static async Task<Guid?> LatestRevisionAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid videoId, CancellationToken ct)

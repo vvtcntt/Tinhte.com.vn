@@ -162,6 +162,7 @@ a { color: inherit; }
 .check input { margin-top: 4px; }
 .button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--surface); }
 .button:disabled { opacity: 0.5; cursor: not-allowed; }
+.field-error { color: var(--error-text); font-size: 13px; }
 .banner.ok { background: var(--ok-bg); color: var(--ok-text); }
 /* Màn Bài viết */
 .title-row.spread { justify-content: space-between; align-items: flex-start; }

@@ -101,7 +101,7 @@ public sealed class VideoMediaUnitTests(WebApplicationFactory<Program> factory) 
         Assert.Null(p.Summary.Value);
         Assert.True(p.MediaId.IsSet);
         Assert.True(p.TouchesRevision);
-        Assert.False(Parse("""{"mediaId":"0190f3c4-1111-7000-8000-00000000abcd"}""").TouchesRevision);
+        Assert.True(Parse("""{"mediaId":"0190f3c4-1111-7000-8000-00000000abcd"}""").TouchesRevision);   // media thuộc revision (0334)
 
         Assert.Contains("$", PatchErrors("{}").Keys);
         Assert.Contains("title", PatchErrors("""{"title":""}""").Keys);
@@ -529,7 +529,7 @@ public sealed class VideoMediaDbTests(MigratedDatabaseFixture db, WebApplication
     }
 
     [DbFact]
-    public async Task Media_binding_rules_one_video_per_media_rights_and_published_videos()
+    public async Task Media_binding_rules_one_video_per_media_and_rights()
     {
         using var cms = Cms();
         var mediaId = await UploadAsync(cms, "a.mp4", MediaSamples.Mp4());
@@ -545,22 +545,10 @@ public sealed class VideoMediaDbTests(MigratedDatabaseFixture db, WebApplication
         Assert.Equal(ErrorCodes.ValidationFailed, rights.GetProperty("code").GetString());
         rightsResponse.Dispose();
 
-        // Video đã từng public (giả lập publish pointer — workflow WBS-040 chưa có): đổi media → 409; sửa tiêu đề → revision mới,
-        // bản công khai giữ nguyên.
-        var replacement = await UploadAsync(cms, "c.mp4", MediaSamples.Mp4());
-        await ExecAsync($"UPDATE tt.videos SET public_revision_id = working_revision_id WHERE id = '{firstId}'");
-        var current = await SendAsync(cms, NewsHttp.Admin(HttpMethod.Get, $"/api/v1/admin/videos/{firstId}", _author, StaffRoles.Author), HttpStatusCode.OK);
-        var currentEtag = $"W/\"{current.GetProperty("rowVersion").GetInt64()}\"";
-        var (_, swap) = await PatchAsync(cms, firstId, $$"""{"mediaId":"{{replacement}}"}""", currentEtag, _author);
-        Assert.Equal(HttpStatusCode.Conflict, swap.StatusCode);
-        swap.Dispose();
-        var (edited, editResponse) = await PatchAsync(cms, firstId, """{"title":"Video A (bản sửa)"}""", currentEtag, _author);
-        Assert.Equal(HttpStatusCode.OK, editResponse.StatusCode);
-        editResponse.Dispose();
-        Assert.NotEqual(current.GetProperty("publicRevisionId").GetGuid(), edited.GetProperty("workingRevisionId").GetGuid());
-        Assert.Equal(current.GetProperty("publicRevisionId").GetGuid(), edited.GetProperty("publicRevisionId").GetGuid());
-        Assert.Equal("Video A", await db.ScalarAsync<string>($"SELECT r.title FROM tt.videos v JOIN tt.video_revisions r ON r.id = v.public_revision_id WHERE v.id = '{firstId}'"));
-        Assert.Equal(2, await db.ScalarAsync<int>($"SELECT max(number) FROM tt.video_revisions WHERE video_id = '{firstId}'"));
+        // Media nằm trên revision; tt.videos.media_id chỉ là media của bản công khai (chưa public → NULL). Đổi media của video đã
+        // public = revision mới: VideoWorkflowDbTests.
+        Assert.Equal(mediaId, await db.ScalarAsync<Guid>($"SELECT r.media_id FROM tt.videos v JOIN tt.video_revisions r ON r.id = v.working_revision_id WHERE v.id = '{firstId}'"));
+        Assert.Null(await db.ScalarAsync<Guid?>($"SELECT media_id FROM tt.videos WHERE id = '{firstId}'"));
     }
 
     [DbFact]

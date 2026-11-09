@@ -50,7 +50,17 @@ related: ADR-0001 (D5, media site), ADR-0003, ADR-0005, WBS-035…040, WBS-046, 
 ### 5. Video trong CMS (migration 0331)
 
 - Cùng mô hình revision với bài viết (ADR-0005): `tt.video_revisions.status`, trigger đóng băng nội dung revision đã rời DRAFT hoặc đang public, không xóa revision. PATCH sửa tại chỗ revision DRAFT, ngược lại tạo revision mới.
-- `tt.videos.media_id` = media đang gắn; một media chỉ gắn một video. Đổi media của video từng public → 409 (media revision thuộc WBS-040). Slug video sinh lúc tạo (tiêu đề + 8 hex của id) vì hợp đồng không có slug video.
+- ~~`tt.videos.media_id` = media đang gắn; đổi media của video từng public → 409~~ — thay bởi §6 (WBS-040). Một media chỉ gắn một video. Slug video sinh lúc tạo (tiêu đề + 8 hex của id) vì hợp đồng không có slug video.
+
+### 6. Duyệt, xuất bản, gỡ; media theo revision (WBS-040, migration 0334/0335)
+
+- **Theo đúng quy ước duyệt bài WBS-024** (nhánh `claude/wbs-022-news-66d391`, chưa gộp vào `sprint-0/scaffold` lúc viết): gửi duyệt = quyền sửa video; yêu cầu sửa `content.review` (201); duyệt/từ chối `content.approve` (MFA); xuất bản `content.publish` (MFA); SoD — người tạo/sửa revision không duyệt/xuất bản (403 `SOD_VIOLATION`); lý do 5–2000 ký tự (422 `REASON_REQUIRED`); người gửi duyệt thành `assigneeId`; If-Match + Idempotency-Key; trigger DB chặn bước chuyển sai và sửa lại hồ sơ duyệt. **Cần đồng bộ khi gộp:** nếu WBS-024 đổi quy tắc SoD/thứ tự lỗi thì sửa cả `VideoService.Workflow.cs`.
+- **Media là nội dung của revision:** `video_revisions.media_id`, đóng băng cùng nội dung. PATCH `mediaId` của video đã public tạo revision mới; bản công khai giữ media cũ tới khi revision mới được duyệt + publish. PATCH khi working revision `IN_REVIEW`/`APPROVED` → 409 (kể cả video đã gỡ).
+- **`tt.videos.media_id` thành cột dẫn xuất** = media của public revision (NULL khi chưa/không còn public), do trigger đặt khi đổi publish pointer; ghi thẳng bị chặn. Phát/playback grant (WBS-039) đọc cột này.
+- **Duyệt chốt thế hệ media** (`approved_media_generation`): media xử lý lại sau khi duyệt → publish 409, phải duyệt lại. Gửi duyệt cần media dùng được.
+- **Publish gate** ở service (thông điệp rõ) **và** trigger 0334 khi đổi publish pointer (mọi đường ghi): media `READY` + `VIDEO` (422 `MEDIA_NOT_READY`), quyền media và video `CLEARED` còn hạn (422 `RIGHTS_INVALID`), thế hệ media khớp (409). SPONSORED: trigger 0307 (cờ `ads.sponsored_publication` mặc định OFF → 403). Không API nào ở đây đặt quyền `CLEARED` (WBS-023) hay đổi `visibility` media (WBS-039).
+- **Gỡ** (`content.takedown`, MFA, If-Match tùy chọn, lý do bắt buộc): xóa publish pointer trong transaction → origin không phục vụ nữa; public revision → `SUPERSEDED`; ghi `unpublished_at/by/reason`. Đưa lên lại = sửa → gửi duyệt → duyệt → publish. Video đang `UNPUBLISHED` vẫn duyệt tiếp được revision đang chờ (không còn pointer nên không lộ bản cũ).
+- **Chưa làm:** `postAdminVideosVideoidSchedule` (cần bộ lập lịch + job kiểm lại gate lúc chạy — WBS-025/020; route chưa có → 404); thu hồi playback grant, purge CDN, gỡ khỏi feed/search khi unpublish (WBS-039/128 + outbox WBS-020); job hết hạn quyền gỡ video đang public.
 
 ## Còn thiếu
 
@@ -58,7 +68,8 @@ related: ADR-0001 (D5, media site), ADR-0003, ADR-0005, WBS-035…040, WBS-046, 
 |---|---|
 | Chọn vendor lưu trữ/transcode/CDN, adapter thật, URL ký sẵn | 035, 036, 039 |
 | Quét mã độc/quarantine, profile rendition, poster, transcode thật, worker hàng đợi + retry/poison | 036…038 |
-| Gửi duyệt/duyệt/publish video, chặn publish khi media chưa READY hoặc quyền chưa CLEARED, media revision | 040 |
+| ~~Gửi duyệt/duyệt/publish video, chặn publish khi media chưa READY hoặc quyền chưa CLEARED, media revision~~ — đã làm, §6 | 040 |
+| Lên lịch xuất bản video, lan truyền gỡ (grant/CDN/feed), job hết hạn quyền | 025, 039, 128, 020 |
 | Xem trước/phát trong CMS (playback grant qua site `media`) | 039, 045 |
 | Rate limit theo IP/edge; con số hạn mức chính thức (PO) | 010, 036 |
 | Dọn object mồ côi trên kho thật bằng lifecycle rule của vendor (bản API chỉ dọn object của intent hết hạn) | 039 |

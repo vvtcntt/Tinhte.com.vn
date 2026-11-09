@@ -2395,8 +2395,9 @@ paths:
       tags:
       - CmsVideo
       summary: Submit video for review
-      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the
-        latest ETag. Retry-safe with Idempotency-Key.'
+      description: 'Submits the DRAFT working revision; it must have usable media attached (409 STATE_CONFLICT otherwise). Access: Staff
+        session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the latest ETag. Retry-safe
+        with Idempotency-Key.'
       operationId: postAdminVideosVideoidSubmit
       security:
       - cmsSession: []
@@ -2447,8 +2448,10 @@ paths:
       tags:
       - CmsVideo
       summary: Approve exact video revision and bound media generation
-      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the
-        latest ETag. Retry-safe with Idempotency-Key.'
+      description: 'Approves the working revision under review named by revisionId and records the generation of its media; publishing later
+        fails with 409 if the media was reprocessed since. Approvers cannot approve a revision they wrote or edited (SOD_VIOLATION). Access:
+        Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the latest ETag. Retry-safe
+        with Idempotency-Key.'
       operationId: postAdminVideosVideoidApprove
       security:
       - cmsSession: []
@@ -2634,7 +2637,8 @@ paths:
       tags:
       - CmsVideo
       summary: Publish video only if rights/media/approval gates pass
-      description: 'Publishes the given APPROVED revision only if media is READY, rights are CLEARED and, for SPONSORED revisions, ads.sponsored_publication
+      description: 'Publishes the given APPROVED revision only if its media is READY (MEDIA_NOT_READY), media and video rights are CLEARED
+        and unexpired (RIGHTS_INVALID), the media generation still matches the approval (STATE_CONFLICT) and, for SPONSORED revisions, ads.sponsored_publication
         is ON and sponsorship is complete and valid. Same transaction rules as article publish. Access: Staff session (cmsSession) with RBAC enforced
         in the domain layer. Optimistic concurrency: send If-Match with the latest ETag. Retry-safe with Idempotency-Key.'
       operationId: postAdminVideosVideoidPublish
@@ -2778,8 +2782,9 @@ paths:
       tags:
       - CmsVideo
       summary: Unpublish video, invalidate playback grants and trigger CDN purge
-      description: 'Emergency takedown: If-Match optional. Origin denies public access immediately; propagation (grant revoke, CDN purge, search/sitemap/feed
-        removal) is tracked asynchronously. Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Retry-safe with Idempotency-Key.'
+      description: 'Emergency takedown: If-Match optional. Clears the publish pointer in the same transaction, so origin denies public access
+        immediately; propagation (grant revoke, CDN purge, search/sitemap/feed removal) is tracked asynchronously. 409 when the video has no
+        public revision. Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Retry-safe with Idempotency-Key.'
       operationId: postAdminVideosVideoidUnpublish
       security:
       - cmsSession: []
@@ -6653,11 +6658,75 @@ components:
           - string
           - 'null'
           format: uuid
+          description: Media bound to the working revision (media is revision content; the public revision keeps its own media until a new
+            revision is published).
         summary:
           type:
           - string
           - 'null'
           description: Summary of the working revision (public revision when no draft exists)
+        revisionStatus:
+          type:
+          - string
+          - 'null'
+          enum:
+          - DRAFT
+          - IN_REVIEW
+          - CHANGES_REQUESTED
+          - REJECTED
+          - APPROVED
+          - PUBLISHED
+          - SUPERSEDED
+          - null
+          readOnly: true
+          description: Status of the working revision. Differs from status after an unpublish (status UNPUBLISHED while a new revision is
+            being edited or reviewed).
+        submittedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          readOnly: true
+          description: Who submitted the working revision for review.
+        submittedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        reviewedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          readOnly: true
+          description: Who approved, requested changes on or rejected the working revision.
+        reviewedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        reviewNote:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          readOnly: true
+          description: Approval note or the reason given with request-changes/reject (FR-CMS-010).
+        unpublishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+          description: Last takedown time (kept after a later republish as history).
+        unpublishReason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          readOnly: true
     AdminVideoList:
       type: object
       properties:

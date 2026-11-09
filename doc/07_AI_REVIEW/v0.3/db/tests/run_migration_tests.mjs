@@ -271,16 +271,47 @@ async function behaviour(sc, db) {
 
   // Revision video (0331, WBS-046/040) — cùng mô hình đóng băng với bài viết
   const VREV = (rev, set) => `UPDATE tt.video_revisions SET ${set} WHERE id = '${id(rev)}';`;
-  const VDRAFT = `INSERT INTO tt.video_revisions (id, video_id, number, title) VALUES ('${id('d3')}', '${id('d1')}', 2, 'Video biên tập');`;
+  const VDRAFT = `INSERT INTO tt.video_revisions (id, video_id, number, title, media_id) VALUES ('${id('d3')}', '${id('d1')}', 2, 'Video biên tập', '${id('e1')}');`;
+  // Media e1 sẵn sàng phát + quyền media/video CLEARED (do WBS-023 đặt; ở đây đặt tay để thử chốt chặn).
+  const VREADY = `UPDATE tt.media_assets SET status = 'READY', media_type = 'VIDEO', rights_status = 'CLEARED' WHERE id = '${id('e1')}';
+    UPDATE tt.videos SET rights_status = 'CLEARED' WHERE id = '${id('d1')}';`;
+  const VPUB = (rev) => `UPDATE tt.videos SET public_revision_id = ${rev ? `'${id(rev)}'` : 'NULL'} WHERE id = '${id('d1')}';`;
   await expectOk(sc, db, 'V1 revision video DRAFT chưa public sửa được nội dung', `${VDRAFT} ${VREV('d3', `title = 'Sửa', summary = 'Mô tả'`)}`);
   await expectError(sc, db, 'V2 revision video đã gửi duyệt không sửa được nội dung → STATE_CONFLICT', `${VDRAFT} ${VREV('d3', `status = 'IN_REVIEW'`)} ${VREV('d3', `title = 'Lén sửa'`)}`, /STATE_CONFLICT.*immutable/);
-  await expectError(sc, db, 'V3 public revision video không sửa được (kể cả DRAFT) → STATE_CONFLICT', `${VDRAFT}
-    UPDATE tt.videos SET public_revision_id = '${id('d3')}' WHERE id = '${id('d1')}'; ${VREV('d3', `summary = 'đổi'`)}`, /STATE_CONFLICT.*public and immutable/);
-  await expectError(sc, db, 'V4 revision video đã rời DRAFT không quay lại DRAFT', `${VDRAFT} ${VREV('d3', `status = 'REJECTED'`)} ${VREV('d3', `status = 'DRAFT'`)}`, /cannot return to DRAFT/);
+  await expectError(sc, db, 'V3 public revision video không sửa được (kể cả DRAFT) → STATE_CONFLICT', `${VDRAFT} ${VREADY} ${VPUB('d3')} ${VREV('d3', `summary = 'đổi'`)}`, /STATE_CONFLICT.*public and immutable/);
+  await expectError(sc, db, 'V4 revision video đã rời DRAFT không quay lại DRAFT', `${VDRAFT} ${VREV('d3', `status = 'IN_REVIEW'`)}
+    ${VREV('d3', `status = 'REJECTED', reviewed_by = '${U1}', reviewed_at = now(), review_note = 'Sai thông tin'`)} ${VREV('d3', `status = 'DRAFT'`)}`, /cannot return to DRAFT/);
   await expectError(sc, db, 'V5 revision video không xóa được', `DELETE FROM tt.video_revisions WHERE id = '${id('d2')}'`, /APPEND_ONLY/);
   await expectError(sc, db, 'V6 status revision video ngoài vòng đời bị chặn', VREV('d2', `status = 'LIVE'`), /ck_video_revisions_status/);
   await expectError(sc, db, 'V7 tiêu đề revision video rỗng bị chặn', VREV('d2', `title = '  '`), /ck_video_revisions_title_not_blank/);
-  await expectError(sc, db, 'V8 down 0331 từ chối khi có lịch sử workflow', `${VREV('d2', `status = 'IN_REVIEW'`)} ${read(path.join(MIG_DIR, '0331_video_revisions.down.sql'))}`, /Refusing to roll back 0331/);
+  await expectError(sc, db, 'V8 down 0331 từ chối khi có lịch sử workflow', `${VREV('d2', `media_id = '${id('e1')}'`)} ${VREV('d2', `status = 'IN_REVIEW'`)} ${read(path.join(MIG_DIR, '0331_video_revisions.down.sql'))}`, /Refusing to roll back 0331/);
+
+  // Duyệt/xuất bản video + chốt chặn publish (0334, WBS-040, FR-VID-008/010)
+  const VSUBMIT = `${VDRAFT} ${VREV('d3', `status = 'IN_REVIEW', submitted_by = '${U2}', submitted_at = now()`)}`;
+  const VAPPROVE = `${VSUBMIT} ${VREV('d3', `status = 'APPROVED', reviewed_by = '${U1}', reviewed_at = now(), approved_media_generation = 1`)}`;
+  await expectError(sc, db, 'W1 gửi duyệt revision chưa có media → STATE_CONFLICT', `INSERT INTO tt.video_revisions (id, video_id, number, title) VALUES ('${id('d4')}', '${id('d1')}', 3, 'Không media');
+    ${VREV('d4', `status = 'IN_REVIEW'`)}`, /STATE_CONFLICT.*no media/);
+  await expectError(sc, db, 'W2 bước chuyển sai (DRAFT → APPROVED) → STATE_CONFLICT', `${VDRAFT} ${VREV('d3', `status = 'APPROVED'`)}`, /STATE_CONFLICT.*cannot go from DRAFT to APPROVED/);
+  await expectError(sc, db, 'W3 duyệt không ghi thế hệ media → STATE_CONFLICT', `${VSUBMIT} ${VREV('d3', `status = 'APPROVED', reviewed_by = '${U1}', reviewed_at = now()`)}`, /STATE_CONFLICT.*approved media generation/);
+  await expectError(sc, db, 'W4 yêu cầu sửa thiếu lý do → REASON_REQUIRED', `${VSUBMIT} ${VREV('d3', `status = 'CHANGES_REQUESTED', reviewed_by = '${U1}', reviewed_at = now(), review_note = 'ok'`)}`, /REASON_REQUIRED/);
+  await expectError(sc, db, 'W5 media của revision đã gửi duyệt không đổi được → STATE_CONFLICT', `${VSUBMIT} INSERT INTO tt.media_assets (id) VALUES ('${id('e3')}'); ${VREV('d3', `media_id = '${id('e3')}'`)}`, /STATE_CONFLICT.*frozen/);
+  await expectError(sc, db, 'W6 hồ sơ duyệt không sửa được', `${VAPPROVE} ${VREV('d3', `review_note = 'Sửa lại hồ sơ'`)}`, /STATE_CONFLICT.*Review record/);
+  await expectError(sc, db, 'W7 publish khi media chưa READY → MEDIA_NOT_READY', `${VAPPROVE} UPDATE tt.videos SET rights_status = 'CLEARED' WHERE id = '${id('d1')}'; ${VPUB('d3')}`, /MEDIA_NOT_READY/);
+  await expectError(sc, db, 'W8 media READY nhưng quyền media chưa CLEARED → RIGHTS_INVALID', `${VAPPROVE} ${VREADY} UPDATE tt.media_assets SET rights_status = 'UNVERIFIED' WHERE id = '${id('e1')}'; ${VPUB('d3')}`, /RIGHTS_INVALID.*Media rights are UNVERIFIED/);
+  await expectError(sc, db, 'W9 quyền video hết hạn → RIGHTS_INVALID', `${VAPPROVE} ${VREADY} UPDATE tt.videos SET rights_expires_at = now() - interval '1 minute' WHERE id = '${id('d1')}'; ${VPUB('d3')}`, /RIGHTS_INVALID.*Video rights are CLEARED \(expired\)/);
+  await expectError(sc, db, 'W10 media xử lý lại sau khi duyệt (generation khác) → STATE_CONFLICT', `${VAPPROVE} ${VREADY} UPDATE tt.media_assets SET generation = 2 WHERE id = '${id('e1')}'; ${VPUB('d3')}`, /STATE_CONFLICT.*changed since approval/);
+  await expectOk(sc, db, 'W11 publish hợp lệ: videos.media_id = media của public revision; gỡ pointer → NULL', `${VAPPROVE} ${VREADY} ${VPUB('d3')}
+    ${VREV('d3', `status = 'PUBLISHED', published_at = now(), published_by = '${U1}'`)}
+    DO $$ BEGIN IF (SELECT media_id FROM tt.videos WHERE id = '${id('d1')}') IS DISTINCT FROM '${id('e1')}' THEN RAISE EXCEPTION 'public media'; END IF; END $$;
+    ${VPUB(null)} DO $$ BEGIN IF (SELECT media_id FROM tt.videos WHERE id = '${id('d1')}') IS NOT NULL THEN RAISE EXCEPTION 'unpublished media'; END IF; END $$;`);
+  await expectError(sc, db, 'W12 ghi thẳng tt.videos.media_id (không qua revision) bị chặn', `UPDATE tt.videos SET media_id = '${id('e1')}' WHERE id = '${id('d1')}'`, /STATE_CONFLICT.*follows its public revision/);
+  await expectError(sc, db, 'W13 gỡ video thiếu lý do bị chặn', `UPDATE tt.videos SET status = 'UNPUBLISHED', unpublished_at = now(), unpublish_reason = ' ' WHERE id = '${id('d1')}'`, /ck_videos_unpublish_reason/);
+  await expectError(sc, db, 'W14 down 0334 từ chối khi đã có lịch sử duyệt', `${VSUBMIT} ${read(path.join(MIG_DIR, '0334_video_review_publish_gate.down.sql'))}`, /Refusing to roll back 0334/);
+  await expectOk(sc, db, 'W15 down 0334 (chưa có lịch sử) trả tt.videos.media_id về media của bản working', `${VDRAFT}
+    UPDATE tt.videos SET working_revision_id = '${id('d3')}' WHERE id = '${id('d1')}';
+    ${read(path.join(MIG_DIR, '0334_video_review_publish_gate.down.sql'))}
+    DO $$ BEGIN IF (SELECT media_id FROM tt.videos WHERE id = '${id('d1')}') IS DISTINCT FROM '${id('e1')}'
+      OR tt_migration.has_column('video_revisions', 'media_id') THEN RAISE EXCEPTION 'down media'; END IF; END $$;`);
 
   // Site Registry trong DB (0312, ADR-0001 D8) — SQL đồng bộ sinh từ config/sites/sites.json
   const SYNC = generateDbSync(siteRegistry);

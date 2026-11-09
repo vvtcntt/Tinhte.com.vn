@@ -14,7 +14,8 @@ internal static class VideoSql
                w.sponsor_name, w.sponsor_reference, w.sponsorship_evidence_ref, w.sponsorship_valid_from, w.sponsorship_valid_to,
                w.sponsorship_approved_by, w.sponsorship_approved_at,
                v.working_revision_id, v.public_revision_id, v.owner_id, v.assignee_id, v.rights_status, v.rights_expires_at,
-               v.scheduled_at, v.updated_at, v.row_version, v.media_id, w.summary, v.created_at
+               v.scheduled_at, v.updated_at, v.row_version, w.media_id, w.summary, v.created_at,
+               w.status, w.submitted_by, w.submitted_at, w.reviewed_by, w.reviewed_at, w.review_note, v.unpublished_at, v.unpublish_reason
           FROM tt.videos v
           LEFT JOIN tt.video_revisions w ON w.id = COALESCE(v.working_revision_id, v.public_revision_id)
         """;
@@ -45,8 +46,18 @@ internal static class VideoSql
             UpdatedAt: Time(r, 18),
             RowVersion: r.GetInt64(19),
             MediaId: NullableGuid(r, 20),
-            Summary: r.IsDBNull(21) ? null : r.GetString(21)),
+            Summary: NullableText(r, 21),
+            RevisionStatus: NullableText(r, 23),
+            SubmittedBy: NullableGuid(r, 24),
+            SubmittedAt: NullableTime(r, 25),
+            ReviewedBy: NullableGuid(r, 26),
+            ReviewedAt: NullableTime(r, 27),
+            ReviewNote: NullableText(r, 28),
+            UnpublishedAt: NullableTime(r, 29),
+            UnpublishReason: NullableText(r, 30)),
         Time(r, 22));
+
+    public static string? NullableText(DbDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
     public static MediaStatus ReadMedia(DbDataReader r) => new(
         MediaId: r.GetGuid(0),
