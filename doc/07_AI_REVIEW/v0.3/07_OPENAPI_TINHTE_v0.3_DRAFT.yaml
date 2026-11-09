@@ -6481,6 +6481,8 @@ components:
           format: uuid
         status:
           type: string
+          description: 'Revision lifecycle (WBS-022): DRAFT, IN_REVIEW, CHANGES_REQUESTED, REJECTED, APPROVED, PUBLISHED, SUPERSEDED. Content
+            is editable only while DRAFT and not public; otherwise PATCH creates a new revision.'
         createdAt:
           type: string
           format: date-time
@@ -6500,6 +6502,31 @@ components:
           type:
           - string
           - 'null'
+        summary:
+          type:
+          - string
+          - 'null'
+          description: Revision-level summary (sapo); public only after this revision is published
+        categoryId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Revision-level category; copied to the article on publish
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last edit of a DRAFT revision; frozen once the revision leaves DRAFT or becomes public
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        publishedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
       required:
       - revisionId
       - articleId
