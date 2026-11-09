@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Tinhte.Platform.Errors;
 
 namespace Tinhte.Platform.Security;
@@ -53,30 +54,24 @@ public static class Permissions
 
 /// <summary>
 /// Ma trận vai trò → quyền (DRAFT, chờ BA/TL/PO duyệt — "role-policy matrix" của 07_API_IMPLEMENTATION_GUIDE).
+/// Nguồn sự thật: <c>config/rbac/rbac.json</c>, nhúng vào assembly lúc build và dùng chung với CMS (ẩn/hiện giao diện).
+/// Test RbacMatrixTests giữ khớp hằng số <see cref="Permissions"/>/<see cref="StaffRoles"/> với file.
 /// Quyền "cao" chỉ hiệu lực khi phiên đã qua MFA (FR-ID-006): thiếu MFA → 403 FORBIDDEN dù có vai trò.
 /// Tách nhiệm vụ (SoD: không tự duyệt bài của mình) kiểm ở domain service, không ở ma trận.
 /// </summary>
 public static class PermissionMatrix
 {
-    private static readonly Dictionary<string, string[]> Grants = new(StringComparer.Ordinal)
-    {
-        [StaffRoles.Author] = [Permissions.ContentRead, Permissions.ContentWriteOwn, Permissions.MediaUpload],
-        [StaffRoles.Editor] = [Permissions.ContentRead, Permissions.ContentWriteOwn, Permissions.ContentWriteAny, Permissions.ContentReview,
-            Permissions.MediaUpload, Permissions.TaxonomyManage],
-        [StaffRoles.Approver] = [Permissions.ContentRead, Permissions.ContentReview, Permissions.ContentApprove, Permissions.ContentPublish,
-            Permissions.ContentTakedown],
-        [StaffRoles.Moderator] = [Permissions.ModerationAct],
-        [StaffRoles.Admin] = [Permissions.UsersRead, Permissions.UsersManage, Permissions.AuditRead],
-    };
+    public const string ResourceName = "Tinhte.Platform.rbac.json";
 
-    public static readonly IReadOnlySet<string> MfaRequired = new HashSet<string>(StringComparer.Ordinal)
-    {
-        Permissions.ContentApprove, Permissions.ContentPublish, Permissions.ContentTakedown, Permissions.ModerationAct,
-        Permissions.UsersManage, Permissions.AuditRead,
-    };
+    public static RbacDocument Document { get; } = Load();
 
-    public static IReadOnlySet<string> AllPermissions { get; } =
-        typeof(Permissions).GetFields().Select(f => (string)f.GetValue(null)!).ToHashSet(StringComparer.Ordinal);
+    private static readonly Dictionary<string, string[]> Grants =
+        Document.Roles.ToDictionary(r => r.Key, r => r.Value.Permissions.ToArray(), StringComparer.Ordinal);
+
+    public static readonly IReadOnlySet<string> MfaRequired =
+        Document.Permissions.Where(p => p.Value.Mfa).Select(p => p.Key).ToHashSet(StringComparer.Ordinal);
+
+    public static IReadOnlySet<string> AllPermissions { get; } = Document.Permissions.Keys.ToHashSet(StringComparer.Ordinal);
 
     public static IReadOnlyList<string> PermissionsOf(string role) => Grants.TryGetValue(role, out var p) ? p : [];
 
@@ -89,7 +84,24 @@ public static class PermissionMatrix
         if (!roles.Any(r => PermissionsOf(r).Contains(permission))) return AccessDecision.MissingPermission;
         return MfaRequired.Contains(permission) && !mfaSatisfied ? AccessDecision.MfaRequired : AccessDecision.Allowed;
     }
+
+    private static RbacDocument Load()
+    {
+        using var stream = typeof(PermissionMatrix).Assembly.GetManifestResourceStream(ResourceName)
+            ?? throw new InvalidOperationException($"Embedded resource {ResourceName} (config/rbac/rbac.json) is missing.");
+        var document = JsonSerializer.Deserialize<RbacDocument>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            ?? throw new InvalidOperationException("config/rbac/rbac.json is empty.");
+        var unknown = document.Roles.SelectMany(r => r.Value.Permissions.Where(p => !document.Permissions.ContainsKey(p)).Select(p => $"{r.Key}:{p}")).ToList();
+        if (unknown.Count > 0) throw new InvalidOperationException($"config/rbac/rbac.json grants unknown permissions: {string.Join(", ", unknown)}");
+        return document;
+    }
 }
+
+public sealed record RbacDocument(int Version, IReadOnlyDictionary<string, RbacPermission> Permissions, IReadOnlyDictionary<string, RbacRole> Roles);
+
+public sealed record RbacPermission(string Label, bool Mfa);
+
+public sealed record RbacRole(string Label, IReadOnlyList<string> Permissions);
 
 public enum AccessDecision
 {

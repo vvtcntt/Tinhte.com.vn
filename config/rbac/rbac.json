@@ -1,0 +1,33 @@
+{
+  "$comment": "Ma trận vai trò → quyền của staff (ADR-0004). Nguồn sự thật duy nhất cho backend (Tinhte.Platform.Security.PermissionMatrix, nhúng lúc build) và CMS (ẩn/hiện giao diện). Danh sách vai trò phải khớp CHECK ck_user_roles_role (migration 0313).",
+  "version": 1,
+  "status": "DRAFT — chờ BA/TL/PO duyệt (07_API_IMPLEMENTATION_GUIDE: role-policy matrix trước sign-off)",
+  "permissions": {
+    "content.read": { "label": "Xem nội dung trong CMS", "mfa": false },
+    "content.write_own": { "label": "Soạn và sửa bài của mình", "mfa": false },
+    "content.write_any": { "label": "Sửa bài của người khác", "mfa": false },
+    "content.review": { "label": "Duyệt nội dung, yêu cầu sửa", "mfa": false },
+    "content.approve": { "label": "Chấp thuận phiên bản", "mfa": true },
+    "content.publish": { "label": "Xuất bản, lên lịch", "mfa": true },
+    "content.takedown": { "label": "Gỡ, đính chính nội dung", "mfa": true },
+    "media.upload": { "label": "Tải lên media", "mfa": false },
+    "taxonomy.manage": { "label": "Quản lý chuyên mục, tag, nguồn", "mfa": false },
+    "moderation.act": { "label": "Xử lý kiểm duyệt", "mfa": true },
+    "users.read": { "label": "Xem tài khoản", "mfa": false },
+    "users.manage": { "label": "Đình chỉ tài khoản, cấp/thu hồi vai trò", "mfa": true },
+    "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true }
+  },
+  "roles": {
+    "AUTHOR": { "label": "Tác giả", "permissions": ["content.read", "content.write_own", "media.upload"] },
+    "EDITOR": {
+      "label": "Biên tập viên",
+      "permissions": ["content.read", "content.write_own", "content.write_any", "content.review", "media.upload", "taxonomy.manage"]
+    },
+    "APPROVER": {
+      "label": "Người duyệt xuất bản",
+      "permissions": ["content.read", "content.review", "content.approve", "content.publish", "content.takedown"]
+    },
+    "MODERATOR": { "label": "Kiểm duyệt viên", "permissions": ["moderation.act"] },
+    "ADMIN": { "label": "Quản trị tài khoản", "permissions": ["users.read", "users.manage", "audit.read"] }
+  }
+}

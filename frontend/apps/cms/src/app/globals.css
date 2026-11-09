@@ -1,0 +1,143 @@
+/* CMS — giao diện tạm cho Sprint 0. Design system thật làm ở WBS-016 (chờ UX 03). Màu định nghĩa bằng token để đổi theme. */
+:root {
+  color-scheme: light;
+  --bg: #f6f6f7;
+  --surface: #ffffff;
+  --text: #18181b;
+  --muted: #6b6b76;
+  --border: #e4e4e7;
+  --accent: #1d4ed8;
+  --accent-text: #ffffff;
+  --ok-bg: #dcfce7;
+  --ok-text: #166534;
+  --warn-bg: #fef3c7;
+  --warn-text: #92400e;
+  --error-bg: #fee2e2;
+  --error-text: #991b1b;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #111113;
+    --surface: #1b1b1f;
+    --text: #ededf0;
+    --muted: #a1a1aa;
+    --border: #2e2e33;
+    --accent: #6d8cff;
+    --accent-text: #0b0b0d;
+    --ok-bg: #12331f;
+    --ok-text: #86efac;
+    --warn-bg: #3a2a0b;
+    --warn-text: #fcd34d;
+    --error-bg: #3b1212;
+    --error-text: #fca5a5;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+h1 { font-size: 22px; line-height: 1.25; margin: 0 0 6px; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+p { margin: 0 0 12px; }
+code { font-size: 13px; overflow-wrap: anywhere; }
+a { color: inherit; }
+
+.muted { color: var(--muted); }
+.eyebrow { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.fine-print { color: var(--muted); font-size: 12px; margin: 16px 0 0; }
+.stack { display: grid; gap: 20px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.card.narrow { width: min(420px, 100%); }
+.card.empty { color: var(--muted); text-align: center; padding: 40px 20px; }
+
+.center-screen { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--text);
+  font: inherit; font-weight: 500; cursor: pointer;
+}
+.button:hover { border-color: var(--muted); }
+.button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.button.block { width: 100%; margin-top: 8px; }
+.button.small { min-height: 30px; padding: 0 10px; font-size: 13px; }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+}
+.badge.ok { background: var(--ok-bg); color: var(--ok-text); border-color: transparent; }
+.badge.warn { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+
+.banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px;
+}
+.banner.warn { background: var(--warn-bg); color: var(--warn-text); }
+.banner.error { background: var(--error-bg); color: var(--error-text); }
+
+/* Khung làm việc: thanh trên + thanh bên; dưới 760px thanh bên thành hàng tab cuộn ngang. */
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "top top" "side main";
+}
+.topbar {
+  grid-area: top;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand { font-weight: 700; text-decoration: none; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.roles { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+.sidebar { grid-area: side; border-right: 1px solid var(--border); padding: 16px 10px; }
+.sidebar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sidebar a {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--muted);
+}
+.sidebar a:hover { background: var(--surface); color: var(--text); }
+.sidebar a.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+.lock { font-size: 11px; font-weight: 700; color: var(--warn-text); background: var(--warn-bg); border-radius: 4px; padding: 0 5px; }
+
+.content { grid-area: main; padding: 24px; min-width: 0; }
+
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; min-width: 0; }
+.perm-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.perm-list li { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "side" "main"; }
+  .topbar { padding: 10px 16px; }
+  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 16px; overflow-x: auto; }
+  .sidebar ul { display: flex; gap: 4px; }
+  .sidebar a { white-space: nowrap; }
+  .content { padding: 16px; }
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .facts dd { margin-bottom: 8px; }
+}

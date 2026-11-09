@@ -9,6 +9,7 @@ Stack: **ASP.NET Core 10 Web API dạng Controller** (modular monolith, [ADR-000
 
 ```
 config/sites/        Site Registry — nguồn sự thật cho mọi subdomain (+ schema, ca kiểm thử phân giải dùng chung)
+config/rbac/         Ma trận vai trò → quyền (DRAFT) — dùng chung cho backend (nhúng lúc build) và CMS
 backend/             ASP.NET Core 10 Web API (Controllers): Tinhte.Api (host + Controllers/), Tinhte.Platform (site, lỗi, cờ, base controller, DB, phân trang/ETag/idempotency), Tinhte.DbMigrator (áp migration), Modules/* (News, Video, Community, Ads, Identity — mỗi module có Controllers/)
 frontend/            npm workspaces: apps/web (site công khai, đa subdomain), apps/cms (CMS), packages/sites (@tinhte/sites)
 tools/               Script sinh từ registry: validate, plan (DNS/TLS/edge), db-sync, Caddyfile; chặn hostname viết cứng; pglite-server (PostgreSQL dev không cần Docker)
@@ -60,7 +61,18 @@ Vai trò lưu trong DB, không lấy từ IdP. Cấp ADMIN đầu tiên:
 dotnet run --project backend/src/Tinhte.DbMigrator -- grant-role --issuer https://idp.example --subject <sub-của-người-đó> --role ADMIN --reason "bootstrap"
 ```
 
-CMS gọi API admin bằng cookie `__Host-tt_cms_session`; request ghi gửi kèm header `X-CSRF-Token` lấy từ cookie `__Host-tt_cms_csrf`.
+CMS gọi API admin bằng cookie `__Host-tt_cms_session`; request ghi gửi kèm header `X-CSRF-Token` lấy từ cookie `__Host-tt_cms_csrf` (`frontend/apps/cms/src/lib/api.ts`).
+
+**Đăng nhập CMS trên máy dev** (chưa có IdP thật): `tools/dev-oidc` là IdP giả, **chỉ dùng local**, chỉ nghe 127.0.0.1.
+
+```bash
+node tools/dev-oidc/server.mjs                                   # http://127.0.0.1:5090
+dotnet run --project backend/src/Tinhte.DbMigrator -- grant-role --issuer http://127.0.0.1:5090 --subject dev-admin --role APPROVER --reason "dev"
+cd backend/src/Tinhte.Api && Auth__Staff__Authority=http://127.0.0.1:5090 Auth__Staff__ClientId=tinhte-cms-dev Auth__Staff__ClientSecret=dev-only-secret Auth__Staff__RequireHttpsMetadata=false dotnet run
+npm run dev -w @tinhte/cms                                       # http://cms.tinhte.localhost:3001 → Đăng nhập
+```
+
+Chạy API từ thư mục `backend/src/Tinhte.Api` (hoặc `dotnet run --project`) để nạp `appsettings.Development.json`; chạy dll từ gốc repo sẽ thiếu cấu hình tin `X-Forwarded-Host` → API trả 400 "Host header does not match".
 
 Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa file hosts. Khi chạy Next trực tiếp, `/api/v1/*` được rewrite sang API (`TT_API_ORIGIN`). Qua edge (Caddy hoặc CDN) thì edge route `/api/*`.
 
@@ -75,7 +87,8 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Hạng mục | Kết quả |
 |---|---|
 | `@tinhte/sites` (node:test) | 11/11 PASS, gồm test "thêm subdomain chỉ bằng registry" và bộ ca dùng chung với C# |
-| Backend `dotnet test` | 152/152 PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem, RBAC + CSRF, đăng nhập OIDC đầu-cuối với IdP giả. Không có DB: 128 PASS + 24 SKIP. Build 0 cảnh báo |
+| Backend `dotnet test` | PASS với DB (PGlite): registry, định tuyến theo host, chặn Origin, khớp spec, quy ước controller, Problem 400/422/409/500, phân trang cursor, ETag/If-Match, idempotency, migration runner, trigger DB → Problem, RBAC + CSRF, đăng nhập OIDC đầu-cuối với IdP giả. 153/153 với DB; không có DB: 129 PASS + 24 SKIP. Build 0 cảnh báo |
+| CMS (`@tinhte/cms`) | 7/7 test thư viện (RBAC, CSRF cookie, returnTo, Problem); chạy thật trên trình duyệt: đăng nhập qua dev IdP → tổng quan → điều hướng theo quyền → màn không đủ quyền / cần MFA → đăng xuất; 375px không cuộn ngang |
 | Next.js `web`, `cms` | `next build` OK; chạy production và kiểm HTTP theo Host: 200/308/400/404, header bảo mật, robots/sitemap theo môi trường |
 | Script registry | validate, plan, db-sync, Caddyfile `--check`, chặn hostname viết cứng: OK |
 | Contract tĩnh v0.3 | 34/34 PASS |
@@ -95,6 +108,6 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 014 | API conventions | Có: problem+json, error catalog, lỗi DB → Problem, cursor HMAC, ETag/If-Match, Idempotency-Key, phân giải site, chặn Origin |
 | 015 | Khung Next.js SSR | Có (web + cms, đa site) |
 | 016 | Design system | Chưa (chờ UX 03) |
-| 017–018 | Staff auth, RBAC | Có: OIDC (IdP bất kỳ) + PKCE, phiên phía server thu hồi được, MFA theo amr/acr, CSRF double-submit, ma trận quyền (DRAFT chờ BA/PO); migration 0313. Chưa: IdP thật, UI đăng nhập CMS |
+| 017–018 | Staff auth, RBAC | Có: OIDC (IdP bất kỳ) + PKCE, phiên phía server thu hồi được, MFA theo amr/acr, CSRF double-submit, ma trận quyền (DRAFT chờ BA/PO); migration 0313; UI CMS: đăng nhập, khung, menu theo quyền, cảnh báo MFA, đăng xuất. Chưa: IdP thật, màn hình nghiệp vụ |
 | 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |

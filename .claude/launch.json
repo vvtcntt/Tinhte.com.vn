@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cms",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend/apps/cms"],
+      "port": 3001,
+      "url": "http://cms.tinhte.localhost:3001"
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend/apps/web"],
+      "port": 3000,
+      "url": "http://www.tinhte.localhost:3000"
+    }
+  ]
+}

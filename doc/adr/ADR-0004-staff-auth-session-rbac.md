@@ -64,6 +64,7 @@ related: ADR-0001 (D4/D5), ADR-0003, WBS-017, WBS-018, FR-ID-002, FR-ID-004, FR-
 ### 5. RBAC: ma trận vai trò → quyền
 
 - Có 5 vai trò (DRAFT): `AUTHOR`, `EDITOR`, `APPROVER`, `MODERATOR`, `ADMIN`. Danh sách khớp CHECK `ck_user_roles_role`; test giữ hai bên khớp nhau.
+- **Nguồn sự thật của ma trận: `config/rbac/rbac.json`** (cập nhật 09/11/2026 khi làm UI CMS). Backend nhúng file vào assembly lúc build (`PermissionMatrix`); CMS import cùng file để ẩn/hiện giao diện. Test C# và test CMS giữ file, hằng số và CHECK của 0313 khớp nhau.
 - Code kiểm **quyền**, không kiểm tên vai trò:
   - Controller: `[RequirePermission(Permissions.X)]`, dựa trên cơ chế authorization chuẩn (`IAuthorizationRequirementData`).
   - Service: `User.RequirePermission(Permissions.X)`, đáp ứng yêu cầu "RBAC enforced in the domain layer".
@@ -102,10 +103,12 @@ Muốn nhiều quyền thì cấp nhiều vai trò, ví dụ EDITOR + APPROVER. 
 | A-1 | `XCsrfToken` ghi "final scheme depends on auth ADR" | Ghi rõ: token lấy từ cookie `__Host-tt_cms_csrf`, cấp lúc đăng nhập, gắn với phiên |
 | A-2 | Chưa có enum vai trò (`RoleAssignment.roles`, `StaffSession.roles`) | Thêm enum `StaffRole` gồm 5 giá trị trên sau khi BA/PO duyệt ma trận |
 | A-3 | Callback khi user chưa có vai trò | Ghi rõ 403 `FORBIDDEN` (đã có trong `x-error-codes`) và lý do |
+| A-4 | Callback luôn do trình duyệt điều hướng tới, nên lỗi (chưa có vai trò, state sai, IdP từ chối) hiện ra dưới dạng JSON thô | Khi `Accept` ưu tiên `text/html`: 302 về trang CMS `/login?error=<code>` để hiển thị thân thiện; client API vẫn nhận Problem. Cần sửa spec trước khi làm (contract-first) |
 
 ## Kiểm chứng (09/11/2026)
 
-- `dotnet test`: **152/152 PASS** khi có DB (PGlite).
+- `dotnet test`: **152/152 PASS** khi có DB (PGlite); 153/153 sau khi chuyển ma trận sang `config/rbac/rbac.json`.
+- **UI CMS chạy thật trên trình duyệt** với `tools/dev-oidc`: đăng nhập (cookie `__Host-` được nhận trên `*.localhost`), tổng quan, menu theo quyền, màn "không có quyền" / "cần MFA", đăng nhập không MFA (banner + khóa), quay lại đúng `returnTo`, đăng xuất (204, gửi CSRF, cookie bị xóa).
 - `AuthRbacTests` (không cần DB):
   - ma trận quyền, MFA, danh mục vai trò khớp migration;
   - 401/403 qua attribute và qua domain layer;

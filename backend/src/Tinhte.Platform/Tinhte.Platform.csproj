@@ -8,4 +8,8 @@
   <ItemGroup>
     <PackageReference Include="Npgsql" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Ma trận RBAC dùng chung với CMS (ADR-0004): nguồn duy nhất config/rbac/rbac.json. -->
+    <EmbeddedResource Include="../../../config/rbac/rbac.json" LogicalName="Tinhte.Platform.rbac.json" />
+  </ItemGroup>
 </Project>

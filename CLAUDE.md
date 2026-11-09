@@ -33,7 +33,9 @@
 ## 2c. Xác thực staff + RBAC (ADR-0004)
 
 - Endpoint admin: `[RequirePermission(Permissions.X)]`. Chỉ cần đăng nhập: `[RequireStaffSession]`. Quyết định phụ thuộc dữ liệu: `User.RequirePermission(...)` trong service. **Kiểm quyền, không kiểm tên vai trò.**
-- Vai trò/quyền mới: sửa `StaffRoles`/`Permissions`/`PermissionMatrix` **và** CHECK `ck_user_roles_role` bằng migration mới. Ma trận là DRAFT: đổi phải có BA/PO duyệt.
+- Ma trận vai trò → quyền: **nguồn duy nhất `config/rbac/rbac.json`** (backend nhúng lúc build, CMS import). Thêm quyền/vai trò: sửa file này + hằng số `Permissions`/`StaffRoles` + CHECK `ck_user_roles_role` bằng migration mới (test giữ ba nơi khớp). Ma trận là DRAFT: đổi phải có BA/PO duyệt.
+- CMS: gọi API qua `apiFetch` (`frontend/apps/cms/src/lib/api.ts`) — tự gửi CSRF; ẩn/hiện UI bằng `access()`/`<RequirePermission>` nhưng không coi đó là bảo vệ (API vẫn kiểm).
+- `tools/dev-oidc` chỉ dùng trên máy dev; không cấu hình nó cho staging/production.
 - Không tin vai trò từ IdP; không dùng cookie auth/JWT cho CMS; không đặt cookie có `Domain`.
 - Request ghi bằng cookie phiên phải có `X-CSRF-Token` (do `CsrfMiddleware` kiểm) — đừng tắt cho endpoint riêng.
 

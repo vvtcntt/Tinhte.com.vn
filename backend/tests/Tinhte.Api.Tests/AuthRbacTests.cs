@@ -47,6 +47,17 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     }
 
     [Fact]
+    public void Code_constants_match_the_shared_rbac_json()
+    {
+        var constants = typeof(Permissions).GetFields().Select(f => (string)f.GetValue(null)!).Order().ToList();
+        Assert.Equal(constants, PermissionMatrix.Document.Permissions.Keys.Order());
+        Assert.Equal(StaffRoles.All.Order(), PermissionMatrix.Document.Roles.Keys.Order());
+        // File nhúng phải trùng file trong repo (CMS đọc trực tiếp file này).
+        using var json = JsonDocument.Parse(File.ReadAllText(RepoPaths.File("config", "rbac", "rbac.json")));
+        Assert.Equal(json.RootElement.GetProperty("roles").EnumerateObject().Select(p => p.Name).Order(), PermissionMatrix.Document.Roles.Keys.Order());
+    }
+
+    [Fact]
     public void Every_role_grants_known_permissions_and_privileged_permissions_need_mfa()
     {
         foreach (var role in StaffRoles.All)
