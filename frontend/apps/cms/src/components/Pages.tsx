@@ -6,6 +6,7 @@ import { returnToFor } from '../lib/loginErrors';
 import { SECTIONS } from '../lib/nav';
 import { grantedPermissions, permissionLabel, roleLabel } from '../lib/rbac';
 import { RequirePermission } from './CmsApp';
+import { ReviewSummaryCard } from './Review';
 import { useStaff } from './session';
 
 export function Dashboard() {
@@ -19,6 +20,7 @@ export function Dashboard() {
       </div>
 
       <div className="grid">
+        <ReviewSummaryCard />
         <div className="card">
           <h2>Phiên làm việc</h2>
           <dl className="facts">

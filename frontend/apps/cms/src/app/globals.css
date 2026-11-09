@@ -190,6 +190,16 @@ a { color: inherit; }
 a.button { text-decoration: none; }
 @media (max-width: 1000px) { .editor-layout { grid-template-columns: minmax(0, 1fr); } }
 
+/* Hàng đợi duyệt (WBS-031) */
+.count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 11px; font-weight: 700; margin-left: auto; }
+.count.muted-count { background: var(--border); color: var(--muted); }
+.sidebar a .count + .lock { margin-left: 4px; }
+.tabs-bar { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.tabs-bar .tab { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 6px 12px; }
+.tabs-bar .tab .count { margin-left: 0; }
+.warn-text { color: var(--warn-text); }
+
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (max-width: 760px) {

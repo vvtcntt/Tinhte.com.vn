@@ -124,3 +124,46 @@ test('articles: trạng thái sửa được khớp ArticleStatuses.Editable c�
   const all = cs.slice(cs.indexOf('All ='), cs.indexOf('};', cs.indexOf('All =')));
   assert.equal(ARTICLE_STATUSES.length, [...all.matchAll(/\b(Draft|InReview|ChangesRequested|Rejected|Approved|Scheduled|Published|Unpublished|Retracted)\b/g)].length);
 });
+
+test('review: hàng đợi theo vai trò (WBS-031)', async () => {
+  const { visibleQueues, queueUrl, badgeText, waitingFor, isOverdue, QUEUES } = await import('../src/lib/review.ts');
+  const { access } = await import('../src/lib/rbac.ts');
+  const keysFor = (roles: string[], mfa = true) => visibleQueues((p) => access({ roles, mfaSatisfied: mfa }, p)).map((q) => q.key);
+  assert.deepEqual(keysFor(['AUTHOR']), ['to-fix', 'my-submitted']);
+  assert.deepEqual(keysFor(['EDITOR']), ['to-review', 'to-fix', 'my-submitted']);
+  assert.deepEqual(keysFor(['APPROVER']), ['to-review', 'to-publish']);
+  assert.deepEqual(keysFor(['APPROVER'], false), ['to-review', 'to-publish']);      // thiếu MFA vẫn thấy việc, nút sẽ yêu cầu MFA
+  assert.deepEqual(keysFor(['ADMIN']), []);
+  assert.deepEqual(keysFor(['MODERATOR']), []);
+
+  const fix = QUEUES.find((q) => q.key === 'to-fix')!;
+  const url = new URL(`http://x/api/v1${queueUrl(fix, 'u-1', 20, 'c1')}`);
+  assert.equal(url.pathname, '/api/v1/admin/articles');
+  assert.equal(url.searchParams.get('status'), 'CHANGES_REQUESTED,REJECTED');
+  assert.equal(url.searchParams.get('assigneeId'), 'u-1');
+  assert.equal(url.searchParams.get('sort'), 'updatedAt_asc');
+  assert.equal(url.searchParams.get('cursor'), 'c1');
+  assert.match(QUEUES.find((q) => q.key === 'to-review')!.params('u').sort, /^updatedAt_asc$/); // chờ lâu nhất trước
+
+  assert.equal(badgeText(0, false), null);
+  assert.equal(badgeText(5, false), '5');
+  assert.equal(badgeText(100, true), '99+');
+  const now = new Date('2026-11-09T12:00:00Z');
+  assert.equal(waitingFor('2026-11-09T11:59:40Z', now), 'vừa xong');
+  assert.equal(waitingFor('2026-11-09T11:15:00Z', now), '45 phút');
+  assert.equal(waitingFor('2026-11-09T07:00:00Z', now), '5 giờ');
+  assert.equal(waitingFor('2026-11-06T12:00:00Z', now), '3 ngày');
+  assert.equal(waitingFor('2026-11-10T00:00:00Z', now), 'vừa xong');
+  assert.equal(isOverdue('2026-11-08T11:00:00Z', now), true);
+  assert.equal(isOverdue('2026-11-09T01:00:00Z', now), false);
+});
+
+test('review: bộ lọc hàng đợi chỉ dùng trạng thái/sort mà API chấp nhận', async () => {
+  const { QUEUES } = await import('../src/lib/review.ts');
+  const { ARTICLE_STATUSES } = await import('../src/lib/articles.ts');
+  for (const q of QUEUES) {
+    const p = q.params('u');
+    for (const s of p.status.split(',')) assert.ok((ARTICLE_STATUSES as readonly string[]).includes(s), `${q.key}: ${s}`);
+    assert.match(p.sort, /^(updatedAt_desc|updatedAt_asc|createdAt_desc|title_asc)$/);
+  }
+});

@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { describeLoginError, type LoginError } from '../lib/loginErrors';
 import { SECTIONS, sectionFor } from '../lib/nav';
 import { access, hasLockedPermissions, roleLabel, type PermissionKey } from '../lib/rbac';
+import { ReviewBadge } from './Review';
 import { SessionProvider, useSession, useStaff } from './session';
 
 /** Gốc giao diện CMS: kiểm phiên → màn đăng nhập hoặc khung làm việc. */
@@ -113,6 +114,7 @@ function AppShell({ siteLabel, children }: { siteLabel: string; children: ReactN
               <li key={s.href}>
                 <Link href={s.href} aria-current={active ? 'page' : undefined} className={active ? 'active' : undefined}>
                   <span>{s.label}</span>
+                  {s.href === '/review' && <ReviewBadge />}
                   {locked && (
                     <span className="lock" title="Cần đăng nhập với MFA">
                       MFA

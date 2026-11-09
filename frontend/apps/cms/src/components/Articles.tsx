@@ -689,6 +689,7 @@ function WorkflowPanel({ article, revision, etag, dirty, canEdit, onChanged }: {
       });
       setReason('');
       await onChanged();
+      window.dispatchEvent(new Event('tt:review-changed')); // cập nhật số việc trên menu (WBS-031)
       setMessage({ kind: 'ok', text: DONE[action] });
     } catch (err) {
       if (err instanceof ApiError && err.code === 'REASON_REQUIRED') setReasonProblem(reasonError(''));
@@ -803,6 +804,7 @@ function PublishPanel({ article, etag, dirty, onPublished }: { article: AdminArt
       });
       setIdempotencyKey(crypto.randomUUID());
       await onPublished();
+      window.dispatchEvent(new Event('tt:review-changed'));
       setMessage({ kind: 'ok', text: 'Đã xuất bản.' });
     } catch (err) {
       if (err instanceof ApiError && err.status < 500) setIdempotencyKey(crypto.randomUUID());
