@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from '../../../components/Pages';
+import { ArticlesPage } from '../../../components/Articles';
 
 export default function Page() {
-  return <SectionPlaceholder href="/articles" />;
+  return <ArticlesPage />;
 }

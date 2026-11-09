@@ -163,6 +163,32 @@ a { color: inherit; }
 .button.danger { background: var(--error-text); border-color: var(--error-text); color: var(--surface); }
 .button:disabled { opacity: 0.5; cursor: not-allowed; }
 .banner.ok { background: var(--ok-bg); color: var(--ok-text); }
+/* Màn Bài viết */
+.title-row.spread { justify-content: space-between; align-items: flex-start; }
+.title-row.spread p { margin: 4px 0 0; }
+.small { font-size: 12px; }
+.check.inline { align-items: center; align-self: center; min-height: 36px; color: var(--muted); font-size: 14px; }
+.check.inline input { margin: 0; }
+.narrow-form { max-width: 640px; }
+.editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.tabs { display: inline-flex; gap: 4px; margin-bottom: 4px; }
+.tab { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; border: 1px solid transparent; background: none; color: var(--muted); cursor: pointer; }
+.tab.active { border-color: var(--border); background: var(--surface); color: var(--text); font-weight: 600; }
+.field textarea.body-editor { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 14px; line-height: 1.6; min-height: 320px; }
+.preview { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-height: 320px; color: var(--text); font-size: 15px; line-height: 1.7; }
+.preview h3, .preview h4 { margin: 16px 0 8px; }
+.preview blockquote { margin: 12px 0; padding-left: 12px; border-left: 3px solid var(--border); color: var(--muted); }
+.revisions { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 280px; overflow-y: auto; }
+.rev { width: 100%; display: grid; gap: 2px; text-align: left; font: inherit; font-size: 14px; color: var(--text); background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; cursor: pointer; }
+.rev:hover, .rev.active { border-color: var(--border); background: var(--bg); }
+.diff { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 10px; }
+.diff-row { display: grid; gap: 2px; font-size: 13px; }
+.diff-row del { color: var(--error-text); background: var(--error-bg); padding: 2px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.diff-row ins { color: var(--ok-text); background: var(--ok-bg); padding: 2px 6px; border-radius: 4px; text-decoration: none; overflow-wrap: anywhere; }
+a.button { text-decoration: none; }
+@media (max-width: 1000px) { .editor-layout { grid-template-columns: minmax(0, 1fr); } }
+
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (max-width: 760px) {

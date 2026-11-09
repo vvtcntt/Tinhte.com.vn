@@ -233,6 +233,21 @@ public sealed class NewsArticleDbTests(MigratedDatabaseFixture db, WebApplicatio
             $$"""{"revisionId":"{{revisionId}}"}""", etag, "publish-" + Guid.NewGuid()));
 
     [DbFact]
+    public async Task Admin_categories_lists_categories_for_staff_with_content_read()
+    {
+        using var cms = Cms();
+        using var ok = await cms.SendAsync(NewsHttp.Admin(HttpMethod.Get, "/api/v1/admin/categories", _author, StaffRoles.Author));
+        var list = await NewsHttp.JsonAsync(ok, HttpStatusCode.OK);
+        var mine = list.GetProperty("items").EnumerateArray().Single(c => c.GetProperty("id").GetGuid() == _category);
+        Assert.Equal(_categorySlug, mine.GetProperty("slug").GetString());
+        Assert.True(mine.GetProperty("isEnabled").GetBoolean());
+        Assert.True(mine.GetProperty("rowVersion").GetInt64() >= 1);
+
+        using var moderator = await cms.SendAsync(NewsHttp.Admin(HttpMethod.Get, "/api/v1/admin/categories", _author, StaffRoles.Moderator));
+        Assert.Equal(HttpStatusCode.Forbidden, moderator.StatusCode);
+    }
+
+    [DbFact]
     public async Task Create_returns_draft_with_working_revision_etag_and_location()
     {
         using var cms = Cms();

@@ -89,3 +89,38 @@ test('login: các reason khớp x-browser-error-redirect của hợp đồng', a
   assert.deepEqual(reasons, ['denied', 'idp_error', 'inactive', 'no_role', 'state_invalid', 'unavailable']);
   for (const r of reasons) assert.notEqual(describeLoginError(`?error=X&reason=${r}`)?.error.title, 'Không thể đăng nhập', r);
 });
+
+test('articles: văn bản ↔ khối nội dung (trình soạn tạm)', async () => {
+  const { textToBlocks, blocksToText, canEditArticle, EDITABLE_STATUSES, statusLabel } = await import('../src/lib/articles.ts');
+  const text = '## Mở đầu\n\nĐoạn một\ncòn tiếp\n\n> Trích dẫn\n> hai dòng\n\n### Mục nhỏ\n\nĐoạn hai';
+  const blocks = textToBlocks(text);
+  assert.deepEqual(blocks.map((b) => b.type), ['heading', 'paragraph', 'quote', 'heading', 'paragraph']);
+  assert.equal(blocks[0].level, 2);
+  assert.equal(blocks[3].level, 3);
+  assert.equal(blocks[1].text, 'Đoạn một\ncòn tiếp');
+  assert.equal(blocks[2].text, 'Trích dẫn\nhai dòng');
+  const back = blocksToText(blocks);
+  assert.equal(back.supported, true);
+  assert.deepEqual(textToBlocks(back.text), blocks);                       // khứ hồi không mất nội dung
+  assert.deepEqual(textToBlocks('\r\n\r\n  \n\n'), []);
+  assert.equal(blocksToText([{ type: 'image', src: 'x' }]).supported, false); // khối lạ → chỉ xem
+  assert.equal(blocksToText([]).text, '');
+
+  const can = (granted: string[]) => (p: string) => granted.includes(p);
+  assert.equal(canEditArticle(can(['content.write_own']), 'u1', { ownerId: 'u1' }), true);
+  assert.equal(canEditArticle(can(['content.write_own']), 'u1', { ownerId: 'u2' }), false);
+  assert.equal(canEditArticle(can(['content.write_any']), 'u1', { ownerId: 'u2' }), true);
+  assert.equal(EDITABLE_STATUSES.has('IN_REVIEW'), false);
+  assert.equal(statusLabel('PUBLISHED'), 'Đã xuất bản');
+});
+
+test('articles: trạng thái sửa được khớp ArticleStatuses.Editable của backend', async () => {
+  const { EDITABLE_STATUSES, ARTICLE_STATUSES } = await import('../src/lib/articles.ts');
+  const cs = readFileSync(new URL('../../../../backend/src/Modules/Tinhte.Modules.News/Domain/ArticleRules.cs', import.meta.url), 'utf8');
+  const block = cs.slice(cs.indexOf('Editable'), cs.indexOf('};', cs.indexOf('Editable')));
+  const names = [...block.matchAll(/\b([A-Z][a-zA-Z]+)\b/g)].map((m) => m[1]).filter((n) => !['Editable', 'HashSet', 'StringComparer', 'Ordinal', 'IReadOnlySet'].includes(n));
+  const toConst = (n: string) => n.replace(/([a-z])([A-Z])/g, '$1_$2').toUpperCase();
+  assert.deepEqual(names.map(toConst).sort(), [...EDITABLE_STATUSES].sort());
+  const all = cs.slice(cs.indexOf('All ='), cs.indexOf('};', cs.indexOf('All =')));
+  assert.equal(ARTICLE_STATUSES.length, [...all.matchAll(/\b(Draft|InReview|ChangesRequested|Rejected|Approved|Scheduled|Published|Unpublished|Retracted)\b/g)].length);
+});

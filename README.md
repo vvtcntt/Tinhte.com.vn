@@ -83,6 +83,18 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 - Revision rời `DRAFT` hoặc đang public bị DB đóng băng (migration 0320): sửa bài đang public tạo revision mới, bản công khai giữ nguyên tới lần publish sau.
 - Chưa có: duyệt (WBS-024 — publish cần revision `APPROVED`), rights/nguồn (WBS-023 — publish cần quyền `CLEARED`), lịch/preview (WBS-025), outbox (WBS-020). Bài tài trợ chỉ hiển thị khi cờ `ads.sponsored_publication` ON **và** đã cấu hình `News:SponsoredLabel` (câu chữ Legal duyệt).
 
+**Màn Bài viết trên CMS** (WBS-030, phần danh sách của WBS-031): `/articles` có danh sách (lọc trạng thái, "bài của tôi", tìm, xem thêm) và nút "Bài mới"; `/articles/{id}` gồm:
+- trình soạn tạm: đoạn cách bằng dòng trống, `##` / `###` là tiêu đề, `>` là trích dẫn, có nút xem trước;
+- lưu bằng If-Match; khi người khác vừa lưu thì báo xung đột kèm nút tải lại;
+- lịch sử phiên bản, so sánh với phiên bản trước;
+- nút xuất bản (`content.publish` + MFA). API sẽ từ chối cho tới khi có bước duyệt (WBS-024) và quyền nguồn (WBS-023).
+
+Form chọn chuyên mục dùng `GET /admin/categories` (chỉ đọc; tạo/sửa chuyên mục thuộc WBS-023/032). Trên máy dev, thêm chuyên mục bằng SQL trong pgAdmin (DB `tinhte`):
+
+```sql
+INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('danh-gia', 'Đánh giá'), ('thu-thuat', 'Thủ thuật');
+```
+
 ## Đa subdomain (tóm tắt ADR-0001)
 
 - Mỗi subdomain là một mục trong `config/sites/sites.json`. Routing (Next `proxy.ts`, middleware ASP.NET), CSP, robots/sitemap, tên cookie, bề mặt API, bảng `tt.sites`, DNS/TLS/edge đều **suy ra** từ đó.
@@ -120,4 +132,5 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 115 | Quản trị tài khoản | Có: `GET /admin/users` (lọc trạng thái/vai trò/tìm, cursor), chi tiết + ETag, đình chỉ/kích hoạt lại (lý do, Idempotency-Key, thu hồi phiên), `PUT …/roles` (If-Match, lý do, chống tự bỏ ADMIN); lịch sử trạng thái (migration 0314) + vai trò (0313); màn CMS Tài khoản |
 | 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |
+| 030 | CMS editor bài viết | Có (tạm): danh sách, tạo nháp, soạn/sửa với If-Match + xung đột, xem trước, lịch sử + so sánh, nút xuất bản; `GET /admin/categories`. Chưa: editor rich-text theo UX-CMS-02 (ảnh/nhúng), autosave/offline |
 | 022 | Content type, article revision, publish pointer | Có (API, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md)): tạo/sửa/đọc/danh sách bài CMS, lịch sử + diff revision, publish pointer, đọc công khai theo slug + redirect 308; migration 0320/0321. `dotnet test` sau khi gộp với WBS-115: 194/194 PASS với DB (PGlite), 151 PASS + 43 SKIP không DB. Chưa: duyệt (024), rights (023), lịch (025), outbox (020), UI CMS (030) |
