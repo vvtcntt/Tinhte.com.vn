@@ -1,0 +1,75 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using Tinhte.Modules.Video.Domain;
+
+namespace Tinhte.Modules.Video.Application;
+
+// DTO theo components.schemas của hợp đồng v0.3 (CmsVideo). Tên kiểu có tiền tố Video để không trùng schema của module News
+// trong tài liệu OpenAPI sinh từ code; JSON giống hệt schema Sponsorship của hợp đồng.
+
+/// <summary>Sponsorship (ghi): approvedBy/approvedAt là readOnly — do workflow duyệt tài trợ đặt, không nhận từ client.</summary>
+public sealed record VideoSponsorshipInput(
+    [Required, StringLength(180, MinimumLength = 1)] string SponsorName,
+    [Required, StringLength(120, MinimumLength = 1)] string SponsorReference,
+    [Required, StringLength(300, MinimumLength = 1)] string EvidenceRef,
+    [Required] DateTimeOffset? ValidFrom,
+    [Required] DateTimeOffset? ValidTo);
+
+/// <summary>Sponsorship (đọc).</summary>
+public sealed record VideoSponsorship(
+    string SponsorName,
+    string SponsorReference,
+    string EvidenceRef,
+    DateTimeOffset ValidFrom,
+    DateTimeOffset ValidTo,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? ApprovedBy,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? ApprovedAt);
+
+/// <summary>CreateVideoRequest. <c>rightsSource</c> thuộc taxonomy nguồn/giấy phép (WBS-023): chưa nhận.</summary>
+public sealed record CreateVideoRequest(
+    [Required, StringLength(300, MinimumLength = 1)] string Title,
+    string? Summary,
+    Guid? MediaId,
+    string? RightsSource,
+    [RegularExpression(VideoContentKinds.Pattern)] string? ContentKind,
+    VideoSponsorshipInput? Sponsorship);
+
+/// <summary>AdminVideo (+ summary, CHANGELOG mục 12).</summary>
+public sealed record AdminVideo(
+    Guid Id,
+    string Title,
+    string Status,
+    string ContentKind,
+    VideoSponsorship? Sponsorship,
+    Guid? WorkingRevisionId,
+    Guid? PublicRevisionId,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? OwnerId,
+    Guid? AssigneeId,
+    string RightsStatus,
+    DateTimeOffset? RightsExpiresAt,
+    DateTimeOffset? ScheduledAt,
+    DateTimeOffset UpdatedAt,
+    long RowVersion,
+    Guid? MediaId,
+    string? Summary);
+
+/// <summary>Bộ lọc getAdminVideos (sau khi đã kiểm tham số query).</summary>
+public sealed record AdminVideoFilter(
+    IReadOnlyList<string> Statuses,
+    Guid? OwnerId,
+    Guid? AssigneeId,
+    DateTimeOffset? UpdatedFrom,
+    DateTimeOffset? UpdatedTo,
+    string? Q,
+    string Sort)
+{
+    public const string DefaultSort = "updatedAt_desc";
+    public const string SortPattern = "^(updatedAt_desc|updatedAt_asc|createdAt_desc|title_asc)$";
+
+    /// <summary>Chuỗi ổn định đưa vào scope cursor: đổi bộ lọc/sort thì cursor cũ thành INVALID_CURSOR.</summary>
+    public string ScopeKey() => string.Join('|', string.Join(',', Statuses), OwnerId, AssigneeId,
+        UpdatedFrom?.UtcTicks, UpdatedTo?.UtcTicks, Q, Sort);
+}
+
+/// <summary>Vị trí cursor của danh sách admin: khóa sắp xếp (thời gian hoặc tiêu đề) + id.</summary>
+public sealed record AdminVideoPosition(DateTimeOffset? At, string? Title, Guid Id);

@@ -1,0 +1,47 @@
+/* Màn Video + thư viện media (WBS-046). Chỉ dùng token màu của globals.css; không sửa globals.css (phiên khác đang làm màn Bài viết). */
+
+.title-row.spread { justify-content: space-between; align-items: flex-start; }
+.title-row.spread > div { min-width: 0; }
+.grid.wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); align-items: start; }
+.stack-xs { display: grid; gap: 6px; }
+.small { font-size: 13px; }
+.break { overflow-wrap: anywhere; }
+.badge.bad { background: var(--error-bg); color: var(--error-text); border-color: transparent; }
+.small-badge { margin-left: 8px; font-size: 11px; }
+.check.inline { align-items: center; align-self: center; min-height: 36px; font-size: 14px; }
+.check.inline input { margin-top: 0; }
+fieldset.plain { border: 0; margin: 0; padding: 0; display: grid; gap: 12px; min-width: 0; }
+.sponsor { border-left: 3px solid var(--warn-bg); padding-left: 12px; }
+
+/* Tab Video | Thư viện media */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab { padding: 8px 14px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); }
+
+/* Hộp tải lên */
+.upload-drop {
+  display: grid; gap: 4px; place-items: center; text-align: center; padding: 28px 16px; cursor: pointer;
+  border: 2px dashed var(--border); border-radius: var(--radius); background: var(--bg);
+}
+.upload-drop:hover, .upload-drop:focus-within { border-color: var(--accent); }
+.upload-drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.upload-drop.disabled { cursor: not-allowed; opacity: 0.6; }
+.upload-drop-title { font-weight: 600; color: var(--accent); }
+.upload-box { display: grid; gap: 12px; }
+.upload-file { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; min-width: 0; }
+.upload-name { overflow-wrap: anywhere; min-width: 0; }
+.upload-phase { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.upload-progress { width: 100%; height: 8px; accent-color: var(--accent); }
+
+/* Chọn media từ thư viện */
+.picker { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 360px; overflow-y: auto; }
+.picker li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.picker li:last-child { border-bottom: 0; }
+.picker-name { min-width: 0; }
+
+@media (max-width: 640px) {
+  .hide-sm { display: none; }
+  .picker li { grid-template-columns: minmax(0, 1fr) auto; }
+  .picker li .small { display: none; }
+}

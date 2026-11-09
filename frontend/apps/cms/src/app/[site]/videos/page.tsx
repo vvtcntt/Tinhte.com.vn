@@ -1,5 +1,6 @@
-import { SectionPlaceholder } from '../../../components/Pages';
+import '../../videos.css';
+import { VideosPage } from '../../../components/Videos';
 
 export default function Page() {
-  return <SectionPlaceholder href="/videos" />;
+  return <VideosPage />;
 }

@@ -96,6 +96,14 @@ Form chọn chuyên mục dùng `GET /admin/categories` (chỉ đọc; tạo/s�
 INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('danh-gia', 'Đánh giá'), ('thu-thuat', 'Thủ thuật');
 ```
 
+### Video + media trong CMS (WBS-046, [ADR-0006](doc/adr/ADR-0006-media-upload-storage-adapter.md))
+
+- API (site `cms`): `POST /admin/media/upload-intents` → PUT tệp lên `uploadUrl` → `POST /admin/media/{id}/finalize` → `GET /admin/media/{id}` (trạng thái), `GET /admin/media` (thư viện); `GET/POST /admin/videos`, `GET/PATCH /admin/videos/{id}` (If-Match, gắn `mediaId`). Migration 0330–0333.
+- CMS: `/videos` (danh sách, lọc, tìm, xem thêm), `/videos/new` (tải lên có tiến độ, checksum, thử lại, trạng thái tự cập nhật), `/videos/{id}` (sửa + xử lý 412, đổi/chọn media), `/videos/media` (thư viện).
+- **Dev:** `Media:StorageProvider` mặc định `Local` ở Development — tệp lưu ở `Media:LocalRoot` (mặc định `%TEMP%/tinhte-media`), xử lý **giả lập** (chỉ kiểm định dạng, không transcode; `Media:SimulatedStepDelay`). Ngoài Development mặc định `None` → tải lên trả 503 cho tới khi chọn vendor (WBS-035/039). Media mới luôn PRIVATE + UNVERIFIED.
+- Hạn mức tải lên theo người (429 + Retry-After) và dọn intent hết hạn (`UPLOAD_EXPIRED`) — `Media:MaxIntentsPerWindow`, `Media:MaxPendingUploadBytes`, `Media:ExpiredUploadGrace` (DRAFT, chờ PO).
+- Chưa có: duyệt/publish video và chặn publish theo media/quyền (WBS-040), transcode/quét mã độc/CDN (WBS-036…039), xem trước/phát trong CMS.
+
 ## Đa subdomain (tóm tắt ADR-0001)
 
 - Mỗi subdomain là một mục trong `config/sites/sites.json`. Routing (Next `proxy.ts`, middleware ASP.NET), CSP, robots/sitemap, tên cookie, bề mặt API, bảng `tt.sites`, DNS/TLS/edge đều **suy ra** từ đó.
@@ -136,3 +144,4 @@ INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('d
 | 030 | CMS editor bài viết | Có (tạm): danh sách, tạo nháp, soạn/sửa với If-Match + xung đột, xem trước, lịch sử + so sánh, nút xuất bản; `GET /admin/categories`. Chưa: editor rich-text theo UX-CMS-02 (ảnh/nhúng), autosave/offline |
 | 022 | Content type, article revision, publish pointer | Có (API, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md)): tạo/sửa/đọc/danh sách bài CMS, lịch sử + diff revision, publish pointer, đọc công khai theo slug + redirect 308; migration 0320/0321. `dotnet test` sau khi gộp với WBS-115: 194/194 PASS với DB (PGlite), 151 PASS + 43 SKIP không DB. Chưa: duyệt (024), rights (023), lịch (025), outbox (020), UI CMS (030) |
 | 024 | Draft/review/approve/reject state machine | Có (API + nút CMS): gửi duyệt, duyệt (MFA), yêu cầu sửa, từ chối; SoD cả khi xuất bản; lý do bắt buộc; migration 0324/0325. `dotnet test` 203/203 với DB; đã chạy trên trình duyệt với 2 người dùng (tác giả gửi → người duyệt trả bài kèm lý do → tác giả thấy lý do). Chưa: hàng đợi duyệt `GET /admin/work-queue` (WBS-031), thông báo cho người phụ trách |
+| 046 | Video upload/status/editor CMS + media library | Có (Sprint 0, [ADR-0006](doc/adr/ADR-0006-media-upload-storage-adapter.md)): API upload intent/finalize/trạng thái/thư viện + video CMS (cursor, ETag/If-Match, Idempotency-Key), kho Local + xử lý giả lập chỉ ở dev; hạn mức tải lên (429) + dọn intent hết hạn; migration 0330–0333; màn CMS Video/thư viện media. `dotnet test` 221/221 PASS với DB (PGlite), 169 PASS + 52 SKIP không DB; migration PGlite 226/226. Chưa: vendor lưu trữ/transcode (035–039), workflow publish video (040) |

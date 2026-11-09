@@ -16,7 +16,7 @@ created_at: 2026-11-09
 | Hạng mục | Kết quả |
 |---|---|
 | Chạy thật trên PostgreSQL | **Có**, PostgreSQL 18.6 qua PGlite 0.5.10 (WASM), dùng stub schema 04 |
-| Test tự động | **215/215 PASS** (chạy lại 09/11/2026 sau khi gộp 0322 — tin nổi bật trang chủ — và 0324/0325 — WBS-024; 179/179 sau 0320/0321; 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
+| Test tự động | **256/256 PASS** (chạy lại 09/11/2026 sau khi gộp 0322 — trang chủ, 0324/0325 — WBS-024, 0330–0333 — WBS-046; 179/179 sau 0320/0321; 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
 | Kịch bản A: DB sạch | up → up lần 2 không đổi schema → 50+ test hành vi → down toàn bộ → schema **trùng khớp baseline** → up lại |
 | Kịch bản B: DB đã áp SQL v0.2 | SQL v0.2 chạy được (lần đầu được thử) → up → 0310 **dừng đúng** vì dữ liệu cũ → backfill → 0310 → down → schema và khóa cờ **trở về đúng v0.2** |
 | Kịch bản C: thiếu bảng tiên quyết | migration dừng, kèm thông báo rõ bảng còn thiếu |
@@ -48,6 +48,10 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | 0322 | `home_featured` | Tin nổi bật trang chủ theo site: `home_layouts` (row_version = ETag danh sách, chỉ site public-web), `home_featured_articles` (thứ tự 1..10, bài phải cùng site — `VALIDATION_FAILED`), `home_featured_history` (ảnh chụp sau mỗi lần đổi, người thao tác từ `tt.actor_id`, chỉ thêm). Down từ chối nếu đã có lịch sử | FR-DISC-003, WBS-027/051 |
 | 0324 | `article_review_workflow` | Hồ sơ duyệt trên revision: `submitted_by/at`, `reviewed_by/at`, `review_note`; trigger chặn bước chuyển trạng thái sai (`STATE_CONFLICT`), trả bài/từ chối thiếu lý do (`REASON_REQUIRED`), sửa lại hồ sơ duyệt; index hàng đợi duyệt. Down từ chối nếu đã có lịch sử duyệt | WBS-024, FR-CMS-002/010, FR-NEWS-004 |
 | 0325 | `validate_article_review` | `VALIDATE` các CHECK NOT VALID của 0324 | AIR-024 |
+| 0330 | `media_uploads` | Tải lên media qua upload intent (WBS-046/036): cột tệp (`file_name`, `content_type`, `size_bytes`, `checksum_sha256`, `storage_key`), `generation`, `error_code`, `upload_token_hash` + `upload_expires_at` (chỉ khi UPLOADING, token không lưu thô), `created_by`, `uploaded_at`, `updated_at`, `row_version` + trigger touch; CHECK status theo `MediaStatus`, checksum hex, token, finalize đủ thông tin tệp; index thư viện + hàng đợi pipeline. Down từ chối khi đã có object trong kho lưu trữ | ADR-0006, FR-VID-005/006, FR-CMS-009 |
+| 0331 | `video_revisions` | Revision video (WBS-046, nền WBS-040): `status`, `summary`, `author_id`, `updated_at/by`; trigger đóng băng như 0320 (`STATE_CONFLICT`), không xóa revision; index danh sách CMS + `videos.media_id`. Down từ chối khi có lịch sử workflow | ADR-0006, FR-VID-008 |
+| 0332 | `validate_media_video` | `VALIDATE` các CHECK NOT VALID của 0330/0331 | AIR-024 |
+| 0333 | `media_upload_quota` | Index cho hạn mức tải lên theo người tải `(created_by, created_at)` và dọn intent hết hạn `(upload_expires_at) WHERE status = 'UPLOADING'`. Chỉ index | ADR-0006, FR-VID-005 |
 | 0312 | `site_registry` | `tt.sites` (đồng bộ từ `config/sites/sites.json` bằng `tools/sites/generate-db-sync.mjs`, không xóa, chỉ retired); `articles/videos.primary_site_key`, `categories.site_key` mặc định `www`; nội dung chỉ thuộc site public-web | ADR-0001 D8 |
 | 0311 | `optional/privacy_requests.LEGAL_PENDING` | Lưu yêu cầu dữ liệu cá nhân không cần tài khoản (email mã hóa ở tầng ứng dụng). **Chỉ chạy khi Legal chọn kênh API** | AIR-017 |
 
@@ -68,6 +72,7 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | A-09 | `tt.categories`, `tt.topics`: không có thì bỏ qua | 0309 |
 | A-10 | `tt.users(id, display_name, status)`; status `ACTIVE` = được đăng nhập. Nếu schema 04 đã có bảng vai trò/phiên → sửa 0313 dùng bảng sẵn có | 0313 |
 | A-11 | `tt.article_revisions(title, body jsonb, author_id, created_at, UNIQUE(article_id, number))`, `tt.articles(category_id, created_at)`, `tt.categories(is_enabled)`. Ngày xuất bản thật của bài cũ: nếu schema 04 có cột riêng thì thay backfill `published_at = created_at` của 0320 | 0320 |
+| A-12 | `tt.media_assets(id, status, created_at)` (status cũ phải map sang enum `MediaStatus` trước 0332), `tt.video_revisions(id, video_id, number, title, created_at, UNIQUE(video_id, number))`, `tt.videos(slug UNIQUE, media_id, created_at)`. Cột tệp của media cũ để NULL (không backfill) | 0330, 0331 |
 
 Nếu schema 04 dùng **tên cột khác nhưng cùng nghĩa** (ví dụ `rights_state` thay cho `rights_status`), sửa migration để dùng cột có sẵn; đừng để tồn tại hai cột song song.
 

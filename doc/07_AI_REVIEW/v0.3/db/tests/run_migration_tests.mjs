@@ -254,6 +254,43 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'W5 bị từ chối thì không duyệt lại được (sửa → revision mới)', `${REVIEW} ${REV('f5', `status = 'REJECTED', review_note = 'Sai sự thật'`)} ${REV('f5', `status = 'APPROVED'`)}`, /STATE_CONFLICT.*from REJECTED to APPROVED/);
   await expectError(sc, db, 'W6 người gửi chỉ có cả hai cột hoặc không', REV('f5', `submitted_by = '${U2}'`), /ck_article_revisions_submitted_pair/);
 
+  // Tải lên media (0330, WBS-046, FR-VID-005) — upload intent → finalize → pipeline
+  const MEDIA = (set) => `UPDATE tt.media_assets SET ${set} WHERE id = '${id('e1')}';`;
+  const SHA = 'a'.repeat(64);
+  const INTENT = `INSERT INTO tt.media_assets (id, media_type, file_name, content_type, size_bytes, checksum_sha256, storage_key, upload_token_hash, upload_expires_at, created_by)
+    VALUES ('${id('e2')}', 'VIDEO', 'clip.mp4', 'video/mp4', 1024, '${SHA}', 'media/2026/11/${id('e2')}', '${'b'.repeat(64)}', now() + interval '15 minutes', '${U1}');`;
+  await expectError(sc, db, 'MV1 status media ngoài enum MediaStatus bị chặn', MEDIA(`status = 'DONE'`), /ck_media_assets_status/);
+  await expectError(sc, db, 'MV2 checksum không phải sha256 hex thường bị chặn', MEDIA(`checksum_sha256 = '${'A'.repeat(64)}'`), /ck_media_assets_checksum_format/);
+  await expectError(sc, db, 'MV3 upload token thiếu hạn bị chặn', MEDIA(`upload_token_hash = '${SHA}'`), /ck_media_assets_upload_token/);
+  await expectError(sc, db, 'MV4 upload token chỉ tồn tại khi UPLOADING', `${INTENT} UPDATE tt.media_assets SET status = 'UPLOADED', uploaded_at = now() WHERE id = '${id('e2')}'`, /ck_media_assets_upload_token/);
+  await expectError(sc, db, 'MV5 đã finalize phải có storage_key/size/checksum', MEDIA(`status = 'UPLOADED', uploaded_at = now()`), /ck_media_assets_uploaded_complete/);
+  await expectError(sc, db, 'MV6 kích thước ≤ 0 bị chặn', MEDIA(`size_bytes = 0`), /ck_media_assets_size_positive/);
+  await expectOk(sc, db, 'MV7 intent → finalize (xóa token) → READY; mỗi UPDATE tăng row_version, quyền giữ PRIVATE/UNVERIFIED', `${INTENT}
+    UPDATE tt.media_assets SET status = 'UPLOADED', uploaded_at = now(), upload_token_hash = NULL, upload_expires_at = NULL WHERE id = '${id('e2')}';
+    UPDATE tt.media_assets SET status = 'READY' WHERE id = '${id('e2')}';
+    DO $$ BEGIN IF (SELECT (row_version, visibility, rights_status) <> (3::bigint, 'PRIVATE', 'UNVERIFIED') FROM tt.media_assets WHERE id = '${id('e2')}')
+      THEN RAISE EXCEPTION 'row_version/rights'; END IF; END $$;`);
+  await expectOk(sc, db, 'MV9 dọn intent hết hạn: UPLOADING → FAILED/UPLOAD_EXPIRED, xóa token (0333 có index theo hạn)', `${INTENT}
+    UPDATE tt.media_assets SET upload_expires_at = now() - interval '1 minute' WHERE id = '${id('e2')}';
+    UPDATE tt.media_assets SET status = 'FAILED', error_code = 'UPLOAD_EXPIRED', upload_token_hash = NULL, upload_expires_at = NULL
+     WHERE status = 'UPLOADING' AND upload_expires_at <= now();
+    DO $$ BEGIN IF to_regclass('tt.ix_media_assets_upload_expiry') IS NULL OR to_regclass('tt.ix_media_assets_creator_created') IS NULL
+      OR (SELECT status FROM tt.media_assets WHERE id = '${id('e2')}') <> 'FAILED' THEN RAISE EXCEPTION 'sweep'; END IF; END $$;`);
+  await expectError(sc, db, 'MV8 down 0330 từ chối khi đã có object trong kho lưu trữ', `${INTENT} ${read(path.join(MIG_DIR, '0330_media_uploads.down.sql'))}`, /Refusing to roll back 0330/);
+
+  // Revision video (0331, WBS-046/040) — cùng mô hình đóng băng với bài viết
+  const VREV = (rev, set) => `UPDATE tt.video_revisions SET ${set} WHERE id = '${id(rev)}';`;
+  const VDRAFT = `INSERT INTO tt.video_revisions (id, video_id, number, title) VALUES ('${id('d3')}', '${id('d1')}', 2, 'Video biên tập');`;
+  await expectOk(sc, db, 'V1 revision video DRAFT chưa public sửa được nội dung', `${VDRAFT} ${VREV('d3', `title = 'Sửa', summary = 'Mô tả'`)}`);
+  await expectError(sc, db, 'V2 revision video đã gửi duyệt không sửa được nội dung → STATE_CONFLICT', `${VDRAFT} ${VREV('d3', `status = 'IN_REVIEW'`)} ${VREV('d3', `title = 'Lén sửa'`)}`, /STATE_CONFLICT.*immutable/);
+  await expectError(sc, db, 'V3 public revision video không sửa được (kể cả DRAFT) → STATE_CONFLICT', `${VDRAFT}
+    UPDATE tt.videos SET public_revision_id = '${id('d3')}' WHERE id = '${id('d1')}'; ${VREV('d3', `summary = 'đổi'`)}`, /STATE_CONFLICT.*public and immutable/);
+  await expectError(sc, db, 'V4 revision video đã rời DRAFT không quay lại DRAFT', `${VDRAFT} ${VREV('d3', `status = 'REJECTED'`)} ${VREV('d3', `status = 'DRAFT'`)}`, /cannot return to DRAFT/);
+  await expectError(sc, db, 'V5 revision video không xóa được', `DELETE FROM tt.video_revisions WHERE id = '${id('d2')}'`, /APPEND_ONLY/);
+  await expectError(sc, db, 'V6 status revision video ngoài vòng đời bị chặn', VREV('d2', `status = 'LIVE'`), /ck_video_revisions_status/);
+  await expectError(sc, db, 'V7 tiêu đề revision video rỗng bị chặn', VREV('d2', `title = '  '`), /ck_video_revisions_title_not_blank/);
+  await expectError(sc, db, 'V8 down 0331 từ chối khi có lịch sử workflow', `${VREV('d2', `status = 'IN_REVIEW'`)} ${read(path.join(MIG_DIR, '0331_video_revisions.down.sql'))}`, /Refusing to roll back 0331/);
+
   // Site Registry trong DB (0312, ADR-0001 D8) — SQL đồng bộ sinh từ config/sites/sites.json
   const SYNC = generateDbSync(siteRegistry);
   const withGame = structuredClone(siteRegistry);

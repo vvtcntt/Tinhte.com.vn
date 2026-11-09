@@ -835,6 +835,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       x-requirements:
       - FR-VID-005
       x-scope: P0
@@ -848,6 +850,7 @@ paths:
       - PAYLOAD_TOO_LARGE
       - VALIDATION_FAILED
       - RATE_LIMITED
+      - DEPENDENCY_UNAVAILABLE
   /admin/media/{mediaId}/finalize:
     post:
       tags:
@@ -894,6 +897,8 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       x-requirements:
       - FR-VID-005
       x-scope: P0
@@ -908,6 +913,7 @@ paths:
       - VALIDATION_FAILED
       - RATE_LIMITED
       - MEDIA_NOT_READY
+      - DEPENDENCY_UNAVAILABLE
   /admin/media/{mediaId}:
     get:
       tags:
@@ -6365,6 +6371,9 @@ components:
           type:
           - string
           - 'null'
+          description: 'Processing outcome code when status is FAILED/REJECTED/QUARANTINED/RESTRICTED. Current values: UNSUPPORTED_FORMAT
+            (content does not match the declared type), OBJECT_MISSING (stored object not found), UPLOAD_EXPIRED (upload intent expired
+            before finalize). Vendor pipelines (WBS-036…038) may add codes; clients must treat unknown codes as generic failure.'
         mediaType:
           type: string
           enum:
@@ -6390,6 +6399,31 @@ components:
           - 'null'
           format: date-time
         createdAt:
+          type: string
+          format: date-time
+        fileName:
+          type:
+          - string
+          - 'null'
+          maxLength: 255
+          description: Original file name from the upload intent (display only; never used as storage key)
+        contentType:
+          type:
+          - string
+          - 'null'
+          maxLength: 150
+        sizeBytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 1
+        createdBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        updatedAt:
           type: string
           format: date-time
     CreateCommentRequest:
@@ -6752,6 +6786,11 @@ components:
           - string
           - 'null'
           format: uuid
+        summary:
+          type:
+          - string
+          - 'null'
+          description: Summary of the working revision (public revision when no draft exists)
     AdminVideoList:
       type: object
       properties:
