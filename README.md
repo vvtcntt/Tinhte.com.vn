@@ -94,7 +94,8 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | Contract tĩnh v0.3 | 34/34 PASS |
 | Migration v0.3 + 0312 (PGlite, PostgreSQL 18.6) | 151/151 PASS |
 | `Tinhte.DbMigrator` | `up` hai lần trên PGlite: 14 file rồi không đổi; API thật có DB: `/health/ready` OK |
-| **Chưa chạy** | Docker Compose, CI trên GitHub (job backend nay có PostgreSQL 17), PostgreSQL bản production, kiểm thử đồng thời, E2E trình duyệt |
+| **PostgreSQL 18 thật** (máy dev, Windows) | `Tinhte.DbMigrator up`: 15 migration (0000 stub + 0299…0313) + đồng bộ `tt.sites`; `dotnet test` **163/163 PASS** với `TT_TEST_PG` trỏ DB `tinhte_test` |
+| **Chưa chạy** | Docker Compose, CI trên GitHub (job backend có PostgreSQL 17), schema 04 thật, kiểm thử đồng thời nhiều kết nối, E2E trình duyệt tự động |
 
 ## Sprint 0 so với WBS (G10)
 
