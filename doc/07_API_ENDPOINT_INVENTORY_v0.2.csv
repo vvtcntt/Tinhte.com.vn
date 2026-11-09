@@ -1,0 +1,107 @@
+﻿Method,Path,OperationId,Scope,FeatureGate,Security,FR IDs,RequestSchema,Status codes,ReviewStatus
+GET,/admin/ad-placements,getAdminAdPlacements,P0-ADS,ads.display_slots,"[{""cmsSession"": []}]",FR-ADS-002,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/admin/ad-placements/{placementId},putAdminAdPlacementsPlacementid,P0-ADS,ads.display_slots,"[{""cmsSession"": []}]",FR-ADS-002,#/components/schemas/AdPlacementUpdate,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/ads/campaigns,getAdminAdsCampaigns,P1,ads.campaign_advanced,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/ads/campaigns,postAdminAdsCampaigns,P1,ads.campaign_advanced,"[{""cmsSession"": []}]",,#/components/schemas/CampaignSave,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/ads/reports,getAdminAdsReports,P1,ads.campaign_advanced,"[{""cmsSession"": []}]",FR-ADS-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/ai/audit,getAdminAiAudit,P2,ai.assistance,"[{""cmsSession"": []}]",FR-AI-004,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/ai/metadata-suggestions,postAdminAiMetadataSuggestions,P2,ai.assistance,"[{""cmsSession"": []}]",FR-AI-001,#/components/schemas/AiSuggestionRequest,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/ai/transcript-jobs,postAdminAiTranscriptJobs,P2,ai.assistance,"[{""cmsSession"": []}]",FR-AI-002,#/components/schemas/AiTranscriptRequest,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/analytics/operations,getAdminAnalyticsOperations,P1,,"[{""cmsSession"": []}]",FR-ANL-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/analytics/overview,getAdminAnalyticsOverview,P0,,"[{""cmsSession"": []}]",FR-ANL-004; FR-ANL-005,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/articles,getAdminArticles,P0,,"[{""cmsSession"": []}]",FR-CMS-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles,createArticleDraft,P0,,"[{""cmsSession"": []}]",FR-CMS-001,#/components/schemas/CreateArticleRequest,201; 401; 403; 422,DRAFT_NOT_IMPLEMENTED
+GET,/admin/articles/{articleId},getAdminArticlesArticleid,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PATCH,/admin/articles/{articleId},patchAdminArticlesArticleid,P0,,"[{""cmsSession"": []}]",FR-ADS-001; FR-CMS-001; FR-CMS-007; FR-NEWS-002; FR-NEWS-006; FR-NEWS-008,#/components/schemas/ArticlePatchRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/approve,approveArticleRevision,P0,,"[{""cmsSession"": []}]",FR-CMS-002; FR-NEWS-004,,200; 403; 409; 412; 422,DRAFT_NOT_IMPLEMENTED
+GET,/admin/articles/{articleId}/preview,getAdminArticlesArticleidPreview,P0,,"[{""cmsSession"": []}]",FR-CMS-005; FR-NEWS-010,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/publish,publishArticle,P0,,"[{""cmsSession"": []}]",FR-CMS-003,,200; 403; 409; 412; 422,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/reject,postAdminArticlesArticleidReject,P0,,"[{""cmsSession"": []}]",FR-CMS-002,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/articles/{articleId}/related-suggestions,getAdminArticlesArticleidRelatedSuggestions,P1,,"[{""cmsSession"": []}]",FR-CMS-008,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/request-changes,postAdminArticlesArticleidRequestChanges,P0,,"[{""cmsSession"": []}]",FR-CMS-002; FR-CMS-010,#/components/schemas/ActionReason,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/articles/{articleId}/revisions,getAdminArticlesArticleidRevisions,P0,,"[{""cmsSession"": []}]",FR-CMS-004; FR-NEWS-005,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/rollback,postAdminArticlesArticleidRollback,P0,,"[{""cmsSession"": []}]",FR-CMS-004,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/schedule,postAdminArticlesArticleidSchedule,P0,,"[{""cmsSession"": []}]",FR-CMS-003,#/components/schemas/ScheduleRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/submit,submitArticleForReview,P0,,"[{""cmsSession"": []}]",FR-NEWS-004,,200; 403; 409; 412; 422,DRAFT_NOT_IMPLEMENTED
+POST,/admin/articles/{articleId}/unpublish,postAdminArticlesArticleidUnpublish,P0,,"[{""cmsSession"": []}]",FR-MOD-003; FR-NEWS-007,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/audit-logs,getAdminAuditLogs,P0,,"[{""cmsSession"": []}]",FR-ID-007; FR-MOD-005,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/auth/session,getAdminAuthSession,P0,,"[{""cmsSession"": []}]",FR-ID-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/categories,getAdminCategories,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/categories,postAdminCategories,P0,,"[{""cmsSession"": []}]",,#/components/schemas/LookupSave,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PATCH,/admin/categories/{categoryId},patchAdminCategoriesCategoryId,P0,,"[{""cmsSession"": []}]",,#/components/schemas/LookupSave,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+DELETE,/admin/comments/{commentId}/pin,deleteAdminCommentsCommentidPin,P0*,community.comments,"[{""cmsSession"": []}]",FR-COM-010,,204; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/admin/comments/{commentId}/pin,putAdminCommentsCommentidPin,P0*,community.comments,"[{""cmsSession"": []}]",FR-COM-010,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/media,listAdminMediaLibrary,P0,,"[{""cmsSession"": []}]",FR-CMS-009,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/media/upload-intents,createUploadIntent,P0,,"[{""cmsSession"": []}]",FR-VID-005,,201; 403; 413; 422,DRAFT_NOT_IMPLEMENTED
+GET,/admin/media/{mediaId},getAdminMedia,P0,,"[{""cmsSession"": []}]",FR-CMS-009; FR-VID-006; FR-VID-007,,200; 403; 404,DRAFT_NOT_IMPLEMENTED
+POST,/admin/media/{mediaId}/finalize,finalizeUpload,P0,,"[{""cmsSession"": []}]",FR-VID-005,,202; 403; 409; 422,DRAFT_NOT_IMPLEMENTED
+GET,/admin/moderation/cases,getAdminModerationCases,P0*,community.comments,"[{""cmsSession"": []}]",FR-MOD-001,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/moderation/cases/{caseId},getAdminModerationCasesCaseid,P0*,community.comments,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/moderation/cases/{caseId}/actions,addModerationAction,P0*,community.comments,"[{""cmsSession"": []}]",FR-COM-007; FR-MOD-002,,200; 403; 409; 412; 422,DRAFT_NOT_IMPLEMENTED
+GET,/admin/takedown-requests,getAdminTakedownRequests,P0,,"[{""cmsSession"": []}]",FR-MOD-004,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/takedown-requests,postAdminTakedownRequests,P0,,"[{""cmsSession"": []}]",FR-MOD-004,#/components/schemas/TakedownRequest,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/topics,getAdminTopics,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/topics,postAdminTopics,P0,,"[{""cmsSession"": []}]",,#/components/schemas/LookupSave,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PATCH,/admin/topics/{topicId},patchAdminTopicsTopicid,P0,,"[{""cmsSession"": []}]",,#/components/schemas/LookupSave,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/users,getAdminUsers,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/users/{userId},getAdminUsersUserid,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/users/{userId}/reactivate,postAdminUsersUseridReactivate,P0,,"[{""cmsSession"": []}]",FR-ID-004,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/admin/users/{userId}/roles,putAdminUsersUseridRoles,P0,,"[{""cmsSession"": []}]",FR-ID-004,#/components/schemas/RoleAssignment,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/users/{userId}/suspend,postAdminUsersUseridSuspend,P0,,"[{""cmsSession"": []}]",FR-ID-004; FR-MOD-006,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/videos,getAdminVideos,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos,postAdminVideos,P0,,"[{""cmsSession"": []}]",,#/components/schemas/CreateVideoRequest,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/videos/{videoId},getAdminVideosVideoid,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PATCH,/admin/videos/{videoId},patchAdminVideosVideoid,P0,,"[{""cmsSession"": []}]",,#/components/schemas/UpdateVideoRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/approve,postAdminVideosVideoidApprove,P0,,"[{""cmsSession"": []}]",FR-VID-008,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/publish,postAdminVideosVideoidPublish,P0,,"[{""cmsSession"": []}]",FR-VID-008,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/reject,postAdminVideosVideoidReject,P0,,"[{""cmsSession"": []}]",,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/admin/videos/{videoId}/related-articles,putAdminVideosVideoidRelatedArticles,P0,,"[{""cmsSession"": []}]",FR-VID-009,#/components/schemas/ContentIdList,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/request-changes,postAdminVideosVideoidRequestChanges,P0,,"[{""cmsSession"": []}]",,#/components/schemas/ActionReason,201; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/schedule,postAdminVideosVideoidSchedule,P0,,"[{""cmsSession"": []}]",,#/components/schemas/ScheduleRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/submit,postAdminVideosVideoidSubmit,P0,,"[{""cmsSession"": []}]",,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/admin/videos/{videoId}/subtitles,putAdminVideosVideoidSubtitles,P0,,"[{""cmsSession"": []}]",FR-AI-002; FR-VID-015,#/components/schemas/Subtitle,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/admin/videos/{videoId}/unpublish,postAdminVideosVideoidUnpublish,P0,,"[{""cmsSession"": []}]",FR-MOD-003; FR-VID-010,#/components/schemas/ActionReason,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/admin/work-queue,getAdminWorkQueue,P0,,"[{""cmsSession"": []}]",FR-CMS-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/ads/placements,getAdsPlacements,P0-ADS,ads.display_slots,[],FR-ADS-001; FR-ADS-002; FR-ADS-004,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/ai/search,postAiSearch,P2,ai.search,[],FR-AI-003,#/components/schemas/AiSearchRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/analytics/events,postAnalyticsEvents,P0,,[],FR-ANL-001; FR-ANL-002; FR-ANL-003; FR-ANL-004,#/components/schemas/EventBatch,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/articles,listPublicArticles,P0,,[],FR-DISC-004; FR-ID-001,,200; 400,DRAFT_NOT_IMPLEMENTED
+GET,/articles/{slug},getPublicArticle,P0,,[],FR-DISC-007; FR-NEWS-001; FR-NEWS-002; FR-NEWS-008; FR-NEWS-010,,200; 404; 410,DRAFT_NOT_IMPLEMENTED
+GET,/articles/{slug}/related-videos,getArticlesSlugRelatedVideos,P0,,[],FR-DISC-005,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/auth/member/logout,postAuthMemberLogout,P0*,community.member,"[{""memberSession"": []}]",FR-ID-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/auth/member/oidc/callback,getAuthMemberOidcCallback,P0*,community.member,[],FR-ID-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/auth/member/oidc/start,getAuthMemberOidcStart,P0*,community.member,[],FR-ID-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/auth/member/verification-requests,postAuthMemberVerificationRequests,P0*,community.member,"[{""memberSession"": []}]",FR-ID-003; FR-ID-009,#/components/schemas/VerificationRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/auth/staff/logout,postAuthStaffLogout,P0,,"[{""cmsSession"": []}]",FR-ID-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/auth/staff/oidc/callback,getAuthStaffOidcCallback,P0,,[],FR-ID-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/auth/staff/oidc/start,getAuthStaffOidcStart,P0,,[],FR-ID-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/categories,getCategories,P0,,[],FR-NEWS-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/categories/{slug}/articles,getCategoriesSlugArticles,P0,,[],FR-DISC-002,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+DELETE,/comments/{commentId}/like,deleteCommentsCommentidLike,P0*,community.comments,"[{""memberSession"": []}]",FR-COM-004,,204; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/comments/{commentId}/like,putCommentsCommentidLike,P0*,community.comments,"[{""memberSession"": []}]",FR-COM-004,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/comments/{commentId}/replies,replyToComment,P0*,community.comments,"[{""memberSession"": []}]",FR-COM-003,#/components/schemas/CreateCommentRequest,201; 403; 404; 409; 429,DRAFT_NOT_IMPLEMENTED
+POST,/comments/{commentId}/reports,postCommentsCommentidReports,P0*,community.comments,"[{""memberSession"": []}]",FR-COM-006,#/components/schemas/CommentReportRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/home,getHome,P0,,[],FR-DISC-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/me,getCurrentUser,P0,,"[{""memberSession"": []}]",FR-ID-002,,200; 401,DRAFT_NOT_IMPLEMENTED
+POST,/me/appeals,postMeAppeals,P1,community.appeals,"[{""memberSession"": []}]",FR-MOD-007,#/components/schemas/AppealRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/me/bookmarks,getMeBookmarks,P1,member.bookmark,"[{""memberSession"": []}]",FR-ID-008,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+DELETE,/me/bookmarks/{videoId},deleteMeBookmarksVideoid,P1,member.bookmark,"[{""memberSession"": []}]",FR-VID-013,,204; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PUT,/me/bookmarks/{videoId},putMeBookmarksVideoid,P1,member.bookmark,"[{""memberSession"": []}]",FR-VID-013,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+POST,/me/data-requests,postMeDataRequests,P0,,"[{""memberSession"": []}]",FR-ID-005,#/components/schemas/UserDataRequest,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/me/eligibility,getMeEligibility,P0*,community.member,"[{""memberSession"": []}]",FR-ID-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/me/notifications,getMeNotifications,P1,community.member,"[{""memberSession"": []}]",FR-COM-011,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/me/profile,getMeProfile,P1,community.member,"[{""memberSession"": []}]",FR-ID-008,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+PATCH,/me/profile,patchMeProfile,P1,community.member,"[{""memberSession"": []}]",FR-ID-008,#/components/schemas/MemberProfilePatch,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/search,searchPublicContent,P0,,[],FR-DISC-001; FR-DISC-004,,200; 400,DRAFT_NOT_IMPLEMENTED
+GET,/search/suggestions,getSearchSuggestions,P1,,[],FR-DISC-006,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/series/{slug},getSeriesSlug,P1,,[],FR-NEWS-009,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/site/config,getSiteConfig,P0,,[],FR-ADS-004; FR-COM-009,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/topics,getTopics,P0,,[],FR-NEWS-003,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/topics/{slug}/articles,getTopicsSlugArticles,P0,,[],FR-DISC-002,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/videos,listPublicVideos,P0,,[],FR-DISC-004; FR-ID-001; FR-VID-001; FR-VID-012; FR-VID-014,,200,DRAFT_NOT_IMPLEMENTED
+GET,/videos/{videoId},getPublicVideo,P0,,[],FR-VID-003; FR-VID-004,,200; 404; 410,DRAFT_NOT_IMPLEMENTED
+GET,/videos/{videoId}/comments,listVideoComments,P0*,community.comments,[],FR-COM-001; FR-COM-005,,200; 403; 404,DRAFT_NOT_IMPLEMENTED
+POST,/videos/{videoId}/comments,createVideoComment,P0*,community.comments,"[{""memberSession"": []}]",FR-COM-002; FR-COM-008; FR-COM-009; FR-COM-012,#/components/schemas/CreateCommentRequest,201; 401; 403; 404; 409; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/videos/{videoId}/playback,getVideoPlayback,P0,,[],FR-VID-002; FR-VID-011,,200; 403; 404; 410; 503,DRAFT_NOT_IMPLEMENTED
+GET,/videos/{videoId}/related-articles,getVideosVideoidRelatedArticles,P0,,[],FR-DISC-005,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED
+GET,/videos/{videoId}/subtitles,getVideosVideoidSubtitles,P0,,[],FR-VID-015,,200; 400; 401; 403; 404; 409; 412; 422; 429,DRAFT_NOT_IMPLEMENTED

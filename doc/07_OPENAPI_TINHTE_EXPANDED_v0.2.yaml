@@ -1,0 +1,5866 @@
+openapi: 3.1.0
+info:
+  title: Tinhte.com.vn Reference API Contract
+  version: 0.2.0-draft
+  description: Expanded contract baseline for review; P0* community and P0-ADS require public release-gates.
+    Not implementation-tested. Supersedes v0.1 only after sign-off.
+servers:
+- url: https://api.example.invalid/api/v1
+  description: Placeholder — replace at deployment; no production host assumed
+tags:
+- name: PublicNews
+- name: PublicVideo
+- name: Discovery
+- name: CmsNews
+- name: Media
+- name: CommunityGated
+- name: ModerationGated
+- name: Account
+- name: CmsVideo
+- name: CmsTaxonomy
+- name: CmsUsers
+- name: CmsRights
+- name: Analytics
+- name: Advertising
+- name: AiOptional
+- name: MemberOptional
+- name: PublicHome
+- name: StaffAuth
+paths:
+  /articles:
+    get:
+      tags:
+      - PublicNews
+      summary: Public article feed
+      operationId: listPublicArticles
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: category
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Published articles only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-requirements:
+      - FR-DISC-004
+      - FR-ID-001
+      x-scope: P0
+      description: ''
+  /articles/{slug}:
+    get:
+      tags:
+      - PublicNews
+      summary: Public article (only published revision and valid rights)
+      operationId: getPublicArticle
+      parameters:
+      - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Public article
+          headers:
+            ETag:
+              schema:
+                type: string
+              description: Published revision/version tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Article'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+      x-requirements:
+      - FR-DISC-007
+      - FR-NEWS-001
+      - FR-NEWS-002
+      - FR-NEWS-008
+      - FR-NEWS-010
+      x-scope: P0
+      description: ''
+  /videos:
+    get:
+      tags:
+      - PublicVideo
+      summary: Public Shorts feed ordered by approved policy
+      operationId: listPublicVideos
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Published & rights-cleared video metadata only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoList'
+      x-requirements:
+      - FR-DISC-004
+      - FR-ID-001
+      - FR-VID-001
+      - FR-VID-012
+      - FR-VID-014
+      x-scope: P0
+      description: ''
+  /videos/{videoId}:
+    get:
+      tags:
+      - PublicVideo
+      summary: Public video watch metadata
+      operationId: getPublicVideo
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: Video object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Video'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+      x-requirements:
+      - FR-VID-003
+      - FR-VID-004
+      x-scope: P0
+      description: ''
+  /videos/{videoId}/playback:
+    get:
+      tags:
+      - PublicVideo
+      summary: Server-side rights gate and short-lived playback manifest authorization
+      operationId: getVideoPlayback
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: Signed derived manifest information, not raw source object keys
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: Private/no-store or short TTL per rights policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaybackGrant'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      x-requirements:
+      - FR-VID-002
+      - FR-VID-011
+      x-scope: P0
+      description: ''
+  /search:
+    get:
+      tags:
+      - Discovery
+      summary: Public search for published news/video
+      operationId: searchPublicContent
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Search result list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-requirements:
+      - FR-DISC-001
+      - FR-DISC-004
+      x-scope: P0
+      description: ''
+  /admin/articles:
+    post:
+      tags:
+      - CmsNews
+      summary: Create article draft (CMS only)
+      operationId: createArticleDraft
+      security:
+      - cmsSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateArticleRequest'
+      responses:
+        '201':
+          description: Draft created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-CMS-001
+      x-scope: P0
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      description: ''
+    get:
+      tags:
+      - CmsNews
+      summary: Paginated CMS article list
+      operationId: getAdminArticles
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-006
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/submit:
+    post:
+      tags:
+      - CmsNews
+      summary: Submit draft revision for review
+      operationId: submitArticleForReview
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      responses:
+        '200':
+          description: In review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-NEWS-004
+      x-scope: P0
+      description: ''
+  /admin/articles/{articleId}/approve:
+    post:
+      tags:
+      - CmsNews
+      summary: Approve revision with separation-of-duties policy
+      operationId: approveArticleRevision
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - revisionId
+              properties:
+                revisionId:
+                  type: string
+                  format: uuid
+                note:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Revision approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-CMS-002
+      - FR-NEWS-004
+      x-scope: P0
+      description: ''
+  /admin/articles/{articleId}/publish:
+    post:
+      tags:
+      - CmsNews
+      summary: Publish approved article revision, rights validated in DB transaction
+      operationId: publishArticle
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - revisionId
+              properties:
+                revisionId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-CMS-003
+      x-scope: P0
+      description: ''
+  /admin/media/upload-intents:
+    post:
+      tags:
+      - Media
+      summary: Create private upload intent (staff only)
+      operationId: createUploadIntent
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - fileName
+              - contentType
+              - sizeBytes
+              - checksumSha256
+              properties:
+                fileName:
+                  type: string
+                  maxLength: 255
+                contentType:
+                  type: string
+                  maxLength: 150
+                sizeBytes:
+                  type: integer
+                  format: int64
+                  minimum: 1
+                checksumSha256:
+                  type: string
+                  pattern: ^[a-fA-F0-9]{64}$
+      responses:
+        '201':
+          description: Short-lived upload intent (authorization restricted to object key and size)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadIntent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/UploadTooLarge'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-VID-005
+      x-scope: P0
+      description: ''
+  /admin/media/{mediaId}/finalize:
+    post:
+      tags:
+      - Media
+      summary: Verify storage HEAD/metadata/checksum and queue media validation
+      operationId: finalizeUpload
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/MediaId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - uploadToken
+              properties:
+                uploadToken:
+                  type: string
+                  minLength: 1
+      responses:
+        '202':
+          description: Accepted for asynchronous media processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaJobAccepted'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-VID-005
+      x-scope: P0
+      description: ''
+  /admin/media/{mediaId}:
+    get:
+      tags:
+      - Media
+      summary: Poll media scan/transcode status from CMS
+      operationId: getAdminMedia
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/MediaId'
+      responses:
+        '200':
+          description: Media processing status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaStatus'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-CMS-009
+      - FR-VID-006
+      - FR-VID-007
+      x-scope: P0
+      description: ''
+  /videos/{videoId}/comments:
+    get:
+      tags:
+      - CommunityGated
+      summary: Read visible comments only when video comment feature is legally enabled
+      description: Legal gate OFF by default. Read policy is subject to Legal+PO decision. Server-side feature
+        gates and eligibility are revalidated on each mutation; public activation requires separate approval.
+      operationId: listVideoComments
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Visible approved comments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-COM-001
+      - FR-COM-005
+      x-scope: P0*
+      x-feature-gate: community.comments
+    post:
+      tags:
+      - CommunityGated
+      summary: Submit comment only if legal flag, video rights and member eligibility pass
+      description: Must return 403 COMMENT_DISABLED while Legal+PO gate is OFF. Server-side feature gates and
+        eligibility are revalidated on each mutation; public activation requires separate approval.
+      operationId: createVideoComment
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: Comment accepted (may be pending moderation)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-COM-002
+      - FR-COM-008
+      - FR-COM-009
+      - FR-COM-012
+      x-scope: P0*
+      x-feature-gate: community.comments
+  /comments/{commentId}/replies:
+    post:
+      tags:
+      - CommunityGated
+      summary: Reply to comment within same published video, feature legally enabled
+      operationId: replyToComment
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: Reply accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-COM-003
+      x-scope: P0*
+      x-feature-gate: community.comments
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/moderation/cases/{caseId}/actions:
+    post:
+      tags:
+      - ModerationGated
+      summary: Moderation decision with mandatory reason and audit
+      operationId: addModerationAction
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CaseId'
+      - $ref: '#/components/parameters/IfMatch'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - action
+              - reason
+              properties:
+                action:
+                  type: string
+                  enum:
+                  - HIDE
+                  - REMOVE
+                  - RESTORE
+                  - DISMISS
+                  - ESCALATE
+                reason:
+                  type: string
+                  minLength: 1
+                  maxLength: 4000
+      responses:
+        '200':
+          description: Moderation action saved and audited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationActionResult'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+      x-requirements:
+      - FR-COM-007
+      - FR-MOD-002
+      x-scope: P0*
+      x-feature-gate: community.comments
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /me:
+    get:
+      tags:
+      - Account
+      summary: Current authenticated user profile (non-sensitive subset)
+      operationId: getCurrentUser
+      security:
+      - memberSession: []
+      responses:
+        '200':
+          description: User profile
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: private, no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+      x-requirements:
+      - FR-ID-002
+      x-scope: P0
+      description: ''
+  /home:
+    get:
+      tags:
+      - PublicHome
+      summary: Public homepage editorial blocks
+      operationId: getHome
+      x-scope: P0
+      x-requirements:
+      - FR-DISC-003
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /categories:
+    get:
+      tags:
+      - Discovery
+      summary: Public categories
+      operationId: getCategories
+      x-scope: P0
+      x-requirements:
+      - FR-NEWS-003
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /topics:
+    get:
+      tags:
+      - Discovery
+      summary: Public topics
+      operationId: getTopics
+      x-scope: P0
+      x-requirements:
+      - FR-NEWS-003
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /categories/{slug}/articles:
+    get:
+      tags:
+      - Discovery
+      summary: Published articles by category
+      operationId: getCategoriesSlugArticles
+      x-scope: P0
+      x-requirements:
+      - FR-DISC-002
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /topics/{slug}/articles:
+    get:
+      tags:
+      - Discovery
+      summary: Published articles by topic
+      operationId: getTopicsSlugArticles
+      x-scope: P0
+      x-requirements:
+      - FR-DISC-002
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /articles/{slug}/related-videos:
+    get:
+      tags:
+      - Discovery
+      summary: Published related videos
+      operationId: getArticlesSlugRelatedVideos
+      x-scope: P0
+      x-requirements:
+      - FR-DISC-005
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /videos/{videoId}/related-articles:
+    get:
+      tags:
+      - Discovery
+      summary: Published related articles
+      operationId: getVideosVideoidRelatedArticles
+      x-scope: P0
+      x-requirements:
+      - FR-DISC-005
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /videos/{videoId}/subtitles:
+    get:
+      tags:
+      - PublicVideo
+      summary: Approved public subtitles
+      operationId: getVideosVideoidSubtitles
+      x-scope: P0
+      x-requirements:
+      - FR-VID-015
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubtitleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /site/config:
+    get:
+      tags:
+      - PublicHome
+      summary: Public safe feature availability and config
+      operationId: getSiteConfig
+      x-scope: P0
+      x-requirements:
+      - FR-ADS-004
+      - FR-COM-009
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePublicConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /search/suggestions:
+    get:
+      tags:
+      - Discovery
+      summary: Search suggestions
+      operationId: getSearchSuggestions
+      x-scope: P1
+      x-requirements:
+      - FR-DISC-006
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchSuggestions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /series/{slug}:
+    get:
+      tags:
+      - Discovery
+      summary: Editorial article series
+      operationId: getSeriesSlug
+      x-scope: P1
+      x-requirements:
+      - FR-NEWS-009
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}:
+    get:
+      tags:
+      - CmsNews
+      summary: Get CMS article detail
+      operationId: getAdminArticlesArticleid
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    patch:
+      tags:
+      - CmsNews
+      summary: Update current draft with optimistic concurrency
+      operationId: patchAdminArticlesArticleid
+      x-scope: P0
+      x-requirements:
+      - FR-ADS-001
+      - FR-CMS-001
+      - FR-CMS-007
+      - FR-NEWS-002
+      - FR-NEWS-006
+      - FR-NEWS-008
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticlePatchRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/revisions:
+    get:
+      tags:
+      - CmsNews
+      summary: Read immutable article revision list
+      operationId: getAdminArticlesArticleidRevisions
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-004
+      - FR-NEWS-005
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleRevisionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/preview:
+    get:
+      tags:
+      - CmsNews
+      summary: Short-lived noindex preview URL
+      operationId: getAdminArticlesArticleidPreview
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-005
+      - FR-NEWS-010
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewUrl'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/work-queue:
+    get:
+      tags:
+      - CmsNews
+      summary: Review queue filtered by role
+      operationId: getAdminWorkQueue
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-006
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkQueue'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/request-changes:
+    post:
+      tags:
+      - CmsNews
+      summary: Request changes with required reason
+      operationId: postAdminArticlesArticleidRequestChanges
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-002
+      - FR-CMS-010
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/reject:
+    post:
+      tags:
+      - CmsNews
+      summary: Reject pending article revision
+      operationId: postAdminArticlesArticleidReject
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-002
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/schedule:
+    post:
+      tags:
+      - CmsNews
+      summary: Schedule approved revision
+      operationId: postAdminArticlesArticleidSchedule
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-003
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/unpublish:
+    post:
+      tags:
+      - CmsNews
+      summary: Unpublish without erasing audit
+      operationId: postAdminArticlesArticleidUnpublish
+      x-scope: P0
+      x-requirements:
+      - FR-MOD-003
+      - FR-NEWS-007
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/rollback:
+    post:
+      tags:
+      - CmsNews
+      summary: Create new draft based on previous revision; never rewrite public silently
+      operationId: postAdminArticlesArticleidRollback
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-004
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminArticle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/articles/{articleId}/related-suggestions:
+    get:
+      tags:
+      - CmsNews
+      summary: Suggest linkable related content (human accepts)
+      operationId: getAdminArticlesArticleidRelatedSuggestions
+      x-scope: P1
+      x-requirements:
+      - FR-CMS-008
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ArticleId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos:
+    get:
+      tags:
+      - CmsVideo
+      summary: List video drafts and statuses
+      operationId: getAdminVideos
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideoList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    post:
+      tags:
+      - CmsVideo
+      summary: Create video draft
+      operationId: postAdminVideos
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVideoRequest'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}:
+    get:
+      tags:
+      - CmsVideo
+      summary: Get CMS video detail
+      operationId: getAdminVideosVideoid
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    patch:
+      tags:
+      - CmsVideo
+      summary: Update video draft and media binding with rowVersion
+      operationId: patchAdminVideosVideoid
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVideoRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/submit:
+    post:
+      tags:
+      - CmsVideo
+      summary: Submit video for review
+      operationId: postAdminVideosVideoidSubmit
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/approve:
+    post:
+      tags:
+      - CmsVideo
+      summary: Approve exact video revision and bound media generation
+      operationId: postAdminVideosVideoidApprove
+      x-scope: P0
+      x-requirements:
+      - FR-VID-008
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/request-changes:
+    post:
+      tags:
+      - CmsVideo
+      summary: Return video revision for corrections
+      operationId: postAdminVideosVideoidRequestChanges
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/reject:
+    post:
+      tags:
+      - CmsVideo
+      summary: Reject video revision with reason
+      operationId: postAdminVideosVideoidReject
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/publish:
+    post:
+      tags:
+      - CmsVideo
+      summary: Publish video only if rights/media/approval gates pass
+      operationId: postAdminVideosVideoidPublish
+      x-scope: P0
+      x-requirements:
+      - FR-VID-008
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/schedule:
+    post:
+      tags:
+      - CmsVideo
+      summary: Schedule video publication
+      operationId: postAdminVideosVideoidSchedule
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/unpublish:
+    post:
+      tags:
+      - CmsVideo
+      summary: Unpublish video, invalidate playback grants and trigger CDN purge
+      operationId: postAdminVideosVideoidUnpublish
+      x-scope: P0
+      x-requirements:
+      - FR-MOD-003
+      - FR-VID-010
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/subtitles:
+    put:
+      tags:
+      - CmsVideo
+      summary: Replace subtitle draft/approved version
+      operationId: putAdminVideosVideoidSubtitles
+      x-scope: P0
+      x-requirements:
+      - FR-AI-002
+      - FR-VID-015
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Subtitle'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subtitle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/videos/{videoId}/related-articles:
+    put:
+      tags:
+      - CmsVideo
+      summary: Set editorial article associations
+      operationId: putAdminVideosVideoidRelatedArticles
+      x-scope: P0
+      x-requirements:
+      - FR-VID-009
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentIdList'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVideo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/media:
+    get:
+      tags:
+      - Media
+      summary: List media library by type and rights
+      operationId: listAdminMediaLibrary
+      x-scope: P0
+      x-requirements:
+      - FR-CMS-009
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/categories:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: Categories admin list
+      operationId: getAdminCategories
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Create category
+      operationId: postAdminCategories
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LookupSave'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/topics:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: Topics admin list
+      operationId: getAdminTopics
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopicList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Create topic
+      operationId: postAdminTopics
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LookupSave'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/topics/{topicId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update topic
+      operationId: patchAdminTopicsTopicid
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/TopicId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LookupSave'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Topic'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /auth/member/oidc/start:
+    get:
+      tags:
+      - Account
+      summary: Begin approved member OIDC flow
+      operationId: getAuthMemberOidcStart
+      x-scope: P0*
+      x-requirements:
+      - FR-ID-003
+      x-feature-gate: community.member
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcStart'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /auth/member/oidc/callback:
+    get:
+      tags:
+      - Account
+      summary: OIDC callback and just-in-time account provisioning
+      operationId: getAuthMemberOidcCallback
+      x-scope: P0*
+      x-requirements:
+      - FR-ID-003
+      x-feature-gate: community.member
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /auth/member/logout:
+    post:
+      tags:
+      - Account
+      summary: Revoke member session
+      operationId: postAuthMemberLogout
+      x-scope: P0*
+      x-requirements:
+      - FR-ID-003
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /auth/staff/oidc/start:
+    get:
+      tags:
+      - StaffAuth
+      summary: Begin staff OIDC login with MFA policy
+      operationId: getAuthStaffOidcStart
+      x-scope: P0
+      x-requirements:
+      - FR-ID-006
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcStart'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /auth/staff/oidc/callback:
+    get:
+      tags:
+      - StaffAuth
+      summary: Staff OIDC callback creates secure session
+      operationId: getAuthStaffOidcCallback
+      x-scope: P0
+      x-requirements:
+      - FR-ID-006
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /auth/staff/logout:
+    post:
+      tags:
+      - StaffAuth
+      summary: Revoke staff session
+      operationId: postAuthStaffLogout
+      x-scope: P0
+      x-requirements:
+      - FR-ID-006
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /me/profile:
+    get:
+      tags:
+      - MemberOptional
+      summary: Read member profile
+      operationId: getMeProfile
+      x-scope: P1
+      x-requirements:
+      - FR-ID-008
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+    patch:
+      tags:
+      - MemberOptional
+      summary: Update member display profile
+      operationId: patchMeProfile
+      x-scope: P1
+      x-requirements:
+      - FR-ID-008
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberProfilePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/users:
+    get:
+      tags:
+      - CmsUsers
+      summary: Users admin list
+      operationId: getAdminUsers
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/users/{userId}:
+    get:
+      tags:
+      - CmsUsers
+      summary: User management detail
+      operationId: getAdminUsersUserid
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/users/{userId}/suspend:
+    post:
+      tags:
+      - CmsUsers
+      summary: Suspend account and revoke active sessions
+      operationId: postAdminUsersUseridSuspend
+      x-scope: P0
+      x-requirements:
+      - FR-ID-004
+      - FR-MOD-006
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/users/{userId}/reactivate:
+    post:
+      tags:
+      - CmsUsers
+      summary: Reactivate account if role permits
+      operationId: postAdminUsersUseridReactivate
+      x-scope: P0
+      x-requirements:
+      - FR-ID-004
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/users/{userId}/roles:
+    put:
+      tags:
+      - CmsUsers
+      summary: Explicitly set RBAC roles with audit
+      operationId: putAdminUsersUseridRoles
+      x-scope: P0
+      x-requirements:
+      - FR-ID-004
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleAssignment'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/auth/session:
+    get:
+      tags:
+      - StaffAuth
+      summary: Current staff session policy and MFA state
+      operationId: getAdminAuthSession
+      x-scope: P0
+      x-requirements:
+      - FR-ID-006
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/audit-logs:
+    get:
+      tags:
+      - CmsUsers
+      summary: Access audited privileged action logs
+      operationId: getAdminAuditLogs
+      x-scope: P0
+      x-requirements:
+      - FR-ID-007
+      - FR-MOD-005
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/takedown-requests:
+    post:
+      tags:
+      - CmsRights
+      summary: Create rights violation/takedown case
+      operationId: postAdminTakedownRequests
+      x-scope: P0
+      x-requirements:
+      - FR-MOD-004
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TakedownRequest'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TakedownTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+    get:
+      tags:
+      - CmsRights
+      summary: List rights violation/takedown requests
+      operationId: getAdminTakedownRequests
+      x-scope: P0
+      x-requirements:
+      - FR-MOD-004
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationCaseList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /me/eligibility:
+    get:
+      tags:
+      - Account
+      summary: Member eligibility without disclosing verification details
+      operationId: getMeEligibility
+      x-scope: P0*
+      x-requirements:
+      - FR-ID-003
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Eligibility'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /auth/member/verification-requests:
+    post:
+      tags:
+      - Account
+      summary: Create verification request through approved identity adapter
+      operationId: postAuthMemberVerificationRequests
+      x-scope: P0*
+      x-requirements:
+      - FR-ID-003
+      - FR-ID-009
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /me/data-requests:
+    post:
+      tags:
+      - Account
+      summary: Data subject request
+      operationId: postMeDataRequests
+      x-scope: P0
+      x-requirements:
+      - FR-ID-005
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserDataRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRequestTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /me/notifications:
+    get:
+      tags:
+      - MemberOptional
+      summary: Member notification list
+      operationId: getMeNotifications
+      x-scope: P1
+      x-requirements:
+      - FR-COM-011
+      x-feature-gate: community.member
+      security:
+      - memberSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /me/bookmarks:
+    get:
+      tags:
+      - MemberOptional
+      summary: My bookmarks
+      operationId: getMeBookmarks
+      x-scope: P1
+      x-requirements:
+      - FR-ID-008
+      x-feature-gate: member.bookmark
+      security:
+      - memberSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /me/bookmarks/{videoId}:
+    put:
+      tags:
+      - MemberOptional
+      summary: Bookmark video
+      operationId: putMeBookmarksVideoid
+      x-scope: P1
+      x-requirements:
+      - FR-VID-013
+      x-feature-gate: member.bookmark
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+    delete:
+      tags:
+      - MemberOptional
+      summary: Remove bookmark
+      operationId: deleteMeBookmarksVideoid
+      x-scope: P1
+      x-requirements:
+      - FR-VID-013
+      x-feature-gate: member.bookmark
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/VideoId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      responses:
+        '204':
+          description: Success (no body)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /comments/{commentId}/like:
+    put:
+      tags:
+      - CommunityGated
+      summary: Idempotent comment like
+      operationId: putCommentsCommentidLike
+      x-scope: P0*
+      x-requirements:
+      - FR-COM-004
+      x-feature-gate: community.comments
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+    delete:
+      tags:
+      - CommunityGated
+      summary: Idempotent unlike
+      operationId: deleteCommentsCommentidLike
+      x-scope: P0*
+      x-requirements:
+      - FR-COM-004
+      x-feature-gate: community.comments
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      responses:
+        '204':
+          description: Success (no body)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /comments/{commentId}/reports:
+    post:
+      tags:
+      - CommunityGated
+      summary: Report inappropriate comment
+      operationId: postCommentsCommentidReports
+      x-scope: P0*
+      x-requirements:
+      - FR-COM-006
+      x-feature-gate: community.comments
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentReportRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/comments/{commentId}/pin:
+    put:
+      tags:
+      - ModerationGated
+      summary: Pin visible comment with moderator permission
+      operationId: putAdminCommentsCommentidPin
+      x-scope: P0*
+      x-requirements:
+      - FR-COM-010
+      x-feature-gate: community.comments
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BooleanStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+    delete:
+      tags:
+      - ModerationGated
+      summary: Unpin comment
+      operationId: deleteAdminCommentsCommentidPin
+      x-scope: P0*
+      x-requirements:
+      - FR-COM-010
+      x-feature-gate: community.comments
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CommentId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      responses:
+        '204':
+          description: Success (no body)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/moderation/cases:
+    get:
+      tags:
+      - ModerationGated
+      summary: List queue of moderation cases
+      operationId: getAdminModerationCases
+      x-scope: P0*
+      x-requirements:
+      - FR-MOD-001
+      x-feature-gate: community.comments
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationCaseList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/moderation/cases/{caseId}:
+    get:
+      tags:
+      - ModerationGated
+      summary: Moderation case detail
+      operationId: getAdminModerationCasesCaseid
+      x-scope: P0*
+      x-requirements: []
+      x-feature-gate: community.comments
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CaseId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationCase'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /me/appeals:
+    post:
+      tags:
+      - MemberOptional
+      summary: Submit appeal after eligible case
+      operationId: postMeAppeals
+      x-scope: P1
+      x-requirements:
+      - FR-MOD-007
+      x-feature-gate: community.appeals
+      security:
+      - memberSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppealRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTicket'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/CommentDisabled'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /analytics/events:
+    post:
+      tags:
+      - Analytics
+      summary: Ingest privacy-compliant client analytics event batch
+      operationId: postAnalyticsEvents
+      x-scope: P0
+      x-requirements:
+      - FR-ANL-001
+      - FR-ANL-002
+      - FR-ANL-003
+      - FR-ANL-004
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventBatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedCount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/analytics/overview:
+    get:
+      tags:
+      - Analytics
+      summary: CMS metrics dashboard
+      operationId: getAdminAnalyticsOverview
+      x-scope: P0
+      x-requirements:
+      - FR-ANL-004
+      - FR-ANL-005
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /admin/analytics/operations:
+    get:
+      tags:
+      - Analytics
+      summary: Operational moderation and review metrics
+      operationId: getAdminAnalyticsOperations
+      x-scope: P1
+      x-requirements:
+      - FR-ANL-006
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+  /ads/placements:
+    get:
+      tags:
+      - Advertising
+      summary: Eligible public ad placements without user targeting
+      operationId: getAdsPlacements
+      x-scope: P0-ADS
+      x-requirements:
+      - FR-ADS-001
+      - FR-ADS-002
+      - FR-ADS-004
+      x-feature-gate: ads.display_slots
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdPlacementList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ad-placements:
+    get:
+      tags:
+      - Advertising
+      summary: List ad slot configs
+      operationId: getAdminAdPlacements
+      x-scope: P0-ADS
+      x-requirements:
+      - FR-ADS-002
+      x-feature-gate: ads.display_slots
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdPlacementList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ad-placements/{placementId}:
+    put:
+      tags:
+      - Advertising
+      summary: Set placement creative and schedule
+      operationId: putAdminAdPlacementsPlacementid
+      x-scope: P0-ADS
+      x-requirements:
+      - FR-ADS-002
+      x-feature-gate: ads.display_slots
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/PlacementId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdPlacementUpdate'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdPlacement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ads/reports:
+    get:
+      tags:
+      - Advertising
+      summary: Campaign reports
+      operationId: getAdminAdsReports
+      x-scope: P1
+      x-requirements:
+      - FR-ADS-003
+      x-feature-gate: ads.campaign_advanced
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ads/campaigns:
+    get:
+      tags:
+      - Advertising
+      summary: Campaign list
+      operationId: getAdminAdsCampaigns
+      x-scope: P1
+      x-requirements: []
+      x-feature-gate: ads.campaign_advanced
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CampaignList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+    post:
+      tags:
+      - Advertising
+      summary: Create campaign
+      operationId: postAdminAdsCampaigns
+      x-scope: P1
+      x-requirements: []
+      x-feature-gate: ads.campaign_advanced
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CampaignSave'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Campaign'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ai/metadata-suggestions:
+    post:
+      tags:
+      - AiOptional
+      summary: AI metadata suggestions for human approval
+      operationId: postAdminAiMetadataSuggestions
+      x-scope: P2
+      x-requirements:
+      - FR-AI-001
+      x-feature-gate: ai.assistance
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiSuggestionRequest'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiSuggestion'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ai/transcript-jobs:
+    post:
+      tags:
+      - AiOptional
+      summary: AI transcript draft, not auto-approved
+      operationId: postAdminAiTranscriptJobs
+      x-scope: P2
+      x-requirements:
+      - FR-AI-002
+      x-feature-gate: ai.assistance
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiTranscriptRequest'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/ai/audit:
+    get:
+      tags:
+      - AiOptional
+      summary: Audit AI operation requests
+      operationId: getAdminAiAudit
+      x-scope: P2
+      x-requirements:
+      - FR-AI-004
+      x-feature-gate: ai.assistance
+      security:
+      - cmsSession: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /ai/search:
+    post:
+      tags:
+      - AiOptional
+      summary: AI grounded answers from published sources only
+      operationId: postAiSearch
+      x-scope: P2
+      x-requirements:
+      - FR-AI-003
+      x-feature-gate: ai.search
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AiSearchRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiSearchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ' Server-side feature gates and eligibility are revalidated on each mutation; public activation
+        requires separate approval.'
+  /admin/categories/{categoryId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update category id
+      operationId: patchAdminCategoriesCategoryId
+      x-scope: P0
+      x-requirements: []
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CategoryId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LookupSave'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      description: ''
+components:
+  securitySchemes:
+    cmsSession:
+      type: apiKey
+      in: cookie
+      name: tt_cms_session
+      description: Placeholder; OIDC/MFA/session binding to be approved, CSRF protection required for cookie
+        writes
+    memberSession:
+      type: apiKey
+      in: cookie
+      name: tt_member_session
+      description: Placeholder; required identity verification and eligibility are legal policy decisions
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        maxLength: 512
+      description: Opaque cursor, verified/signed if applicable
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Example bounds; final limit TBD performance/PO
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 250
+    VideoId:
+      name: videoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ArticleId:
+      name: articleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CaseId:
+      name: caseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Resource revision/row_version ETag; reject mismatches with 412
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+      description: Actor+method+route scoped; same key different payload returns 409
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PlacementId:
+      name: placementId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RevisionId:
+      name: revisionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CampaignId:
+      name: campaignId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TopicId:
+      name: topicId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    XCsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+      description: Double-submit or equivalent CSRF protection for session cookie mutations; final scheme depends
+        on auth ADR
+    CategoryId:
+      name: categoryId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Problem:
+      type: object
+      required:
+      - type
+      - title
+      - status
+      - code
+      - traceId
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+          description: 'Examples: FEATURE_DISABLED, ELIGIBILITY_REQUIRED, SPONSORSHIP_LABEL_REQUIRED, RIGHTS_EXPIRED,
+            REVISION_CONFLICT, CSRF_INVALID, RATE_LIMITED.'
+        detail:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    ArticleSummary:
+      type: object
+      required:
+      - id
+      - slug
+      - title
+      - publishedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        summary:
+          type:
+          - string
+          - 'null'
+        publishedAt:
+          type: string
+          format: date-time
+        thumbnailUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+        sponsorLabel:
+          type:
+          - string
+          - 'null'
+    Article:
+      allOf:
+      - $ref: '#/components/schemas/ArticleSummary'
+      - type: object
+        properties:
+          revisionId:
+            type: string
+            format: uuid
+          authorDisplayName:
+            type: string
+          categorySlug:
+            type: string
+          bodyBlocks:
+            type: array
+            items:
+              type: object
+          relatedVideoIds:
+            type: array
+            items:
+              type: string
+              format: uuid
+    ArticleList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleSummary'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    Video:
+      type: object
+      required:
+      - id
+      - slug
+      - title
+      - publishedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        publishedAt:
+          type: string
+          format: date-time
+        posterUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        durationMs:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        relatedArticleIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        commentsEnabled:
+          type: boolean
+          description: Server policy-derived
+          defaults false: null
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+        sponsorLabel:
+          type:
+          - string
+          - 'null'
+    VideoList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    PlaybackGrant:
+      oneOf:
+      - $ref: '#/components/schemas/HlsPlaybackGrant'
+      - $ref: '#/components/schemas/ExternalEmbedPlaybackGrant'
+      discriminator:
+        propertyName: deliveryType
+        mapping:
+          HLS: '#/components/schemas/HlsPlaybackGrant'
+          EXTERNAL_EMBED: '#/components/schemas/ExternalEmbedPlaybackGrant'
+    SearchHit:
+      type: object
+      required:
+      - type
+      - id
+      - title
+      - url
+      properties:
+        type:
+          type: string
+          enum:
+          - ARTICLE
+          - VIDEO
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        url:
+          type: string
+        snippet:
+          type:
+          - string
+          - 'null'
+    SearchResponse:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    CreateArticleRequest:
+      type: object
+      required:
+      - title
+      - categoryId
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        summary:
+          type:
+          - string
+          - 'null'
+        categoryId:
+          type: string
+          format: uuid
+        initialBodyBlocks:
+          type: array
+          items:
+            type: object
+    AdminArticle:
+      type: object
+      required:
+      - id
+      - status
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - IN_REVIEW
+          - CHANGES_REQUESTED
+          - REJECTED
+          - APPROVED
+          - SCHEDULED
+          - PUBLISHED
+          - UNPUBLISHED
+          - RETRACTED
+        publicRevisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        rowVersion:
+          type: integer
+          format: int64
+    UploadIntent:
+      type: object
+      required:
+      - mediaId
+      - uploadUrl
+      - expiresAt
+      - uploadToken
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        uploadUrl:
+          type: string
+          format: uri
+          description: Short-lived scoped pre-signed private upload URL
+        expiresAt:
+          type: string
+          format: date-time
+        uploadToken:
+          type: string
+          description: Opaque finalize token; treat as secret
+    MediaJobAccepted:
+      type: object
+      required:
+      - mediaId
+      - status
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - UPLOADED
+          - VALIDATING
+          - PROCESSING
+    MediaStatus:
+      type: object
+      required:
+      - mediaId
+      - status
+      - generation
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - UPLOADING
+          - UPLOADED
+          - VALIDATING
+          - PROCESSING
+          - READY
+          - FAILED
+          - QUARANTINED
+          - REJECTED
+          - RESTRICTED
+        generation:
+          type: integer
+          minimum: 1
+        errorCode:
+          type:
+          - string
+          - 'null'
+    CreateCommentRequest:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+    Comment:
+      type: object
+      required:
+      - id
+      - videoId
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        parentId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        text:
+          type: string
+        status:
+          type: string
+          enum:
+          - PENDING_REVIEW
+          - VISIBLE
+          - HIDDEN
+          - REMOVED
+          - REJECTED
+        createdAt:
+          type: string
+          format: date-time
+    CommentList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    ModerationActionResult:
+      type: object
+      required:
+      - caseId
+      - caseStatus
+      properties:
+        caseId:
+          type: string
+          format: uuid
+        caseStatus:
+          type: string
+    CurrentUser:
+      type: object
+      required:
+      - id
+      - displayName
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        verificationStatus:
+          type: string
+    ArticlePatchRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        summary:
+          type:
+          - string
+          - 'null'
+        categoryId:
+          type: string
+          format: uuid
+        bodyBlocks:
+          type: array
+          items:
+            type: object
+        sourceId:
+          type: string
+          format: uuid
+        licenseId:
+          type: string
+          format: uuid
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+        sponsorName:
+          type:
+          - string
+          - 'null'
+          maxLength: 180
+        rightsExpiresAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    AdminArticleList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminArticle'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    ActionReason:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 2000
+      required:
+      - reason
+    ScheduleRequest:
+      type: object
+      properties:
+        publishAt:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+          minLength: 1
+          example: Asia/Ho_Chi_Minh
+      required:
+      - publishAt
+      - timezone
+    ArticleRevision:
+      type: object
+      properties:
+        revisionId:
+          type: string
+          format: uuid
+        articleId:
+          type: string
+          format: uuid
+        number:
+          type: integer
+          minimum: 1
+        authorId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        bodyBlocks:
+          type: array
+          items:
+            type: object
+      required:
+      - revisionId
+      - articleId
+      - number
+      - status
+    ArticleRevisionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleRevision'
+      required:
+      - items
+    WorkQueue:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminArticle'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    AdminVideo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - IN_REVIEW
+          - CHANGES_REQUESTED
+          - APPROVED
+          - SCHEDULED
+          - PUBLISHED
+          - RETRACTED
+        revisionId:
+          type: string
+          format: uuid
+        publicRevisionId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        mediaId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        rowVersion:
+          type: string
+        title:
+          type: string
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+        sponsorName:
+          type:
+          - string
+          - 'null'
+        rightsValid:
+          type: boolean
+      required:
+      - id
+      - status
+      - rowVersion
+      - title
+    AdminVideoList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminVideo'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    CreateVideoRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        summary:
+          type:
+          - string
+          - 'null'
+        mediaId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        rightsSource:
+          type: string
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+      required:
+      - title
+    UpdateVideoRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        summary:
+          type:
+          - string
+          - 'null'
+        mediaId:
+          type: string
+          format: uuid
+        rightsSource:
+          type: string
+        sponsorName:
+          type:
+          - string
+          - 'null'
+        contentKind:
+          type: string
+          enum:
+          - EDITORIAL
+          - SPONSORED
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        isEnabled:
+          type: boolean
+      required:
+      - id
+      - slug
+      - name
+    CategoryList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+      required:
+      - items
+    Topic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+      required:
+      - id
+      - slug
+      - name
+    TopicList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Topic'
+      required:
+      - items
+    LookupSave:
+      type: object
+      properties:
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        isEnabled:
+          type: boolean
+      required:
+      - slug
+      - name
+    ContentIdList:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - ids
+    PreviewUrl:
+      type: object
+      properties:
+        previewUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - previewUrl
+      - expiresAt
+    MediaList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MediaStatus'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    Subtitle:
+      type: object
+      properties:
+        language:
+          type: string
+          example: vi
+        format:
+          type: string
+          enum:
+          - WEBVTT
+          - SRT
+        text:
+          type: string
+        approved:
+          type: boolean
+      required:
+      - language
+      - format
+      - text
+      - approved
+    SubtitleList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subtitle'
+      required:
+      - items
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        verificationStatus:
+          type: string
+      required:
+      - id
+      - status
+    AdminUserList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    RoleAssignment:
+      type: object
+      properties:
+        roles:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+      required:
+      - roles
+      - reason
+    Eligibility:
+      type: object
+      properties:
+        canComment:
+          type: boolean
+        reasonCode:
+          type:
+          - string
+          - 'null'
+        policyVersion:
+          type: string
+      required:
+      - canComment
+      - policyVersion
+    VerificationRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum:
+          - PROVIDER_ADAPTER
+          - MANUAL_POLICY_FLOW
+        purpose:
+          type: string
+        consentVersion:
+          type: string
+      required:
+      - provider
+      - purpose
+      - consentVersion
+    VerificationTicket:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - requestId
+      - status
+    UserDataRequest:
+      type: object
+      properties:
+        requestType:
+          type: string
+          enum:
+          - ACCESS
+          - EXPORT
+          - RECTIFY
+          - DELETE
+          - WITHDRAW_CONSENT
+        note:
+          type:
+          - string
+          - 'null'
+      required:
+      - requestType
+    DataRequestTicket:
+      type: object
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - requestId
+      - status
+    NotificationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              type:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+            required:
+            - id
+            - type
+      required:
+      - items
+    BookmarkList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+      required:
+      - items
+    Flag:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        policyVersion:
+          type: string
+      required:
+      - enabled
+    SitePublicConfig:
+      type: object
+      properties:
+        communityCommentsEnabled:
+          type: boolean
+        sponsoredContentEnabled:
+          type: boolean
+        adSlotsEnabled:
+          type: boolean
+        shortsInstreamAdsEnabled:
+          type: boolean
+      required:
+      - communityCommentsEnabled
+      - sponsoredContentEnabled
+      - adSlotsEnabled
+      - shortsInstreamAdsEnabled
+    HomePage:
+      type: object
+      properties:
+        featuredArticles:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleSummary'
+        recentArticles:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleSummary'
+        featuredVideos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Video'
+      required:
+      - featuredArticles
+      - recentArticles
+      - featuredVideos
+    SearchSuggestions:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      required:
+      - items
+    Event:
+      type: object
+      properties:
+        eventName:
+          type: string
+          enum:
+          - article_impression
+          - article_engaged
+          - video_impression
+          - video_start
+          - video_progress
+          - video_complete
+          - video_buffer
+          - video_error
+          - article_to_video
+          - video_to_article
+          - sponsor_impression
+          - sponsor_click
+        contentId:
+          type:
+          - string
+          - 'null'
+        eventId:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        durationMs:
+          type:
+          - integer
+          - 'null'
+          minimum: 0
+      required:
+      - eventName
+      - eventId
+      - timestamp
+    EventBatch:
+      type: object
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/Event'
+      required:
+      - events
+    AcceptedCount:
+      type: object
+      properties:
+        accepted:
+          type: integer
+          minimum: 0
+      required:
+      - accepted
+    AnalyticsOverview:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        metrics:
+          type: object
+          additionalProperties:
+            type: number
+        dataQualityNote:
+          type: string
+      required:
+      - from
+      - to
+      - metrics
+    AdPlacement:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - APPROVED
+          - ACTIVE
+          - PAUSED
+          - EXPIRED
+        label:
+          type: string
+        creativeUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        targetUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        startsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        endsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - id
+      - code
+      - status
+      - label
+    AdPlacementList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdPlacement'
+      required:
+      - items
+    AdPlacementUpdate:
+      type: object
+      properties:
+        code:
+          type: string
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - APPROVED
+          - ACTIVE
+          - PAUSED
+          - EXPIRED
+        label:
+          type: string
+        creativeUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        targetUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        startsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        endsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+      required:
+      - code
+      - status
+      - label
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - name
+      - status
+    CampaignList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Campaign'
+      required:
+      - items
+    CampaignSave:
+      type: object
+      properties:
+        name:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+      required:
+      - name
+      - startsAt
+      - endsAt
+    ModerationCase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - entityType
+      - entityId
+      - status
+    ModerationCaseList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationCase'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+      required:
+      - items
+    ModerationActionRequest:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - APPROVE
+          - REJECT
+          - HIDE
+          - REMOVE
+          - RESTORE
+          - LOCK
+        reason:
+          type: string
+      required:
+      - action
+      - reason
+    CommentReportRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          enum:
+          - SPAM
+          - ABUSE
+          - ILLEGAL
+          - PRIVACY
+          - COPYRIGHT
+          - OTHER
+        details:
+          type:
+          - string
+          - 'null'
+      required:
+      - reasonCode
+    ReportTicket:
+      type: object
+      properties:
+        reportId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - reportId
+      - status
+    AuditLogList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              at:
+                type: string
+                format: date-time
+              actorId:
+                type: string
+                format: uuid
+              action:
+                type: string
+              objectId:
+                type: string
+            required:
+            - at
+            - action
+      required:
+      - items
+    TakedownRequest:
+      type: object
+      properties:
+        contentType:
+          type: string
+          enum:
+          - ARTICLE
+          - VIDEO
+          - COMMENT
+          - MEDIA
+        contentId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        receivedAt:
+          type: string
+          format: date-time
+        legalReference:
+          type:
+          - string
+          - 'null'
+      required:
+      - contentType
+      - contentId
+      - reason
+    TakedownTicket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - id
+      - status
+    AppealRequest:
+      type: object
+      properties:
+        caseId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+      required:
+      - caseId
+      - reason
+    StaffSession:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        roles:
+          type: array
+          items:
+            type: string
+        mfaSatisfied:
+          type: boolean
+      required:
+      - userId
+      - roles
+      - mfaSatisfied
+    BooleanStatus:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+      - ok
+    AiSuggestionRequest:
+      type: object
+      properties:
+        contentId:
+          type: string
+          format: uuid
+        task:
+          type: string
+          enum:
+          - TAG
+          - SUMMARY
+      required:
+      - contentId
+      - task
+    AiSuggestion:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: string
+        requiresHumanApproval:
+          type: boolean
+      required:
+      - suggestions
+      - requiresHumanApproval
+    AiTranscriptRequest:
+      type: object
+      properties:
+        videoId:
+          type: string
+          format: uuid
+        language:
+          type: string
+      required:
+      - videoId
+      - language
+    AiJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+      required:
+      - jobId
+      - status
+    AiSearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 200
+      required:
+      - query
+    AiSearchResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        sources:
+          type: array
+          items:
+            type: object
+            properties:
+              contentId:
+                type: string
+                format: uuid
+              url:
+                type: string
+            required:
+            - contentId
+            - url
+      required:
+      - answer
+      - sources
+    OidcStart:
+      type: object
+      properties:
+        authorizationUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - authorizationUrl
+      - expiresAt
+    MemberProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        bio:
+          type:
+          - string
+          - 'null'
+        avatarUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+      required:
+      - id
+      - displayName
+    MemberProfilePatch:
+      type: object
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 80
+        bio:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+    HlsPlaybackGrant:
+      type: object
+      properties:
+        deliveryType:
+          type: string
+          const: HLS
+        manifestUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+        subtitleUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+      required:
+      - deliveryType
+      - manifestUrl
+      - expiresAt
+    ExternalEmbedPlaybackGrant:
+      type: object
+      properties:
+        deliveryType:
+          type: string
+          const: EXTERNAL_EMBED
+        embedUrl:
+          type: string
+          format: uri
+        provider:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - deliveryType
+      - embedUrl
+      - provider
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthenticated:
+      description: Unauthenticated
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Not authorized
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CommentDisabled:
+      description: Legal gate OFF or account ineligible
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: Not found or non-public
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Gone:
+      description: Resource gone per takedown policy
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: State or idempotency conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailed:
+      description: ETag mismatch
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UploadTooLarge:
+      description: Upload quota exceeded
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationError:
+      description: Domain validation failed
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Rate limited
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ServiceUnavailable:
+      description: Dependency outage
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
