@@ -1,0 +1,71 @@
+{
+  "$schema": "./sites.schema.json",
+  "version": 1,
+  "environments": {
+    "production": {
+      "domainSuffix": "tinhte.com.vn",
+      "scheme": "https",
+      "publicPort": null,
+      "indexable": true,
+      "resolveStatuses": ["active"]
+    },
+    "staging": {
+      "domainSuffix": "staging.tinhte.com.vn",
+      "scheme": "https",
+      "publicPort": null,
+      "indexable": false,
+      "resolveStatuses": ["active", "planned"]
+    },
+    "local": {
+      "domainSuffix": "tinhte.localhost",
+      "scheme": "http",
+      "publicPort": 8080,
+      "indexable": false,
+      "resolveStatuses": ["active", "planned"]
+    }
+  },
+  "sites": [
+    {
+      "key": "www",
+      "label": "Tinhte.com.vn",
+      "kind": "public-web",
+      "app": "web",
+      "subdomain": "www",
+      "aliases": ["@"],
+      "status": "active",
+      "scope": "P0",
+      "apiSurfaces": ["public"],
+      "session": "member",
+      "seo": { "indexable": true, "sitemap": true },
+      "owner": "Product & Editorial"
+    },
+    {
+      "key": "cms",
+      "label": "Tinhte CMS",
+      "kind": "cms",
+      "app": "cms",
+      "subdomain": "cms",
+      "aliases": [],
+      "status": "active",
+      "scope": "P0",
+      "apiSurfaces": ["admin"],
+      "session": "staff",
+      "seo": { "indexable": false, "sitemap": false },
+      "owner": "Engineering"
+    },
+    {
+      "key": "media",
+      "label": "Tinhte Media",
+      "kind": "media",
+      "app": "cdn",
+      "subdomain": "media",
+      "aliases": [],
+      "status": "active",
+      "scope": "P0",
+      "apiSurfaces": [],
+      "session": "none",
+      "seo": { "indexable": false, "sitemap": false },
+      "owner": "Engineering"
+    }
+  ]
+}

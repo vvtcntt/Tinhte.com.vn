@@ -1,0 +1,23 @@
+{
+  "name": "tinhte-frontend",
+  "private": true,
+  "description": "Frontend monorepo: apps/web (site công khai, đa subdomain), apps/cms (CMS), packages/sites (Site Registry runtime)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "typescript": "6.0.3"
+  }
+}

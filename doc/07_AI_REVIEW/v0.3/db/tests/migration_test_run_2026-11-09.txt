@@ -1,0 +1,157 @@
+# Kết quả run_migration_tests.mjs — 2026-11-09 (gồm 0312 site registry)
+# Môi trường: Node v24.14.1, PGlite 0.5.10 (PostgreSQL 18.6, WASM, một kết nối)
+# Mutation test (bản sao, lần chạy trước): gỡ trigger chặn publish + bỏ rollback của 0305 → 8 FAIL được phát hiện.
+
+PASS [A] UP 0299_migration_support.up.sql
+PASS [A] UP 0300_feature_gate_registry.up.sql
+PASS [A] UP 0301_revision_sponsorship.up.sql
+PASS [A] UP 0302_ad_placements.up.sql
+PASS [A] UP 0303_takedown.up.sql
+PASS [A] UP 0304_moderation_cases.up.sql
+PASS [A] UP 0305_media_rights.up.sql
+PASS [A] UP 0306_content_aggregates.up.sql
+PASS [A] UP 0307_write_guards.up.sql
+PASS [A] UP 0308_slug_redirects_idempotency.up.sql
+PASS [A] UP 0309_lookup_row_versions.up.sql
+PASS [A] UP 0310_validate_constraints.up.sql
+PASS [A] UP 0312_site_registry.up.sql
+PASS [A] UP 0311_privacy_requests.LEGAL_PENDING.up.sql
+PASS [A] UP lần 2 (idempotent) 0299_migration_support.up.sql
+PASS [A] UP lần 2 (idempotent) 0300_feature_gate_registry.up.sql
+PASS [A] UP lần 2 (idempotent) 0301_revision_sponsorship.up.sql
+PASS [A] UP lần 2 (idempotent) 0302_ad_placements.up.sql
+PASS [A] UP lần 2 (idempotent) 0303_takedown.up.sql
+PASS [A] UP lần 2 (idempotent) 0304_moderation_cases.up.sql
+PASS [A] UP lần 2 (idempotent) 0305_media_rights.up.sql
+PASS [A] UP lần 2 (idempotent) 0306_content_aggregates.up.sql
+PASS [A] UP lần 2 (idempotent) 0307_write_guards.up.sql
+PASS [A] UP lần 2 (idempotent) 0308_slug_redirects_idempotency.up.sql
+PASS [A] UP lần 2 (idempotent) 0309_lookup_row_versions.up.sql
+PASS [A] UP lần 2 (idempotent) 0310_validate_constraints.up.sql
+PASS [A] UP lần 2 (idempotent) 0312_site_registry.up.sql
+PASS [A] UP lần 2 (idempotent) 0311_privacy_requests.LEGAL_PENDING.up.sql
+PASS [A] Chạy up lần 2 không đổi schema
+PASS [A] F1 17 khóa registry + 1 khóa ngoài registry được giữ
+PASS [A] F1b khóa cũ đã đổi tên hết
+PASS [A] F1c chỉ community.moderation ON, mọi cờ public OFF
+PASS [A] F2 bật cờ không có hồ sơ duyệt bị chặn — new row for relation "feature_gates" violates check constraint "ck_feature_gates_enabled_requires_approval" | Failing row contains (ads.sponsored_publication, t, P0-ADS, 
+PASS [A] F3 bật cờ có hồ sơ duyệt → audit có người thao tác + version tăng
+PASS [A] F4 xóa nhật ký cờ bị chặn — APPEND_ONLY | DELETE on tt.feature_gate_changes is not allowed: rows are append-only evidence
+PASS [A] F5 TRUNCATE nhật ký cờ bị chặn — APPEND_ONLY | TRUNCATE on tt.feature_gate_changes is not allowed: rows are append-only evidence
+PASS [A] R1 revision SPONSORED thiếu sponsorship bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_complete" | Failing row contains (b0b6fde0-0b8c-4b53-8c70-07dd67e2b22
+PASS [A] R2 validTo ≤ validFrom bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_window" | Failing row contains (3e0e4fc2-2e3c-492b-91f4-cab53ef5ac9e,
+PASS [A] R3 approved_by thiếu approved_at bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_approval_pair" | Failing row contains (00000000-0000-0000-0000-000000
+PASS [A] R4 content_kind ngoài enum bị chặn — new row for relation "video_revisions" violates check constraint "ck_video_revisions_content_kind" | Failing row contains (00000000-0000-0000-0000-0000000000d2, 00000000-
+PASS [A] P1 publish tài trợ khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | ads.sponsored_publication is OFF: sponsored revisions cannot be published
+PASS [A] P2 cờ ON, tài trợ chưa duyệt → SPONSORSHIP_LABEL_REQUIRED — SPONSORSHIP_LABEL_REQUIRED | Sponsorship of revision 00000000-0000-0000-0000-0000000000f2 is not approved
+PASS [A] P3 cờ ON, tài trợ hết hạn → SPONSORSHIP_EXPIRED — SPONSORSHIP_EXPIRED | Sponsorship window [2026-09-10 12:11:29.961+07, 2026-11-08 12:11:29.961+07) does not include now
+PASS [A] P4 cờ ON, đã duyệt, còn hạn → publish được
+PASS [A] P5 bài EDITORIAL publish được khi cờ tài trợ OFF
+PASS [A] P6 revision của bài khác → STATE_CONFLICT — STATE_CONFLICT | Revision 00000000-0000-0000-0000-0000000000f5 does not belong to articles 00000000-0000-0000-0000-0000000000b1
+PASS [A] P7 video tài trợ khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | ads.sponsored_publication is OFF: sponsored revisions cannot be published
+PASS [A] C1 ghi bình luận khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | community.video_comments is OFF: write to tt.comments rejected
+PASS [A] C2 ghi bình luận khi cờ ON (có duyệt)
+PASS [A] A1 targetUrl javascript: bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_target_https" | Failing row contains (b49d50a6-860d-4939-bafc-c33fb3a1becb, slot_a, Quảng
+PASS [A] A2 ACTIVE chưa duyệt bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_approval" | Failing row contains (9060c055-97eb-4489-a8b8-d8e0b1cd8018, slot_a, Quảng cáo
+PASS [A] A3 APPROVED thiếu alt/media bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_serving_complete" | Failing row contains (4ddf599b-34fd-4205-9c23-930efe41237b, slot_a, Q
+PASS [A] A4 code sai định dạng bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_code_format" | Failing row contains (731ff1ae-a84d-436a-85d7-084a616b0520, Bad Code, Quản
+PASS [A] A5 thiếu kích thước bị chặn (chống CLS) — new row for relation "ad_placements" violates check constraint "ck_ad_placements_dimensions" | Failing row contains (daea19b8-7c52-4d66-8672-7da779164fbe, slot_a, Quảng c
+PASS [A] A6 status ngoài enum bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_status" | Failing row contains (52b39048-ec5e-42e6-8513-bc25a7ce685f, slot_a, Quảng cáo, 
+PASS [A] A7 slot ACTIVE đầy đủ hợp lệ; UPDATE tăng row_version
+PASS [A] T1 ghi nhận yêu cầu takedown
+PASS [A] T2 ACTIONED khi chưa có action → STATE_CONFLICT (kiểm hoãn) — STATE_CONFLICT | Takedown 00000000-0000-0000-0000-0000000007d1 cannot be ACTIONED without a linked action
+PASS [A] T3 có action UNPUBLISH → ACTIONED hợp lệ, tự sinh 7 bước lan truyền
+PASS [A] T4 sửa bằng chứng bị chặn — APPEND_ONLY | UPDATE on tt.takedown_evidence is not allowed: rows are append-only evidence
+PASS [A] T5 xóa bằng chứng bị chặn — APPEND_ONLY | DELETE on tt.takedown_evidence is not allowed: rows are append-only evidence
+PASS [A] T6 xóa yêu cầu takedown bị chặn — APPEND_ONLY | DELETE on tt.takedown_requests is not allowed: rows are append-only evidence
+PASS [A] T7 TRUNCATE bằng chứng bị chặn — APPEND_ONLY | TRUNCATE on tt.takedown_evidence is not allowed: rows are append-only evidence
+PASS [A] T8 RECEIVED → CLOSED bị chặn — STATE_CONFLICT | Takedown 00000000-0000-0000-0000-0000000007d1: transition RECEIVED → CLOSED is not allowed
+PASS [A] T9 bước lan truyền DONE thiếu completed_at bị chặn — new row for relation "takedown_propagation" violates check constraint "ck_takedown_propagation_done_at" | Failing row contains (00000000-0000-0000-0000-0000000007d1, CDN_
+PASS [A] T10 down 0303 từ chối khi đã có yêu cầu takedown — Refusing to roll back 0303: tt.takedown_requests contains rows (legal evidence). Export the data and obtain approval before rolling back.
+PASS [A] T11 action thiếu lý do bị chặn — new row for relation "takedown_actions" violates check constraint "takedown_actions_reason_check" | Failing row contains (d9b65eeb-deb0-438d-b947-efa40c0e1518, 00000000-0
+PASS [A] M1 priority ngoài enum bị chặn — new row for relation "moderation_cases" violates check constraint "ck_moderation_cases_priority" | Failing row contains (00000000-0000-0000-0000-0000000000c1, COMMENT, 00
+PASS [A] M2 sửa lịch sử kiểm duyệt bị chặn — APPEND_ONLY | UPDATE on tt.moderation_case_history is not allowed: rows are append-only evidence
+PASS [A] M3 HIDE thiếu lý do bị chặn — new row for relation "moderation_case_history" violates check constraint "ck_moderation_case_history_reason" | Failing row contains (2, 00000000-0000-0000-0000-0000000000
+PASS [A] M4 ASSIGN không cần lý do; UPDATE case tăng row_version
+PASS [A] MD1 media PUBLIC khi quyền chưa CLEARED bị chặn — new row for relation "media_assets" violates check constraint "ck_media_assets_public_requires_cleared" | Failing row contains (00000000-0000-0000-0000-0000000000e1, UPLO
+PASS [A] MD2 media PUBLIC khi quyền CLEARED
+PASS [A] G1 PUBLISHED thiếu public revision bị chặn — new row for relation "articles" violates check constraint "ck_articles_published_requires_public_revision" | Failing row contains (00000000-0000-0000-0000-0000000000b1, b
+PASS [A] G2 PUBLISHED khi quyền chưa CLEARED bị chặn — new row for relation "articles" violates check constraint "ck_articles_published_requires_cleared_rights" | Failing row contains (00000000-0000-0000-0000-0000000000b1, ba
+PASS [A] G3 SCHEDULED thiếu scheduled_at bị chặn — new row for relation "articles" violates check constraint "ck_articles_scheduled_requires_time" | Failing row contains (00000000-0000-0000-0000-0000000000b1, bai-mot, SCH
+PASS [A] G4 status ngoài enum bị chặn — new row for relation "videos" violates check constraint "ck_videos_status" | Failing row contains (00000000-0000-0000-0000-0000000000d1, video-mot, LIVE, 00000000-0000-00
+PASS [A] G5 publish hợp lệ (EDITORIAL, CLEARED); row_version tăng
+PASS [A] S1 đổi slug → slug cũ thành redirect
+PASS [A] S2 bài khác chiếm slug đang là redirect → STATE_CONFLICT — STATE_CONFLICT | Slug "bai-mot" is reserved as a redirect of another article
+PASS [A] S3 bài lấy lại slug cũ → redirect cũ bị gỡ, slug vừa bỏ thành redirect
+PASS [A] I1 trùng Idempotency-Key cùng phạm vi bị chặn — duplicate key value violates unique constraint "idempotency_keys_pkey" | Key (actor_key, http_method, route_template, idempotency_key)=(00000000-0000-0000-0000-0000000000
+PASS [A] I2 Idempotency-Key quá ngắn bị chặn — new row for relation "idempotency_keys" violates check constraint "idempotency_keys_idempotency_key_check" | Failing row contains (00000000-0000-0000-0000-0000000000a2, P
+PASS [A] L1 UPDATE category tăng row_version
+PASS [A] Z1 nội dung có sẵn và mới mặc định thuộc site www
+PASS [A] Z2 site không có trong registry bị chặn (trigger trước, khóa ngoại dự phòng) — VALIDATION_FAILED | tt.articles.primary_site_key = nope: content must belong to an active/planned public-web site
+PASS [A] Z3 nội dung không được gán cho site cms/media — VALIDATION_FAILED | tt.videos.primary_site_key = cms: content must belong to an active/planned public-web site
+PASS [A] Z4 đồng bộ idempotent; thêm site chỉ bằng registry; bỏ khỏi registry → retired, không xóa
+PASS [A] Z5 xóa site bị chặn (chỉ retired) — APPEND_ONLY | DELETE on tt.sites is not allowed: rows are append-only evidence
+PASS [A] O1 privacy request VERIFIED thiếu verified_at bị chặn — new row for relation "privacy_requests" violates check constraint "ck_privacy_requests_verified_at" | Failing row contains (8958cfe2-dea6-4886-afe8-fa47a018ecf3, ACCESS, 
+PASS [A] DOWN 0312_site_registry.down.sql
+PASS [A] DOWN 0311_privacy_requests.LEGAL_PENDING.down.sql
+PASS [A] DOWN 0310_validate_constraints.down.sql
+PASS [A] DOWN 0309_lookup_row_versions.down.sql
+PASS [A] DOWN 0308_slug_redirects_idempotency.down.sql
+PASS [A] DOWN 0307_write_guards.down.sql
+PASS [A] DOWN 0306_content_aggregates.down.sql
+PASS [A] DOWN 0305_media_rights.down.sql
+PASS [A] DOWN 0304_moderation_cases.down.sql
+PASS [A] DOWN 0303_takedown.down.sql
+PASS [A] DOWN 0302_ad_placements.down.sql
+PASS [A] DOWN 0301_revision_sponsorship.down.sql
+PASS [A] DOWN 0300_feature_gate_registry.down.sql
+PASS [A] DOWN 0299_migration_support.down.sql
+PASS [A] Sau down toàn bộ, schema trở về đúng baseline 04
+PASS [A] UP lại sau down 0299_migration_support.up.sql
+PASS [A] UP lại sau down 0300_feature_gate_registry.up.sql
+PASS [A] UP lại sau down 0301_revision_sponsorship.up.sql
+PASS [A] UP lại sau down 0302_ad_placements.up.sql
+PASS [A] UP lại sau down 0303_takedown.up.sql
+PASS [A] UP lại sau down 0304_moderation_cases.up.sql
+PASS [A] UP lại sau down 0305_media_rights.up.sql
+PASS [A] UP lại sau down 0306_content_aggregates.up.sql
+PASS [A] UP lại sau down 0307_write_guards.up.sql
+PASS [A] UP lại sau down 0308_slug_redirects_idempotency.up.sql
+PASS [A] UP lại sau down 0309_lookup_row_versions.up.sql
+PASS [A] UP lại sau down 0310_validate_constraints.up.sql
+PASS [A] UP lại sau down 0312_site_registry.up.sql
+PASS [B] SQL addendum v0.2 chạy được trên stub (lần đầu được chạy thử)
+PASS [B] UP 0299_migration_support.up.sql
+PASS [B] UP 0300_feature_gate_registry.up.sql
+PASS [B] UP 0301_revision_sponsorship.up.sql
+PASS [B] UP 0302_ad_placements.up.sql
+PASS [B] UP 0303_takedown.up.sql
+PASS [B] UP 0304_moderation_cases.up.sql
+PASS [B] UP 0305_media_rights.up.sql
+PASS [B] UP 0306_content_aggregates.up.sql
+PASS [B] UP 0307_write_guards.up.sql
+PASS [B] UP 0308_slug_redirects_idempotency.up.sql
+PASS [B] UP 0309_lookup_row_versions.up.sql
+PASS [B] UP 0312_site_registry.up.sql
+PASS [B] Khóa v0.2 đổi sang registry, giữ trạng thái OFF
+PASS [B] Báo cáo vi phạm NOT VALID chỉ ra đúng dòng v0.2 thiếu kích thước — ad_placements.ck_ad_placements_dimensions=1
+PASS [B] 0310 phải DỪNG khi dữ liệu cũ thiếu kích thước slot — 0310_validate_constraints.up.sql: VALIDATE failed for tt.ad_placements.ck_ad_placements_dimensions: existing rows violate it — backfill/map data, then rerun 0310 (check c
+PASS [B] UP sau backfill 0310_validate_constraints.up.sql
+PASS [B] Mọi ràng buộc v0.3 đã VALIDATED
+PASS [B] DOWN 0312_site_registry.down.sql
+PASS [B] DOWN 0310_validate_constraints.down.sql
+PASS [B] DOWN 0309_lookup_row_versions.down.sql
+PASS [B] DOWN 0308_slug_redirects_idempotency.down.sql
+PASS [B] DOWN 0307_write_guards.down.sql
+PASS [B] DOWN 0306_content_aggregates.down.sql
+PASS [B] DOWN 0305_media_rights.down.sql
+PASS [B] DOWN 0304_moderation_cases.down.sql
+PASS [B] DOWN 0303_takedown.down.sql
+PASS [B] DOWN 0302_ad_placements.down.sql
+PASS [B] DOWN 0301_revision_sponsorship.down.sql
+PASS [B] DOWN 0300_feature_gate_registry.down.sql
+PASS [B] DOWN 0299_migration_support.down.sql
+PASS [B] Sau down, schema + khóa cờ trở về đúng trạng thái v0.2
+PASS [C] 0304 dừng khi thiếu tt.moderation_cases — 0304_moderation_cases.up.sql: Precondition failed: table tt.moderation_cases is required (schema 04). Reconcile 04_DATABASE_SCHEMA_REFERENCE_v0.1.sql first.
+
+TỔNG: 151/151 PASS

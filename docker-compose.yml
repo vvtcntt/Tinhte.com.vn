@@ -1,0 +1,33 @@
+# Hạ tầng dev local (Sprint 0) — CHƯA chạy thử trên máy dựng khung (không có Docker).
+#   postgres : PostgreSQL cho API/migration
+#   edge     : Caddy mô phỏng CDN đa subdomain; Caddyfile SINH TỪ config/sites/sites.json
+#              (node tools/sites/generate-caddyfile.mjs) — ADR-0001 D10.
+# App chạy trên máy: API `dotnet run` (5080), web `npm run dev -w @tinhte/web` (3000), cms (3001).
+# Truy cập qua edge: http://www.tinhte.localhost:8080 , http://cms.tinhte.localhost:8080 (trình duyệt tự trỏ *.localhost về 127.0.0.1).
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: tinhte
+      POSTGRES_USER: tinhte
+      POSTGRES_PASSWORD: ${TT_LOCAL_PG_PASSWORD:-change-me-local-only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tinhte -d tinhte"]
+      interval: 5s
+      retries: 10
+
+  edge:
+    image: caddy:2
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infra/local/Caddyfile:/etc/caddy/Caddyfile:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pgdata: {}

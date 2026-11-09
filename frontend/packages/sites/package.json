@@ -1,0 +1,14 @@
+{
+  "name": "@tinhte/sites",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Site Registry runtime (ADR-0001): phân giải host, header bảo mật, cookie, SEO — nguồn duy nhất config/sites/sites.json",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -1,0 +1,504 @@
+# Kết quả chạy test_static_contract.py — 2026-11-09
+# Lệnh: python -m unittest -v test_static_contract.py (Python 3.13, PyYAML 6.0.3, openapi-spec-validator)
+# Kết quả mong đợi ở v0.2: FAIL là bằng chứng cho đề xuất AIR-xxx tương ứng.
+
+test_T13_cursor_lists_accept_cursor_param (test_static_contract.DomainContract.test_T13_cursor_lists_accept_cursor_param)
+AIR-003: response có nextCursor thì request phải nhận cursor/limit. ... FAIL
+test_T15_moderation_action_enum_consistent (test_static_contract.DomainContract.test_T15_moderation_action_enum_consistent)
+AIR-006: enum hành động phải thống nhất và đủ APPROVE/LOCK cho FR-COM-007. ... FAIL
+test_T27_takedown_list_returns_takedown_schema (test_static_contract.DomainContract.test_T27_takedown_list_returns_takedown_schema)
+AIR-008. ... FAIL
+test_T28_revision_targeted_operations (test_static_contract.DomainContract.test_T28_revision_targeted_operations)
+AIR-005: rollback và publish video phải chỉ rõ revisionId. ... FAIL
+test_T10b_sponsored_publication_gate_enforced_on_publish (test_static_contract.FeatureGatesAndAds.test_T10b_sponsored_publication_gate_enforced_on_publish)
+AIR-002: publish bài/video phải khai báo gate sponsored + lỗi SPONSORSHIP_LABEL_REQUIRED. ... FAIL
+test_T11_feature_gate_keys_match_registry (test_static_contract.FeatureGatesAndAds.test_T11_feature_gate_keys_match_registry)
+AIR-001: khóa x-feature-gate phải trùng khóa trong DB (SQL) và cấu hình production. ... FAIL
+test_T14_public_content_dtos_require_content_kind (test_static_contract.FeatureGatesAndAds.test_T14_public_content_dtos_require_content_kind)
+AIR-011: mọi DTO công khai phải bắt buộc contentKind để FE không thể bỏ nhãn tài trợ. ... FAIL
+test_T29_ad_placement_has_dimensions (test_static_contract.FeatureGatesAndAds.test_T29_ad_placement_has_dimensions)
+AIR-013: slot quảng cáo cần kích thước dự phòng để chống CLS. ... FAIL
+test_T03_cookie_mutations_require_csrf (test_static_contract.SecurityAndConcurrency.test_T03_cookie_mutations_require_csrf) ... ok
+test_T04_versioned_writes_require_if_match (test_static_contract.SecurityAndConcurrency.test_T04_versioned_writes_require_if_match)
+AIR-004: PATCH/PUT tài nguyên có phiên bản phải có If-Match (FR-CMS-007). ... FAIL
+test_T05_admin_get_exposes_etag (test_static_contract.SecurityAndConcurrency.test_T05_admin_get_exposes_etag)
+AIR-004: client phải lấy được ETag từ GET trước khi gửi If-Match. ... FAIL
+test_T12_create_posts_require_idempotency_key (test_static_contract.SecurityAndConcurrency.test_T12_create_posts_require_idempotency_key)
+AIR-023: POST tạo mới (201) có rủi ro retry phải có Idempotency-Key. ... FAIL
+test_T01_openapi_31_schema_valid (test_static_contract.SpecStructure.test_T01_openapi_31_schema_valid)
+Spec hợp lệ theo JSON Schema OpenAPI 3.1 (validator chuyên dụng). ... ok
+test_T02_counts_and_unique_operation_ids (test_static_contract.SpecStructure.test_T02_counts_and_unique_operation_ids) ... ok
+test_T16_no_orphan_components (test_static_contract.SpecStructure.test_T16_no_orphan_components)
+AIR-027: component khai báo nhưng không được tham chiếu. ... FAIL
+test_T17_no_unknown_schema_keywords (test_static_contract.SpecStructure.test_T17_no_unknown_schema_keywords)
+AIR-027: phát hiện khóa gõ sai (vd 'defaults false') bị JSON Schema bỏ qua âm thầm. ... FAIL
+test_T18_row_version_type_consistent (test_static_contract.SpecStructure.test_T18_row_version_type_consistent)
+AIR-004: rowVersion phải cùng kiểu ở mọi DTO để map sang ETag/If-Match. ... FAIL
+test_T19_every_operation_links_fr (test_static_contract.SpecStructure.test_T19_every_operation_links_fr)
+AIR-021: thao tác không có x-requirements thì không có owner nghiệp vụ / test trace. ... FAIL
+test_T20_errors_use_problem_json (test_static_contract.SpecStructure.test_T20_errors_use_problem_json) ... ok
+test_T06_authenticated_ops_declare_401 (test_static_contract.StatusCodeMatrix.test_T06_authenticated_ops_declare_401)
+AIR-009. ... FAIL
+test_T07_path_param_ops_declare_404 (test_static_contract.StatusCodeMatrix.test_T07_path_param_ops_declare_404)
+AIR-009. ... FAIL
+test_T08_mutations_declare_429_with_retry_after (test_static_contract.StatusCodeMatrix.test_T08_mutations_declare_429_with_retry_after)
+AIR-009. ... FAIL
+test_T09_p0star_ops_gated_with_403 (test_static_contract.StatusCodeMatrix.test_T09_p0star_ops_gated_with_403) ... ok
+test_T10_error_codes_consistent_with_guide (test_static_contract.StatusCodeMatrix.test_T10_error_codes_consistent_with_guide)
+AIR-009: guide quy định FEATURE_DISABLED/ELIGIBILITY_REQUIRED; không dùng mã khác cho cùng ý nghĩa. ... FAIL
+test_T21_inventory_matches_spec (test_static_contract.Traceability.test_T21_inventory_matches_spec) ... ok
+test_T22_fr84_apis_exist_in_spec (test_static_contract.Traceability.test_T22_fr84_apis_exist_in_spec) ... ok
+test_T23_child_scope_compatible_with_parent (test_static_contract.Traceability.test_T23_child_scope_compatible_with_parent)
+AIR-014: task P1/P2 không treo dưới cha P0; task P0*/P0 không treo dưới cha P1. ... FAIL
+test_T24_child_fr_present_in_parent_trace (test_static_contract.Traceability.test_T24_child_fr_present_in_parent_trace)
+AIR-015: child '0 additional estimate' chỉ an toàn nếu FR đã nằm trong Trace của WBS cha. ... FAIL
+test_T25_ads_tasks_traced_in_fr84 (test_static_contract.Traceability.test_T25_ads_tasks_traced_in_fr84)
+AIR-014: FR được WBS-131..135 thực hiện phải liệt kê các WBS đó trong FR84. ... FAIL
+test_T26_ads_estimate_arithmetic (test_static_contract.Traceability.test_T26_ads_estimate_arithmetic) ... ok
+
+======================================================================
+FAIL: test_T13_cursor_lists_accept_cursor_param (test_static_contract.DomainContract.test_T13_cursor_lists_accept_cursor_param)
+AIR-003: response có nextCursor thì request phải nhận cursor/limit.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('GET', '/admin/articles'), ('GET', '/cat[414 chars]es')] != []
+
+First list contains 13 additional elements.
+First extra element 0:
+('GET', '/admin/articles')
+
++ []
+- [('GET', '/admin/articles'),
+-  ('GET', '/categories/{slug}/articles'),
+-  ('GET', '/topics/{slug}/articles'),
+-  ('GET', '/articles/{slug}/related-videos'),
+-  ('GET', '/videos/{videoId}/related-articles'),
+-  ('GET', '/series/{slug}'),
+-  ('GET', '/admin/work-queue'),
+-  ('GET', '/admin/articles/{articleId}/related-suggestions'),
+-  ('GET', '/admin/videos'),
+-  ('GET', '/admin/media'),
+-  ('GET', '/admin/users'),
+-  ('GET', '/admin/takedown-requests'),
+-  ('GET', '/admin/moderation/cases')] : 13 list có nextCursor nhưng không nhận cursor:
+  - GET /admin/articles
+  - GET /categories/{slug}/articles
+  - GET /topics/{slug}/articles
+  - GET /articles/{slug}/related-videos
+  - GET /videos/{videoId}/related-articles
+  - GET /series/{slug}
+  - GET /admin/work-queue
+  - GET /admin/articles/{articleId}/related-suggestions
+  - GET /admin/videos
+  - GET /admin/media
+  - GET /admin/users
+  - GET /admin/takedown-requests
+  - GET /admin/moderation/cases
+
+======================================================================
+FAIL: test_T15_moderation_action_enum_consistent (test_static_contract.DomainContract.test_T15_moderation_action_enum_consistent)
+AIR-006: enum hành động phải thống nhất và đủ APPROVE/LOCK cho FR-COM-007.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ["inline=['DISMISS', 'ESCALATE', 'HIDE', '[138 chars]ùng"] != []
+
+First list contains 2 additional elements.
+First extra element 0:
+"inline=['DISMISS', 'ESCALATE', 'HIDE', 'REMOVE', 'RESTORE'] != component=['APPROVE', 'HIDE', 'LOCK', 'REJECT', 'REMOVE', 'RESTORE']"
+
++ []
+- ["inline=['DISMISS', 'ESCALATE', 'HIDE', 'REMOVE', 'RESTORE'] != "
+-  "component=['APPROVE', 'HIDE', 'LOCK', 'REJECT', 'REMOVE', 'RESTORE']",
+-  "thiếu ['APPROVE', 'LOCK'] trong enum đang dùng"] : inline=['DISMISS', 'ESCALATE', 'HIDE', 'REMOVE', 'RESTORE'] != component=['APPROVE', 'HIDE', 'LOCK', 'REJECT', 'REMOVE', 'RESTORE']; thiếu ['APPROVE', 'LOCK'] trong enum đang dùng
+
+======================================================================
+FAIL: test_T27_takedown_list_returns_takedown_schema (test_static_contract.DomainContract.test_T27_takedown_list_returns_takedown_schema)
+AIR-008.
+----------------------------------------------------------------------
+AssertionError: 'ModerationCase' unexpectedly found in '#/components/schemas/ModerationCaseList' : GET /admin/takedown-requests trả #/components/schemas/ModerationCaseList
+
+======================================================================
+FAIL: test_T28_revision_targeted_operations (test_static_contract.DomainContract.test_T28_revision_targeted_operations)
+AIR-005: rollback và publish video phải chỉ rõ revisionId.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['rollback không có target revisionId', 'p[69 chars]tch'] != []
+
+First list contains 3 additional elements.
+First extra element 0:
+'rollback không có target revisionId'
+
++ []
+- ['rollback không có target revisionId',
+-  'publish video không có body revisionId',
+-  'publish video không có If-Match'] : rollback không có target revisionId; publish video không có body revisionId; publish video không có If-Match
+
+======================================================================
+FAIL: test_T10b_sponsored_publication_gate_enforced_on_publish (test_static_contract.FeatureGatesAndAds.test_T10b_sponsored_publication_gate_enforced_on_publish)
+AIR-002: publish bài/video phải khai báo gate sponsored + lỗi SPONSORSHIP_LABEL_REQUIRED.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['/admin/articles/{articleId}/publish', '/admin/videos/{videoId}/publish'] != []
+
+First list contains 2 additional elements.
+First extra element 0:
+'/admin/articles/{articleId}/publish'
+
+- ['/admin/articles/{articleId}/publish', '/admin/videos/{videoId}/publish']
++ [] : Publish không nhắc tới chính sách sponsored:
+  - /admin/articles/{articleId}/publish
+  - /admin/videos/{videoId}/publish
+
+======================================================================
+FAIL: test_T11_feature_gate_keys_match_registry (test_static_contract.FeatureGatesAndAds.test_T11_feature_gate_keys_match_registry)
+AIR-001: khóa x-feature-gate phải trùng khóa trong DB (SQL) và cấu hình production.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['ads.campaign_advanced', 'ads.display_slo[111 chars]ark'] != []
+
+First list contains 8 additional elements.
+First extra element 0:
+'ads.campaign_advanced'
+
++ []
+- ['ads.campaign_advanced',
+-  'ads.display_slots',
+-  'ai.assistance',
+-  'ai.search',
+-  'community.appeals',
+-  'community.comments',
+-  'community.member',
+-  'member.bookmark'] : Khóa gate API không có trong registry ['article_comments_enabled', 'display_ad_slots', 'public_creator_publish_enabled', 'shorts_instream_ads', 'sponsored_content_publication', 'user_upload_enabled', 'video_comments_enabled']:
+  - ads.campaign_advanced
+  - ads.display_slots
+  - ai.assistance
+  - ai.search
+  - community.appeals
+  - community.comments
+  - community.member
+  - member.bookmark
+
+======================================================================
+FAIL: test_T14_public_content_dtos_require_content_kind (test_static_contract.FeatureGatesAndAds.test_T14_public_content_dtos_require_content_kind)
+AIR-011: mọi DTO công khai phải bắt buộc contentKind để FE không thể bỏ nhãn tài trợ.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('ArticleSummary', 'contentKind không req[80 chars]nd')] != []
+
+First list contains 3 additional elements.
+First extra element 0:
+('ArticleSummary', 'contentKind không required')
+
++ []
+- [('ArticleSummary', 'contentKind không required'),
+-  ('Video', 'contentKind không required'),
+-  ('SearchHit', 'thiếu contentKind')] : DTO công khai:
+  - ArticleSummary contentKind không required
+  - Video contentKind không required
+  - SearchHit thiếu contentKind
+
+======================================================================
+FAIL: test_T29_ad_placement_has_dimensions (test_static_contract.FeatureGatesAndAds.test_T29_ad_placement_has_dimensions)
+AIR-013: slot quảng cáo cần kích thước dự phòng để chống CLS.
+----------------------------------------------------------------------
+                    "AdPlacement không có width/height/aspectRatio")
+AssertionError: False is not true : AdPlacement không có width/height/aspectRatio
+
+======================================================================
+FAIL: test_T04_versioned_writes_require_if_match (test_static_contract.SecurityAndConcurrency.test_T04_versioned_writes_require_if_match)
+AIR-004: PATCH/PUT tài nguyên có phiên bản phải có If-Match (FR-CMS-007).
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('PATCH', '/admin/articles/{articleId}'),[328 chars]d}')] != []
+
+First list contains 9 additional elements.
+First extra element 0:
+('PATCH', '/admin/articles/{articleId}')
+
++ []
+- [('PATCH', '/admin/articles/{articleId}'),
+-  ('PATCH', '/admin/videos/{videoId}'),
+-  ('PUT', '/admin/videos/{videoId}/subtitles'),
+-  ('PUT', '/admin/videos/{videoId}/related-articles'),
+-  ('PATCH', '/admin/topics/{topicId}'),
+-  ('PATCH', '/me/profile'),
+-  ('PUT', '/admin/users/{userId}/roles'),
+-  ('PUT', '/admin/ad-placements/{placementId}'),
+-  ('PATCH', '/admin/categories/{categoryId}')] : 9 thao tác ghi thiếu If-Match:
+  - PATCH /admin/articles/{articleId}
+  - PATCH /admin/videos/{videoId}
+  - PUT /admin/videos/{videoId}/subtitles
+  - PUT /admin/videos/{videoId}/related-articles
+  - PATCH /admin/topics/{topicId}
+  - PATCH /me/profile
+  - PUT /admin/users/{userId}/roles
+  - PUT /admin/ad-placements/{placementId}
+  - PATCH /admin/categories/{categoryId}
+
+======================================================================
+FAIL: test_T05_admin_get_exposes_etag (test_static_contract.SecurityAndConcurrency.test_T05_admin_get_exposes_etag)
+AIR-004: client phải lấy được ETag từ GET trước khi gửi If-Match.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['/admin/articles/{articleId}', '/admin/videos/{videoId}'] != []
+
+First list contains 2 additional elements.
+First extra element 0:
+'/admin/articles/{articleId}'
+
+- ['/admin/articles/{articleId}', '/admin/videos/{videoId}']
++ [] : GET admin không trả ETag:
+  - /admin/articles/{articleId}
+  - /admin/videos/{videoId}
+
+======================================================================
+FAIL: test_T12_create_posts_require_idempotency_key (test_static_contract.SecurityAndConcurrency.test_T12_create_posts_require_idempotency_key)
+AIR-023: POST tạo mới (201) có rủi ro retry phải có Idempotency-Key.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('POST', '/admin/articles')] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+('POST', '/admin/articles')
+
+- [('POST', '/admin/articles')]
++ [] : POST 201 thiếu Idempotency-Key:
+  - POST /admin/articles
+
+======================================================================
+FAIL: test_T16_no_orphan_components (test_static_contract.SpecStructure.test_T16_no_orphan_components)
+AIR-027: component khai báo nhưng không được tham chiếu.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['schemas/Flag', 'schemas/ModerationAction[54 chars]nId'] != []
+
+First list contains 4 additional elements.
+First extra element 0:
+'schemas/Flag'
+
++ []
+- ['schemas/Flag',
+-  'schemas/ModerationActionRequest',
+-  'parameters/RevisionId',
+-  'parameters/CampaignId'] : Component mồ côi:
+  - schemas/Flag
+  - schemas/ModerationActionRequest
+  - parameters/RevisionId
+  - parameters/CampaignId
+
+======================================================================
+FAIL: test_T17_no_unknown_schema_keywords (test_static_contract.SpecStructure.test_T17_no_unknown_schema_keywords)
+AIR-027: phát hiện khóa gõ sai (vd 'defaults false') bị JSON Schema bỏ qua âm thầm.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('Video.commentsEnabled', "'defaults false'")] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+('Video.commentsEnabled', "'defaults false'")
+
+- [('Video.commentsEnabled', "'defaults false'")]
++ [] : Khóa schema không hợp lệ:
+  - Video.commentsEnabled 'defaults false'
+
+======================================================================
+FAIL: test_T18_row_version_type_consistent (test_static_contract.SpecStructure.test_T18_row_version_type_consistent)
+AIR-004: rowVersion phải cùng kiểu ở mọi DTO để map sang ETag/If-Match.
+----------------------------------------------------------------------
+AssertionError: 2 != 1 : rowVersion không đồng nhất: {'AdminArticle': 'integer', 'AdminVideo': 'string'}
+
+======================================================================
+FAIL: test_T19_every_operation_links_fr (test_static_contract.SpecStructure.test_T19_every_operation_links_fr)
+AIR-021: thao tác không có x-requirements thì không có owner nghiệp vụ / test trace.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('GET', '/admin/articles/{articleId}', 'P[796 chars]P0')] != []
+
+First list contains 20 additional elements.
+First extra element 0:
+('GET', '/admin/articles/{articleId}', 'P0')
+
+Diff is 908 characters long. Set self.maxDiff to None to see it. : 20 thao tác thiếu FR:
+  - GET /admin/articles/{articleId} P0
+  - GET /admin/videos P0
+  - POST /admin/videos P0
+  - GET /admin/videos/{videoId} P0
+  - PATCH /admin/videos/{videoId} P0
+  - POST /admin/videos/{videoId}/submit P0
+  - POST /admin/videos/{videoId}/request-changes P0
+  - POST /admin/videos/{videoId}/reject P0
+  - POST /admin/videos/{videoId}/schedule P0
+  - GET /admin/categories P0
+  - POST /admin/categories P0
+  - GET /admin/topics P0
+  - POST /admin/topics P0
+  - PATCH /admin/topics/{topicId} P0
+  - GET /admin/users P0
+  - GET /admin/users/{userId} P0
+  - GET /admin/moderation/cases/{caseId} P0*
+  - GET /admin/ads/campaigns P1
+  - POST /admin/ads/campaigns P1
+  - PATCH /admin/categories/{categoryId} P0
+
+======================================================================
+FAIL: test_T06_authenticated_ops_declare_401 (test_static_contract.StatusCodeMatrix.test_T06_authenticated_ops_declare_401)
+AIR-009.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('POST', '/admin/articles/{articleId}/sub[317 chars]ns')] != []
+
+First list contains 8 additional elements.
+First extra element 0:
+('POST', '/admin/articles/{articleId}/submit')
+
++ []
+- [('POST', '/admin/articles/{articleId}/submit'),
+-  ('POST', '/admin/articles/{articleId}/approve'),
+-  ('POST', '/admin/articles/{articleId}/publish'),
+-  ('POST', '/admin/media/upload-intents'),
+-  ('POST', '/admin/media/{mediaId}/finalize'),
+-  ('GET', '/admin/media/{mediaId}'),
+-  ('POST', '/comments/{commentId}/replies'),
+-  ('POST', '/admin/moderation/cases/{caseId}/actions')] : 8 thao tác cần đăng nhập thiếu 401:
+  - POST /admin/articles/{articleId}/submit
+  - POST /admin/articles/{articleId}/approve
+  - POST /admin/articles/{articleId}/publish
+  - POST /admin/media/upload-intents
+  - POST /admin/media/{mediaId}/finalize
+  - GET /admin/media/{mediaId}
+  - POST /comments/{commentId}/replies
+  - POST /admin/moderation/cases/{caseId}/actions
+
+======================================================================
+FAIL: test_T07_path_param_ops_declare_404 (test_static_contract.StatusCodeMatrix.test_T07_path_param_ops_declare_404)
+AIR-009.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('POST', '/admin/articles/{articleId}/sub[198 chars]ns')] != []
+
+First list contains 5 additional elements.
+First extra element 0:
+('POST', '/admin/articles/{articleId}/submit')
+
++ []
+- [('POST', '/admin/articles/{articleId}/submit'),
+-  ('POST', '/admin/articles/{articleId}/approve'),
+-  ('POST', '/admin/articles/{articleId}/publish'),
+-  ('POST', '/admin/media/{mediaId}/finalize'),
+-  ('POST', '/admin/moderation/cases/{caseId}/actions')] : 5 thao tác có path param thiếu 404:
+  - POST /admin/articles/{articleId}/submit
+  - POST /admin/articles/{articleId}/approve
+  - POST /admin/articles/{articleId}/publish
+  - POST /admin/media/{mediaId}/finalize
+  - POST /admin/moderation/cases/{caseId}/actions
+
+======================================================================
+FAIL: test_T08_mutations_declare_429_with_retry_after (test_static_contract.StatusCodeMatrix.test_T08_mutations_declare_429_with_retry_after)
+AIR-009.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('POST', '/admin/articles'), ('POST', '/a[338 chars]er')] != []
+
+First list contains 8 additional elements.
+First extra element 0:
+('POST', '/admin/articles')
+
++ []
+- [('POST', '/admin/articles'),
+-  ('POST', '/admin/articles/{articleId}/submit'),
+-  ('POST', '/admin/articles/{articleId}/approve'),
+-  ('POST', '/admin/articles/{articleId}/publish'),
+-  ('POST', '/admin/media/upload-intents'),
+-  ('POST', '/admin/media/{mediaId}/finalize'),
+-  ('POST', '/admin/moderation/cases/{caseId}/actions'),
+-  ('components/responses/TooManyRequests', 'thiếu header Retry-After')] : Thiếu 429/Retry-After:
+  - POST /admin/articles
+  - POST /admin/articles/{articleId}/submit
+  - POST /admin/articles/{articleId}/approve
+  - POST /admin/articles/{articleId}/publish
+  - POST /admin/media/upload-intents
+  - POST /admin/media/{mediaId}/finalize
+  - POST /admin/moderation/cases/{caseId}/actions
+  - components/responses/TooManyRequests thiếu header Retry-After
+
+======================================================================
+FAIL: test_T10_error_codes_consistent_with_guide (test_static_contract.StatusCodeMatrix.test_T10_error_codes_consistent_with_guide)
+AIR-009: guide quy định FEATURE_DISABLED/ELIGIBILITY_REQUIRED; không dùng mã khác cho cùng ý nghĩa.
+----------------------------------------------------------------------
+AssertionError: Lists differ: ['COMMENT_DISABLED'] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+'COMMENT_DISABLED'
+
+- ['COMMENT_DISABLED']
++ [] : Mã lỗi ngoài danh mục guide
+
+======================================================================
+FAIL: test_T23_child_scope_compatible_with_parent (test_static_contract.Traceability.test_T23_child_scope_compatible_with_parent)
+AIR-014: task P1/P2 không treo dưới cha P0; task P0*/P0 không treo dưới cha P1.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('WBS-101', 'P1', '-> parent', 'WBS-042',[101 chars]P0')] != []
+
+First list contains 3 additional elements.
+First extra element 0:
+('WBS-101', 'P1', '-> parent', 'WBS-042', 'P0')
+
++ []
+- [('WBS-101', 'P1', '-> parent', 'WBS-042', 'P0'),
+-  ('WBS-125', 'P0*', '-> parent', 'WBS-085', 'P1'),
+-  ('WBS-126', 'P1', '-> parent', 'WBS-051', 'P0')] : Scope con/cha lệch:
+  - WBS-101 P1 -> parent WBS-042 P0
+  - WBS-125 P0* -> parent WBS-085 P1
+  - WBS-126 P1 -> parent WBS-051 P0
+
+======================================================================
+FAIL: test_T24_child_fr_present_in_parent_trace (test_static_contract.Traceability.test_T24_child_fr_present_in_parent_trace)
+AIR-015: child '0 additional estimate' chỉ an toàn nếu FR đã nằm trong Trace của WBS cha.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('WBS-091', 'FR-ADS-004', 'parents', 'WBS[666 chars]51')] != []
+
+First list contains 14 additional elements.
+First extra element 0:
+('WBS-091', 'FR-ADS-004', 'parents', 'WBS-085')
+
+Diff is 760 characters long. Set self.maxDiff to None to see it. : 14 child có FR không nằm trong Trace cha:
+  - WBS-091 FR-ADS-004 parents WBS-085
+  - WBS-099 FR-CMS-005 parents WBS-025+WBS-030
+  - WBS-100 FR-CMS-006 parents WBS-031
+  - WBS-101 FR-CMS-008 parents WBS-042
+  - WBS-102 FR-CMS-009 parents WBS-046
+  - WBS-109 FR-COM-009 parents WBS-060
+  - WBS-113 FR-DISC-005 parents WBS-042
+  - WBS-114 FR-ID-001 parents WBS-015
+  - WBS-118 FR-MOD-004 parents WBS-033+WBS-076
+  - WBS-119 FR-MOD-006 parents WBS-062
+  - WBS-120 FR-MOD-007 parents WBS-083
+  - WBS-121 FR-NEWS-002 parents WBS-022+WBS-034
+  - WBS-125 FR-NEWS-008 parents WBS-085
+  - WBS-126 FR-NEWS-009 parents WBS-051
+
+======================================================================
+FAIL: test_T25_ads_tasks_traced_in_fr84 (test_static_contract.Traceability.test_T25_ads_tasks_traced_in_fr84)
+AIR-014: FR được WBS-131..135 thực hiện phải liệt kê các WBS đó trong FR84.
+----------------------------------------------------------------------
+AssertionError: Lists differ: [('FR-ADS-001', 'thiếu', 'WBS-131'), ('FR-[353 chars]35')] != []
+
+First list contains 11 additional elements.
+First extra element 0:
+('FR-ADS-001', 'thiếu', 'WBS-131')
+
++ []
+- [('FR-ADS-001', 'thiếu', 'WBS-131'),
+-  ('FR-NEWS-008', 'thiếu', 'WBS-131'),
+-  ('FR-ADS-001', 'thiếu', 'WBS-132'),
+-  ('FR-ADS-002', 'thiếu', 'WBS-132'),
+-  ('FR-NEWS-008', 'thiếu', 'WBS-132'),
+-  ('FR-ADS-001', 'thiếu', 'WBS-133'),
+-  ('FR-ADS-002', 'thiếu', 'WBS-133'),
+-  ('FR-NEWS-008', 'thiếu', 'WBS-133'),
+-  ('FR-ADS-001', 'thiếu', 'WBS-134'),
+-  ('FR-NEWS-008', 'thiếu', 'WBS-134'),
+-  ('FR-ADS-002', 'thiếu', 'WBS-135')] : 
+  - FR-ADS-001 thiếu WBS-131
+  - FR-NEWS-008 thiếu WBS-131
+  - FR-ADS-001 thiếu WBS-132
+  - FR-ADS-002 thiếu WBS-132
+  - FR-NEWS-008 thiếu WBS-132
+  - FR-ADS-001 thiếu WBS-133
+  - FR-ADS-002 thiếu WBS-133
+  - FR-NEWS-008 thiếu WBS-133
+  - FR-ADS-001 thiếu WBS-134
+  - FR-NEWS-008 thiếu WBS-134
+  - FR-ADS-002 thiếu WBS-135
+
+----------------------------------------------------------------------
+Ran 30 tests in 2.395s
+
+FAILED (failures=22)

@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sites:
+    name: Site registry (ADR-0001)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node tools/sites/validate.mjs
+      - run: node tools/check-hardcoded-hosts.mjs
+      - run: node tools/sites/generate-caddyfile.mjs --check
+      - run: node --test "frontend/packages/sites/test/*.test.ts"
+
+  backend:
+    name: Backend (.NET 10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build backend/Tinhte.slnx -nologo
+      - run: dotnet test backend/Tinhte.slnx --no-build -nologo
+
+  frontend:
+    name: Frontend (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run typecheck
+
+  contract:
+    name: Contract v0.3 (static)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml==6.0.3 openapi-spec-validator jsonschema
+      - name: test_static_contract.py on v0.3 (spec + inventory + trace)
+        working-directory: doc/07_AI_REVIEW/contract-tests
+        env:
+          TT_SPEC_FILE: ../v0.3/07_OPENAPI_TINHTE_v0.3_DRAFT.yaml
+          TT_INVENTORY_FILE: ../v0.3/07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv
+          TT_FR84_FILE: ../v0.3/trace/07_FR84_TRACEABILITY_v0.3_DRAFT.csv
+          TT_WBS_FILE: ../v0.3/trace/07_WBS_EXTENDED_v0.3_DRAFT.csv
+        run: python -m unittest -v test_static_contract.py
+
+  db-migrations:
+    name: DB migrations v0.3 (PGlite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: doc/07_AI_REVIEW/v0.3/db/tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test

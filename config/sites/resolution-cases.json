@@ -1,0 +1,16 @@
+[
+  { "env": "production", "host": "www.tinhte.com.vn", "expect": { "type": "site", "site": "www" } },
+  { "env": "production", "host": "WWW.TINHTE.COM.VN.", "expect": { "type": "site", "site": "www" } },
+  { "env": "production", "host": "tinhte.com.vn", "expect": { "type": "alias", "site": "www", "canonicalHost": "www.tinhte.com.vn" } },
+  { "env": "production", "host": "cms.tinhte.com.vn", "expect": { "type": "site", "site": "cms" } },
+  { "env": "production", "host": "media.tinhte.com.vn", "expect": { "type": "site", "site": "media" } },
+  { "env": "production", "host": "evil.example", "expect": { "type": "unknown" } },
+  { "env": "production", "host": "www.staging.tinhte.com.vn", "expect": { "type": "unknown" } },
+  { "env": "production", "host": "www.tinhte.com.vn.evil.example", "expect": { "type": "unknown" } },
+  { "env": "production", "host": "[::1]", "expect": { "type": "unknown" } },
+  { "env": "staging", "host": "cms.staging.tinhte.com.vn", "expect": { "type": "site", "site": "cms" } },
+  { "env": "staging", "host": "staging.tinhte.com.vn", "expect": { "type": "alias", "site": "www", "canonicalHost": "www.staging.tinhte.com.vn" } },
+  { "env": "local", "host": "www.tinhte.localhost:3000", "expect": { "type": "site", "site": "www" } },
+  { "env": "local", "host": "tinhte.localhost:8080", "expect": { "type": "alias", "site": "www", "canonicalHost": "www.tinhte.localhost" } },
+  { "env": "local", "host": "", "expect": { "type": "unknown" } }
+]

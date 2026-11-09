@@ -1,0 +1,69 @@
+# Kết quả chạy test_static_contract.py trên toàn bộ bản v0.3 DRAFT (spec + inventory + FR84 + WBS) — 2026-11-09
+# Lệnh: TT_SPEC_FILE=../v0.3/07_OPENAPI_TINHTE_v0.3_DRAFT.yaml TT_INVENTORY_FILE=../v0.3/07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv TT_FR84_FILE=../v0.3/trace/07_FR84_TRACEABILITY_v0.3_DRAFT.csv TT_WBS_FILE=../v0.3/trace/07_WBS_EXTENDED_v0.3_DRAFT.csv python -m unittest -v test_static_contract.py
+
+test_T13_cursor_lists_accept_cursor_param (test_static_contract.DomainContract.test_T13_cursor_lists_accept_cursor_param)
+AIR-003: response có nextCursor thì request phải nhận cursor/limit. ... ok
+test_T15_moderation_action_enum_consistent (test_static_contract.DomainContract.test_T15_moderation_action_enum_consistent)
+AIR-006: enum hành động phải thống nhất và đủ APPROVE/LOCK cho FR-COM-007. ... ok
+test_T27_takedown_list_returns_takedown_schema (test_static_contract.DomainContract.test_T27_takedown_list_returns_takedown_schema)
+AIR-008. ... ok
+test_T28_revision_targeted_operations (test_static_contract.DomainContract.test_T28_revision_targeted_operations)
+AIR-005: rollback và publish video phải chỉ rõ revisionId. ... ok
+test_T10b_sponsored_publication_gate_enforced_on_publish (test_static_contract.FeatureGatesAndAds.test_T10b_sponsored_publication_gate_enforced_on_publish)
+AIR-002: publish/schedule bài/video phải có gate điều kiện sponsored + SPONSORSHIP_LABEL_REQUIRED. ... ok
+test_T11_feature_gate_keys_match_registry (test_static_contract.FeatureGatesAndAds.test_T11_feature_gate_keys_match_registry)
+AIR-001: khóa gate phải thuộc registry; mọi khóa cũ ở DB/cấu hình phải được ánh xạ (legacyKeys). ... ok
+test_T14_public_content_dtos_require_content_kind (test_static_contract.FeatureGatesAndAds.test_T14_public_content_dtos_require_content_kind)
+AIR-011: mọi DTO công khai phải bắt buộc contentKind để FE không thể bỏ nhãn tài trợ. ... ok
+test_T29_ad_placement_has_dimensions (test_static_contract.FeatureGatesAndAds.test_T29_ad_placement_has_dimensions)
+AIR-013: slot quảng cáo cần kích thước dự phòng để chống CLS. ... ok
+test_T30_conditional_rules (test_static_contract.SchemaBehaviour.test_T30_conditional_rules) ... ok
+test_T03_cookie_mutations_require_csrf (test_static_contract.SecurityAndConcurrency.test_T03_cookie_mutations_require_csrf) ... ok
+test_T04_versioned_writes_require_if_match (test_static_contract.SecurityAndConcurrency.test_T04_versioned_writes_require_if_match)
+AIR-004: PATCH/PUT tài nguyên có phiên bản phải có If-Match (FR-CMS-007). ... ok
+test_T05_admin_get_exposes_etag (test_static_contract.SecurityAndConcurrency.test_T05_admin_get_exposes_etag)
+AIR-004: client phải lấy được ETag từ GET trước khi gửi If-Match. ... ok
+test_T12_create_posts_require_idempotency_key (test_static_contract.SecurityAndConcurrency.test_T12_create_posts_require_idempotency_key)
+AIR-023: POST tạo mới (201) có rủi ro retry phải có Idempotency-Key. ... ok
+test_T01_openapi_31_schema_valid (test_static_contract.SpecStructure.test_T01_openapi_31_schema_valid)
+Spec hợp lệ theo JSON Schema OpenAPI 3.1 (validator chuyên dụng). ... ok
+test_T02_counts_and_unique_operation_ids (test_static_contract.SpecStructure.test_T02_counts_and_unique_operation_ids)
+v0.2: đúng 93/106. Bản sau: không được âm thầm xóa thao tác nào của v0.2. ... ok
+test_T16_no_orphan_components (test_static_contract.SpecStructure.test_T16_no_orphan_components)
+AIR-027: component khai báo nhưng không được tham chiếu. ... ok
+test_T17_no_unknown_schema_keywords (test_static_contract.SpecStructure.test_T17_no_unknown_schema_keywords)
+AIR-027: phát hiện khóa gõ sai (vd 'defaults false') bị JSON Schema bỏ qua âm thầm. ... ok
+test_T18_row_version_type_consistent (test_static_contract.SpecStructure.test_T18_row_version_type_consistent)
+AIR-004: rowVersion phải cùng kiểu ở mọi DTO để map sang ETag/If-Match. ... ok
+test_T19_every_operation_links_fr (test_static_contract.SpecStructure.test_T19_every_operation_links_fr)
+AIR-021: thao tác không có x-requirements thì không có owner nghiệp vụ / test trace. ... ok
+test_T20_errors_use_problem_json (test_static_contract.SpecStructure.test_T20_errors_use_problem_json) ... ok
+test_T06_authenticated_ops_declare_401 (test_static_contract.StatusCodeMatrix.test_T06_authenticated_ops_declare_401)
+AIR-009. ... ok
+test_T07_path_param_ops_declare_404 (test_static_contract.StatusCodeMatrix.test_T07_path_param_ops_declare_404)
+AIR-009. ... ok
+test_T08_mutations_declare_429_with_retry_after (test_static_contract.StatusCodeMatrix.test_T08_mutations_declare_429_with_retry_after)
+AIR-009. ... ok
+test_T09_p0star_ops_gated_with_403 (test_static_contract.StatusCodeMatrix.test_T09_p0star_ops_gated_with_403) ... ok
+test_T10_error_codes_consistent_with_guide (test_static_contract.StatusCodeMatrix.test_T10_error_codes_consistent_with_guide)
+AIR-009: guide quy định FEATURE_DISABLED/ELIGIBILITY_REQUIRED; không dùng mã khác cho cùng ý nghĩa. ... ok
+test_T21_inventory_matches_spec (test_static_contract.Traceability.test_T21_inventory_matches_spec) ... ok
+test_T22_fr84_apis_exist_in_spec (test_static_contract.Traceability.test_T22_fr84_apis_exist_in_spec) ... ok
+test_T23_child_scope_compatible_with_parent (test_static_contract.Traceability.test_T23_child_scope_compatible_with_parent)
+AIR-014: task P1/P2 không treo dưới cha P0; task P0*/P0 không treo dưới cha P1. ... ok
+test_T24_child_fr_present_in_parent_trace (test_static_contract.Traceability.test_T24_child_fr_present_in_parent_trace)
+AIR-015: child '0 additional estimate' chỉ an toàn nếu FR đã nằm trong Trace của WBS cha. ... ok
+test_T25_ads_tasks_traced_in_fr84 (test_static_contract.Traceability.test_T25_ads_tasks_traced_in_fr84)
+AIR-014: FR được WBS-131..135 thực hiện phải liệt kê các WBS đó trong FR84. ... ok
+test_T26_ads_estimate_arithmetic (test_static_contract.Traceability.test_T26_ads_estimate_arithmetic) ... ok
+test_T31_every_fr_has_test_ids_api_and_package (test_static_contract.Traceability.test_T31_every_fr_has_test_ids_api_and_package)
+AIR-025: mỗi FR có TC POS + NEG, ít nhất một API, gói phát hành hợp lệ (chỉ áp dụng FR84 v0.3). ... ok
+test_T32_fr_ids_consistent_between_spec_and_fr84 (test_static_contract.Traceability.test_T32_fr_ids_consistent_between_spec_and_fr84)
+FR trong x-requirements của spec phải có trong FR84 và ngược lại (không FR mồ côi). ... ok
+test_T33_wbs_trace_and_fr84_agree_both_ways (test_static_contract.Traceability.test_T33_wbs_trace_and_fr84_agree_both_ways)
+AIR-014: Trace của WBS có FR ⇔ FR84 liệt kê WBS đó (bỏ qua dòng đề xuất chưa duyệt). ... ok
+
+----------------------------------------------------------------------
+Ran 34 tests in 1.303s
+
+OK

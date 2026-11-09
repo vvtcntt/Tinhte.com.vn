@@ -1,0 +1,12 @@
+{
+  "name": "tinhte-db-migration-tests",
+  "private": true,
+  "type": "module",
+  "description": "Chạy thử migration v0.3 trên PostgreSQL (PGlite/WASM) — không cần cài server",
+  "scripts": {
+    "test": "node run_migration_tests.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.10"
+  }
+}

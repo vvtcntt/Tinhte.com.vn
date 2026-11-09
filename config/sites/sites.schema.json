@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tinhte:schema:site-registry:v1",
+  "title": "Tinhte Site Registry",
+  "description": "Nguồn sự thật duy nhất cho mọi subdomain (ADR-0001). Ràng buộc chéo (trùng key/host, alias apex duy nhất) được kiểm bởi validateRegistry trong @tinhte/sites và SiteRegistry trong Tinhte.Platform.",
+  "type": "object",
+  "required": ["version", "environments", "sites"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "environments": {
+      "type": "object",
+      "required": ["production", "staging", "local"],
+      "additionalProperties": { "$ref": "#/$defs/environment" }
+    },
+    "sites": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/site" }
+    }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "required": ["domainSuffix", "scheme", "publicPort", "indexable", "resolveStatuses"],
+      "additionalProperties": false,
+      "properties": {
+        "domainSuffix": { "type": "string", "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$" },
+        "scheme": { "enum": ["https", "http"] },
+        "publicPort": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },
+        "indexable": { "type": "boolean" },
+        "resolveStatuses": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/status" } }
+      }
+    },
+    "status": { "enum": ["active", "planned", "reserved", "retired"] },
+    "label": { "type": "string", "pattern": "^(@|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)$" },
+    "site": {
+      "type": "object",
+      "required": ["key", "label", "kind", "app", "subdomain", "aliases", "status", "scope", "apiSurfaces", "session", "seo", "owner"],
+      "additionalProperties": false,
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "kind": { "enum": ["public-web", "cms", "media", "api", "identity"] },
+        "app": { "enum": ["web", "cms", "api", "cdn", "identity"] },
+        "subdomain": { "$ref": "#/$defs/label" },
+        "aliases": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/label" } },
+        "status": { "$ref": "#/$defs/status" },
+        "scope": { "enum": ["P0", "P0*", "P0-ADS", "P1", "P2"] },
+        "apiSurfaces": { "type": "array", "uniqueItems": true, "items": { "enum": ["public", "admin"] } },
+        "session": { "enum": ["none", "member", "staff"] },
+        "seo": {
+          "type": "object",
+          "required": ["indexable", "sitemap"],
+          "additionalProperties": false,
+          "properties": { "indexable": { "type": "boolean" }, "sitemap": { "type": "boolean" } }
+        },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 120 }
+      }
+    }
+  }
+}

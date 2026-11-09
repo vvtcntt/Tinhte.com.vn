@@ -1,0 +1,18 @@
+{
+  "name": "@tinhte/cms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CMS biên tập (site kind cms) — app riêng, luôn noindex",
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tinhte/sites": "0.1.0",
+    "next": "16.4.3",
+    "react": "19.2.9",
+    "react-dom": "19.2.9"
+  }
+}

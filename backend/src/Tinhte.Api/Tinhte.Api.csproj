@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Tinhte.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Tinhte.Platform/Tinhte.Platform.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.News/Tinhte.Modules.News.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Video/Tinhte.Modules.Video.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Community/Tinhte.Modules.Community.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Ads/Tinhte.Modules.Ads.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Identity/Tinhte.Modules.Identity.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Site Registry (ADR-0001) đi kèm bản build: tìm thấy tại <output>/config/sites/sites.json -->
+    <Content Include="../../../config/sites/sites.json" Link="config/sites/sites.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

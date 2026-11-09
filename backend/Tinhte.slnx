@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tinhte.Api/Tinhte.Api.csproj" />
+    <Project Path="src/Tinhte.Platform/Tinhte.Platform.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/Tinhte.Modules.Ads/Tinhte.Modules.Ads.csproj" />
+    <Project Path="src/Modules/Tinhte.Modules.Community/Tinhte.Modules.Community.csproj" />
+    <Project Path="src/Modules/Tinhte.Modules.Identity/Tinhte.Modules.Identity.csproj" />
+    <Project Path="src/Modules/Tinhte.Modules.News/Tinhte.Modules.News.csproj" />
+    <Project Path="src/Modules/Tinhte.Modules.Video/Tinhte.Modules.Video.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tinhte.Api.Tests/Tinhte.Api.Tests.csproj" />
+  </Folder>
+</Solution>
