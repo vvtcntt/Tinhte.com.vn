@@ -311,3 +311,63 @@ main:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Trang bài (UX-PUB-03) ---------- */
+.article-page { padding-top: 16px; padding-bottom: 48px; }
+.state-block h1 { font-size: 22px; margin-bottom: 8px; }
+
+.breadcrumb ol { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; font-size: 14px; }
+.breadcrumb li + li::before { content: "›"; margin-right: 6px; color: var(--muted); }
+.breadcrumb a { color: var(--brand); font-weight: 600; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+.article-layout { display: grid; gap: 32px; }
+@media (min-width: 1024px) {
+  .article-layout--aside { grid-template-columns: minmax(0, 1fr) 320px; gap: 40px; align-items: start; }
+}
+
+.article { min-width: 0; max-width: 760px; }
+.article__title { font-size: 28px; line-height: 1.25; font-weight: 800; letter-spacing: -0.01em; }
+.article__lead { margin-top: 14px; font-size: 19px; line-height: 1.6; font-weight: 600; color: var(--text); }
+.article__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px;
+  margin-top: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  font-size: 14px; color: var(--muted);
+}
+.article__author { font-weight: 700; color: var(--text); }
+.article__author::after { content: "·"; margin-left: 8px; color: var(--muted); font-weight: 400; }
+@media (min-width: 768px) {
+  .article__title { font-size: 38px; }
+  .article__lead { font-size: 20px; }
+}
+
+.sponsor-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin-bottom: 12px; padding: 8px 12px; border-radius: var(--radius-sm);
+  background: var(--sponsor-bg); color: var(--sponsor-text); font-size: 14px;
+}
+.sponsor-note .sponsor-badge { margin: 0; background: var(--surface); }
+
+.article__figure { margin: 20px 0 0; }
+.article__figure img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--radius); background: var(--surface-2); }
+
+.article-body { margin-top: 20px; font-size: 18px; line-height: 1.75; }
+.article-body > * + * { margin-top: 1.1em; }
+.article-body p { white-space: pre-line; overflow-wrap: anywhere; }
+.article-body h2 { font-size: 24px; line-height: 1.3; font-weight: 800; margin-top: 1.6em; }
+.article-body h3 { font-size: 20px; line-height: 1.35; font-weight: 700; margin-top: 1.4em; }
+.article-body blockquote {
+  margin-left: 0; margin-right: 0; padding: 4px 0 4px 18px;
+  border-left: 4px solid var(--brand-2); color: var(--muted); font-style: italic; white-space: pre-line;
+}
+.ad-slot--article { margin-top: 32px; }
+
+.article-aside { min-width: 0; }
+.article-aside__title {
+  font-size: 18px; font-weight: 800; margin-bottom: 12px;
+  padding-left: 12px; border-left: 4px solid var(--brand-2);
+}
+.article-aside__list { display: grid; gap: 12px; }
+@media (min-width: 1024px) {
+  .article-aside { position: sticky; top: 88px; }
+}

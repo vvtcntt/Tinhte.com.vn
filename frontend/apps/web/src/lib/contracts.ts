@@ -26,6 +26,18 @@ export interface VideoSummary {
   sponsorLabel?: string | null;
 }
 
+/** Khối nội dung bài (bodyBlocks). Hiện CMS soạn: paragraph, heading (level 2|3), quote. Kiểu khác: bỏ qua khi hiển thị. */
+export type BodyBlock = { type: string; text?: string; level?: number; [key: string]: unknown };
+
+/** Article (getPublicArticle; FR-NEWS-001). */
+export interface Article extends ArticleSummary {
+  revisionId: string;
+  authorDisplayName?: string | null;
+  categorySlug?: string | null;
+  bodyBlocks: BodyBlock[];
+  relatedVideoIds: string[];
+}
+
 /** HomePage (FR-DISC-003). */
 export interface HomePage {
   featuredArticles: ArticleSummary[];

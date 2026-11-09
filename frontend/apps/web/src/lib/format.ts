@@ -16,6 +16,14 @@ export function relativeTime(iso: string, now: Date = new Date()): string {
   return dateFmt.format(then);
 }
 
+const stampFmt = new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: TZ });
+
+/** "14:35 09/11/2026" — mốc thời gian đầy đủ ở trang bài. */
+export function dateTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : stampFmt.format(d);
+}
+
 export function fullDateTime(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : fullFmt.format(d);
