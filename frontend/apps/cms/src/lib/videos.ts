@@ -94,6 +94,7 @@ const MEDIA_STATUS_LABEL: Record<string, string> = {
 const MEDIA_ERROR_LABEL: Record<string, string> = {
   UNSUPPORTED_FORMAT: 'Nội dung tệp không đúng định dạng đã khai báo (ví dụ tệp bị đổi đuôi).',
   OBJECT_MISSING: 'Không tìm thấy tệp đã tải lên trong kho lưu trữ.',
+  UPLOAD_EXPIRED: 'Phiên tải lên đã hết hạn trước khi hoàn tất. Tải tệp lên lại.',
 };
 
 const RIGHTS_LABEL: Record<string, string> = {
@@ -415,8 +416,13 @@ const FIELD_LABEL: Record<string, string> = {
   changeReason: 'Lý do sửa',
 };
 
-/** Thông điệp tiếng Việt cho lỗi API của màn Video. */
-export function videoErrorText(e: unknown): string {
+export function formatWait(seconds: number): string {
+  if (seconds < 60) return `${Math.ceil(seconds)} giây`;
+  return `${Math.ceil(seconds / 60)} phút`;
+}
+
+/** Thông điệp tiếng Việt cho lỗi API của màn Video. <paramref name="retryAfterSeconds"/>: header Retry-After của 429 (nếu đọc được). */
+export function videoErrorText(e: unknown, retryAfterSeconds?: number | null): string {
   if (e instanceof ApiError) {
     switch (e.code) {
       case 'REVISION_CONFLICT':
@@ -425,6 +431,8 @@ export function videoErrorText(e: unknown): string {
         return e.problem.detail ?? 'Tệp vượt quá dung lượng cho phép.';
       case 'MEDIA_NOT_READY':
         return 'Kho lưu trữ chưa nhận được tệp. Tải lên lại rồi hoàn tất.';
+      case 'RATE_LIMITED':
+        return `Bạn đã tải lên quá nhiều trong thời gian ngắn hoặc còn nhiều tệp chưa hoàn tất.${retryAfterSeconds ? ` Thử lại sau khoảng ${formatWait(retryAfterSeconds)}.` : ' Thử lại sau ít phút.'}`;
       case 'DEPENDENCY_UNAVAILABLE':
         return 'Dịch vụ lưu trữ hoặc cơ sở dữ liệu chưa sẵn sàng. Thử lại sau.';
       case 'FORBIDDEN':

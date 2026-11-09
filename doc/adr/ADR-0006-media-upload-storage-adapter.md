@@ -41,7 +41,13 @@ related: ADR-0001 (D5, media site), ADR-0003, ADR-0005, WBS-035…040, WBS-046, 
 - Bước kiểm tra đọc 16 byte đầu tệp, so chữ ký định dạng (MP4/MOV `ftyp`, WebM EBML, JPEG, PNG, WebP, `WEBVTT`): sai → `REJECTED` + `errorCode = UNSUPPORTED_FORMAT`; mất tệp → `FAILED`/`OBJECT_MISSING`.
 - **`READY` ở dev KHÔNG có nghĩa phát được:** không transcode, không poster/rendition, không quét mã độc. Production dùng `NoMediaProcessor` (media đứng ở `UPLOADED` cho tới khi có worker WBS-038).
 
-### 4. Video trong CMS (migration 0331)
+### 4. Hạn mức + dọn intent hết hạn (migration 0333)
+
+- **Hạn mức theo người tải** (DRAFT, chờ PO): tối đa `Media:MaxIntentsPerWindow` (30) intent mỗi `Media:UploadQuotaWindow` (10 phút) và tổng dung lượng intent còn hạn chưa finalize ≤ `Media:MaxPendingUploadBytes` (10 GiB). Vượt → 429 `RATE_LIMITED` + `Retry-After`. Đếm trong transaction có `pg_advisory_xact_lock` theo người tải nên request song song không cùng lọt qua; đếm từ `tt.media_assets` nên đúng cả khi nhiều instance API.
+- **Dọn intent hết hạn:** intent `UPLOADING` quá hạn thêm `Media:ExpiredUploadGrace` (1 giờ, để PUT đang chạy kịp xong) → `FAILED` + `errorCode = UPLOAD_EXPIRED`, xóa token, xóa object dở trên kho (sau khi commit). Chạy theo lượt khi tạo intent hoặc mở thư viện, tối đa 50 dòng/lượt, `FOR UPDATE SKIP LOCKED` — không cần worker. Media `REJECTED`/`FAILED` vì nội dung vẫn giữ object (đối chiếu/điều tra).
+- Đây là hạn mức nghiệp vụ, không thay rate limit theo IP/edge (WAF/CDN, WBS-010/039).
+
+### 5. Video trong CMS (migration 0331)
 
 - Cùng mô hình revision với bài viết (ADR-0005): `tt.video_revisions.status`, trigger đóng băng nội dung revision đã rời DRAFT hoặc đang public, không xóa revision. PATCH sửa tại chỗ revision DRAFT, ngược lại tạo revision mới.
 - `tt.videos.media_id` = media đang gắn; một media chỉ gắn một video. Đổi media của video từng public → 409 (media revision thuộc WBS-040). Slug video sinh lúc tạo (tiêu đề + 8 hex của id) vì hợp đồng không có slug video.
@@ -54,8 +60,8 @@ related: ADR-0001 (D5, media site), ADR-0003, ADR-0005, WBS-035…040, WBS-046, 
 | Quét mã độc/quarantine, profile rendition, poster, transcode thật, worker hàng đợi + retry/poison | 036…038 |
 | Gửi duyệt/duyệt/publish video, chặn publish khi media chưa READY hoặc quyền chưa CLEARED, media revision | 040 |
 | Xem trước/phát trong CMS (playback grant qua site `media`) | 039, 045 |
-| Rate limit (429) cho upload intent; hạn mức theo người dùng | 036 |
-| Dọn object mồ côi (intent hết hạn chưa finalize) | 038 |
+| Rate limit theo IP/edge; con số hạn mức chính thức (PO) | 010, 036 |
+| Dọn object mồ côi trên kho thật bằng lifecycle rule của vendor (bản API chỉ dọn object của intent hết hạn) | 039 |
 
 ## Hệ quả
 

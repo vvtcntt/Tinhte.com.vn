@@ -261,6 +261,12 @@ async function behaviour(sc, db) {
     UPDATE tt.media_assets SET status = 'READY' WHERE id = '${id('e2')}';
     DO $$ BEGIN IF (SELECT (row_version, visibility, rights_status) <> (3::bigint, 'PRIVATE', 'UNVERIFIED') FROM tt.media_assets WHERE id = '${id('e2')}')
       THEN RAISE EXCEPTION 'row_version/rights'; END IF; END $$;`);
+  await expectOk(sc, db, 'MV9 dọn intent hết hạn: UPLOADING → FAILED/UPLOAD_EXPIRED, xóa token (0333 có index theo hạn)', `${INTENT}
+    UPDATE tt.media_assets SET upload_expires_at = now() - interval '1 minute' WHERE id = '${id('e2')}';
+    UPDATE tt.media_assets SET status = 'FAILED', error_code = 'UPLOAD_EXPIRED', upload_token_hash = NULL, upload_expires_at = NULL
+     WHERE status = 'UPLOADING' AND upload_expires_at <= now();
+    DO $$ BEGIN IF to_regclass('tt.ix_media_assets_upload_expiry') IS NULL OR to_regclass('tt.ix_media_assets_creator_created') IS NULL
+      OR (SELECT status FROM tt.media_assets WHERE id = '${id('e2')}') <> 'FAILED' THEN RAISE EXCEPTION 'sweep'; END IF; END $$;`);
   await expectError(sc, db, 'MV8 down 0330 từ chối khi đã có object trong kho lưu trữ', `${INTENT} ${read(path.join(MIG_DIR, '0330_media_uploads.down.sql'))}`, /Refusing to roll back 0330/);
 
   // Revision video (0331, WBS-046/040) — cùng mô hình đóng băng với bài viết

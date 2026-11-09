@@ -6266,6 +6266,9 @@ components:
           type:
           - string
           - 'null'
+          description: 'Processing outcome code when status is FAILED/REJECTED/QUARANTINED/RESTRICTED. Current values: UNSUPPORTED_FORMAT
+            (content does not match the declared type), OBJECT_MISSING (stored object not found), UPLOAD_EXPIRED (upload intent expired
+            before finalize). Vendor pipelines (WBS-036…038) may add codes; clients must treat unknown codes as generic failure.'
         mediaType:
           type: string
           enum:

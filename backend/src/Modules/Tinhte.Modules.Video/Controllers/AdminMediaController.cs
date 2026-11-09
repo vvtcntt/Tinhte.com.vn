@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -17,14 +18,19 @@ namespace Tinhte.Modules.Video.Controllers;
 [Route(ApiRoutes.Prefix + "/admin/media")]
 public sealed class AdminMediaController(MediaService media, IMediaStorage storage, ICursorCodec cursors) : TinhteControllerBase
 {
-    /// <summary>createUploadIntent: URL tải lên ngắn hạn (chỉ đúng object + kích thước) + token finalize một lần.</summary>
+    /// <summary>
+    /// createUploadIntent: URL tải lên ngắn hạn (chỉ đúng object + kích thước) + token finalize một lần.
+    /// Vượt hạn mức theo người tải → 429 RATE_LIMITED + Retry-After.
+    /// </summary>
     [HttpPost("upload-intents", Name = "createUploadIntent")]
     [RequirePermission(Permissions.MediaUpload)]
     [Idempotent]
     public async Task<ActionResult<UploadIntent>> CreateUploadIntent(CreateUploadIntentRequest request, CancellationToken cancellationToken)
     {
         var actor = User.RequirePermission(Permissions.MediaUpload);
-        var intent = await media.CreateIntentAsync(actor, request, RequestOrigin(), cancellationToken);
+        var intent = await media.CreateIntentAsync(actor, request, RequestOrigin(),
+            retryAfter => Response.Headers.RetryAfter = Math.Max(1, (long)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
         return CreatedAtRoute("getAdminMedia", new { mediaId = intent.MediaId }, intent);
     }
 

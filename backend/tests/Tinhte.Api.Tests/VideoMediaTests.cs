@@ -420,6 +420,63 @@ public sealed class VideoMediaDbTests(MigratedDatabaseFixture db, WebApplication
     }
 
     [DbFact]
+    public async Task Upload_quota_returns_429_with_retry_after_per_uploader()
+    {
+        var (first, second) = (Guid.NewGuid(), Guid.NewGuid());
+        await ExecAsync($"INSERT INTO tt.users (id, display_name) VALUES ('{first}', 'Người tải 1'), ('{second}', 'Người tải 2');");
+        using var app = _app!.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Media:MaxIntentsPerWindow", "2");
+            b.UseSetting("Media:MaxPendingUploadBytes", "5000");
+        });
+        using var cms = app.Client(TestHost.Cms);
+        async Task<HttpResponseMessage> Intent(Guid user, int size) =>
+            await cms.SendAsync(NewsHttp.Admin(HttpMethod.Post, "/api/v1/admin/media/upload-intents", user, StaffRoles.Author,
+                json: MediaSamples.IntentJson("q.mp4", "video/mp4", new byte[size]), idempotencyKey: "quota-" + Guid.NewGuid()));
+
+        using (var a = await Intent(first, 1000)) Assert.Equal(HttpStatusCode.Created, a.StatusCode);
+        using (var b = await Intent(first, 1000)) Assert.Equal(HttpStatusCode.Created, b.StatusCode);
+        using (var limited = await Intent(first, 1000))
+        {
+            await NewsHttp.ProblemAsync(limited, HttpStatusCode.TooManyRequests, ErrorCodes.RateLimited);
+            var retryAfter = int.Parse(limited.Headers.GetValues("Retry-After").Single(), System.Globalization.CultureInfo.InvariantCulture);
+            Assert.InRange(retryAfter, 1, 600);
+        }
+
+        // Hạn mức tách theo người tải; tổng dung lượng chưa finalize cũng bị giới hạn.
+        using (var tooMuch = await Intent(second, 6000)) await NewsHttp.ProblemAsync(tooMuch, HttpStatusCode.TooManyRequests, ErrorCodes.RateLimited);
+        using (var ok = await Intent(second, 4000)) Assert.Equal(HttpStatusCode.Created, ok.StatusCode);
+        using (var pending = await Intent(second, 2000)) await NewsHttp.ProblemAsync(pending, HttpStatusCode.TooManyRequests, ErrorCodes.RateLimited);
+    }
+
+    [DbFact]
+    public async Task Expired_unfinalized_uploads_are_swept_and_their_objects_deleted()
+    {
+        using var cms = Cms();
+        var bytes = MediaSamples.Mp4(2000);
+        var intent = await IntentAsync(cms, "bo-do.mp4", bytes);
+        var mediaId = intent.GetProperty("mediaId").GetGuid();
+        using (var put = await cms.SendAsync(MediaSamples.Put(intent.GetProperty("uploadUrl").GetString()!, bytes, _author))) Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        Assert.Single(Directory.EnumerateFiles(_root, $"{mediaId}*", SearchOption.AllDirectories));
+
+        // Mới hết hạn (trong khoảng ân hạn): chưa dọn, finalize → 409.
+        await ExecAsync($"UPDATE tt.media_assets SET upload_expires_at = now() - interval '1 minute' WHERE id = '{mediaId}'");
+        await SendAsync(cms, NewsHttp.Admin(HttpMethod.Get, "/api/v1/admin/media?limit=1", _author, StaffRoles.Author), HttpStatusCode.OK);
+        Assert.Equal("UPLOADING", (await MediaAsync(cms, mediaId)).GetProperty("status").GetString());
+
+        // Quá ân hạn: mở thư viện → FAILED/UPLOAD_EXPIRED, token và tệp dở bị xóa.
+        await ExecAsync($"UPDATE tt.media_assets SET upload_expires_at = now() - interval '2 hours' WHERE id = '{mediaId}'");
+        await SendAsync(cms, NewsHttp.Admin(HttpMethod.Get, "/api/v1/admin/media?limit=1", _author, StaffRoles.Author), HttpStatusCode.OK);
+        var swept = await MediaAsync(cms, mediaId);
+        Assert.Equal("FAILED", swept.GetProperty("status").GetString());
+        Assert.Equal(MediaService.UploadExpired, swept.GetProperty("errorCode").GetString());
+        Assert.Null(await db.ScalarAsync<string>($"SELECT upload_token_hash FROM tt.media_assets WHERE id = '{mediaId}'"));
+        Assert.Empty(Directory.EnumerateFiles(_root, $"{mediaId}*", SearchOption.AllDirectories));
+        using var finalize = await FinalizeAsync(cms, mediaId, intent.GetProperty("uploadToken").GetString()!);
+        await NewsHttp.ProblemAsync(finalize, HttpStatusCode.Conflict, ErrorCodes.StateConflict);
+    }
+
+    [DbFact]
     public async Task Dev_upload_url_is_scoped_to_the_intent()
     {
         using var cms = Cms();

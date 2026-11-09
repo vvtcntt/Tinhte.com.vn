@@ -25,7 +25,11 @@ public sealed class MediaService(ITinhteDatabase database, IMediaStorage storage
 
     // ---------------------------------------------------------------- createUploadIntent
 
-    public async Task<UploadIntent> CreateIntentAsync(Guid actorId, CreateUploadIntentRequest request, Uri requestOrigin, CancellationToken ct)
+    /// <summary>Mã lỗi xử lý ghi vào <c>MediaStatus.errorCode</c> khi intent hết hạn mà chưa finalize.</summary>
+    public const string UploadExpired = "UPLOAD_EXPIRED";
+
+    /// <param name="onRateLimited">Nhận thời gian chờ trước khi ném 429 RATE_LIMITED (controller đặt header Retry-After).</param>
+    public async Task<UploadIntent> CreateIntentAsync(Guid actorId, CreateUploadIntentRequest request, Uri requestOrigin, Action<TimeSpan> onRateLimited, CancellationToken ct)
     {
         var fileName = CleanFileName(request.FileName) ?? throw Invalid("fileName", "A file name without path or control characters is required.");
         var contentType = MediaFormats.Normalize(request.ContentType)
@@ -47,8 +51,10 @@ public sealed class MediaService(ITinhteDatabase database, IMediaStorage storage
         var expiresAt = TruncateToSeconds(now + _options.UploadIntentTtl);
         var storageKey = MediaStorageKeys.For(mediaId, now);
 
+        await SweepExpiredUploadsAsync(ct);
         await database.InTransactionAsync(actorId, async (connection, tx) =>
         {
+            await EnforceQuotaAsync(connection, tx, actorId, size, onRateLimited, ct);
             await using var insert = VideoSql.Command(connection, tx, """
                 INSERT INTO tt.media_assets (id, status, media_type, file_name, content_type, size_bytes, checksum_sha256, storage_key,
                                              upload_token_hash, upload_expires_at, created_by)
@@ -158,6 +164,7 @@ public sealed class MediaService(ITinhteDatabase database, IMediaStorage storage
 
     public async Task<IReadOnlyList<MediaStatus>> ListAsync(MediaFilter filter, MediaPosition? after, int limitPlusOne, CancellationToken ct)
     {
+        await SweepExpiredUploadsAsync(ct);
         await processor.AdvanceAsync(ct);
         var sql = new StringBuilder(VideoSql.MediaSelect).Append(" WHERE TRUE");
         await using var connection = await database.OpenConnectionAsync(ct);
@@ -180,6 +187,91 @@ public sealed class MediaService(ITinhteDatabase database, IMediaStorage storage
         await using var r = await command.ExecuteReaderAsync(ct);
         while (await r.ReadAsync(ct)) items.Add(VideoSql.ReadMedia(r));
         return items;
+    }
+
+    // ---------------------------------------------------------------- hạn mức + dọn intent hết hạn
+
+    /// <summary>
+    /// Hạn mức theo người tải (DRAFT, <c>Media:MaxIntentsPerWindow</c> / <c>Media:MaxPendingUploadBytes</c>): số intent trong cửa sổ và
+    /// tổng dung lượng intent còn hạn chưa finalize. Khóa advisory theo người tải → hai request song song không cùng lọt qua.
+    /// </summary>
+    private async Task EnforceQuotaAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid actorId, long requestedBytes, Action<TimeSpan> onRateLimited, CancellationToken ct)
+    {
+        await using (var lockCommand = VideoSql.Command(connection, tx, "SELECT pg_advisory_xact_lock(hashtextextended('tt.media-quota:' || @actor::text, 0))")
+            .WithUuid("actor", actorId))
+        {
+            await lockCommand.ExecuteNonQueryAsync(ct);
+        }
+
+        long count, pendingBytes;
+        DateTimeOffset? oldest, firstExpiry;
+        DateTimeOffset now;
+        await using (var command = VideoSql.Command(connection, tx, """
+            SELECT count(*) FILTER (WHERE created_at > now() - @window),
+                   min(created_at) FILTER (WHERE created_at > now() - @window),
+                   COALESCE(sum(size_bytes) FILTER (WHERE status = 'UPLOADING' AND upload_expires_at > now()), 0)::bigint,
+                   min(upload_expires_at) FILTER (WHERE status = 'UPLOADING' AND upload_expires_at > now()),
+                   now()
+              FROM tt.media_assets
+             WHERE created_by = @actor AND created_at > now() - GREATEST(@window, @ttl)
+            """).WithUuid("actor", actorId).WithInterval("window", _options.UploadQuotaWindow).WithInterval("ttl", _options.UploadIntentTtl))
+        await using (var r = await command.ExecuteReaderAsync(ct))
+        {
+            await r.ReadAsync(ct);
+            (count, oldest, pendingBytes, firstExpiry, now) = (r.GetInt64(0), VideoSql.NullableTime(r, 1), r.GetInt64(2), VideoSql.NullableTime(r, 3), VideoSql.Time(r, 4));
+        }
+
+        if (count >= _options.MaxIntentsPerWindow)
+        {
+            var wait = (oldest ?? now) + _options.UploadQuotaWindow - now;
+            onRateLimited(wait > TimeSpan.Zero ? wait : TimeSpan.FromSeconds(1));
+            throw new DomainProblemException(ErrorCodes.RateLimited, "Upload quota exceeded",
+                $"At most {_options.MaxIntentsPerWindow} uploads per {_options.UploadQuotaWindow.TotalMinutes:0} minutes. Retry later.");
+        }
+
+        if (pendingBytes + requestedBytes > _options.MaxPendingUploadBytes)
+        {
+            var wait = (firstExpiry ?? now) - now;
+            onRateLimited(wait > TimeSpan.Zero ? wait : TimeSpan.FromSeconds(1));
+            throw new DomainProblemException(ErrorCodes.RateLimited, "Upload quota exceeded",
+                $"Unfinished uploads would exceed {_options.MaxPendingUploadBytes} bytes. Finish (finalize) or let pending uploads expire, then retry.");
+        }
+    }
+
+    /// <summary>
+    /// Intent hết hạn quá <c>Media:ExpiredUploadGrace</c> mà chưa finalize → FAILED + <see cref="UploadExpired"/>, xóa token và object dở.
+    /// Chạy theo lượt khi tạo intent / mở thư viện (không cần worker); mỗi lượt tối đa 50 dòng, bỏ qua dòng đang bị khóa.
+    /// </summary>
+    public async Task<int> SweepExpiredUploadsAsync(CancellationToken ct)
+    {
+        var keys = await database.InTransactionAsync(null, async (connection, tx) =>
+        {
+            await using var command = VideoSql.Command(connection, tx, """
+                UPDATE tt.media_assets m
+                   SET status = 'FAILED', error_code = @code, upload_token_hash = NULL, upload_expires_at = NULL
+                  FROM (SELECT id FROM tt.media_assets
+                         WHERE status = 'UPLOADING' AND upload_expires_at <= now() - @grace
+                         ORDER BY upload_expires_at LIMIT 50 FOR UPDATE SKIP LOCKED) due
+                 WHERE m.id = due.id
+                RETURNING m.storage_key
+                """).WithText("code", UploadExpired).WithInterval("grace", _options.ExpiredUploadGrace);
+            var found = new List<string>();
+            await using var r = await command.ExecuteReaderAsync(ct);
+            while (await r.ReadAsync(ct))
+            {
+                if (!r.IsDBNull(0)) found.Add(r.GetString(0));
+            }
+
+            return found;
+        }, ct);
+
+        // Xóa object sau khi đã commit trạng thái: lỗi xóa chỉ để lại tệp mồ côi, không làm hỏng dữ liệu.
+        if (storage.IsConfigured)
+        {
+            foreach (var key in keys) await storage.DeleteAsync(key, ct);
+        }
+
+        return keys.Count;
     }
 
     // ---------------------------------------------------------------- nội bộ

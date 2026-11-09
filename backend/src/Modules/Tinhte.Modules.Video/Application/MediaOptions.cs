@@ -16,6 +16,20 @@ public sealed class MediaOptions
     /// <summary>Hạn của upload intent (URL tải lên + token finalize).</summary>
     public TimeSpan UploadIntentTtl { get; set; } = TimeSpan.FromMinutes(15);
 
+    /// <summary>Hạn mức theo người tải (DRAFT, chờ PO): số upload intent tối đa trong <see cref="UploadQuotaWindow"/>.</summary>
+    public int MaxIntentsPerWindow { get; set; } = 30;
+
+    public TimeSpan UploadQuotaWindow { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>Tổng dung lượng các intent còn hạn chưa finalize của một người (DRAFT, chờ PO).</summary>
+    public long MaxPendingUploadBytes { get; set; } = 10L * 1024 * 1024 * 1024;
+
+    /// <summary>
+    /// Intent hết hạn chưa finalize được dọn (FAILED/UPLOAD_EXPIRED + xóa object dở) sau hạn + khoảng này — đủ để một PUT đang chạy
+    /// lúc hết hạn kết thúc trước khi object bị xóa.
+    /// </summary>
+    public TimeSpan ExpiredUploadGrace { get; set; } = TimeSpan.FromHours(1);
+
     public long MaxVideoBytes { get; set; } = 2L * 1024 * 1024 * 1024;
 
     public long MaxImageBytes { get; set; } = 20L * 1024 * 1024;

@@ -5,7 +5,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { ApiError } from '../src/lib/api.ts';
 import {
   Sha256, sha256Blob, canAttachToVideo, draftFromVideo, guessContentType, isSameOrigin, mediaListQuery, mediaTone, pollDelayMs,
-  titleFromFileName, videoErrorText, videoListQuery, videoPatchBody, formatBytes, isMediaInFlight, isMediaFailed,
+  titleFromFileName, videoErrorText, mediaErrorLabel, videoListQuery, videoPatchBody, formatBytes, isMediaInFlight, isMediaFailed,
   type AdminVideo, type MediaStatus,
 } from '../src/lib/videos.ts';
 
@@ -121,4 +121,9 @@ test('lỗi: thông điệp theo mã của catalog, kèm lỗi từng trường'
   assert.match(videoErrorText(err('MEDIA_NOT_READY')), /chưa nhận được tệp/);
   assert.match(videoErrorText(err('VALIDATION_FAILED', { detail: 'Invalid', errors: { contentType: ['Unsupported'] } })), /Loại tệp: Unsupported/);
   assert.match(videoErrorText(new TypeError('fetch failed')), /Không kết nối được API/);
+  assert.match(videoErrorText(err('RATE_LIMITED'), 125), /3 phút/);
+  assert.match(videoErrorText(err('RATE_LIMITED'), 20), /20 giây/);
+  assert.match(videoErrorText(err('RATE_LIMITED')), /ít phút/);
+  assert.match(mediaErrorLabel('UPLOAD_EXPIRED') ?? '', /hết hạn/);
+  assert.match(mediaErrorLabel('SOMETHING_NEW') ?? '', /SOMETHING_NEW/);   // mã lạ của vendor → thông điệp chung
 });
