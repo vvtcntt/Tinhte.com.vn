@@ -83,6 +83,13 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 - Revision rời `DRAFT` hoặc đang public bị DB đóng băng (migration 0320): sửa bài đang public tạo revision mới, bản công khai giữ nguyên tới lần publish sau.
 - Chưa có: duyệt (WBS-024 — publish cần revision `APPROVED`), rights/nguồn (WBS-023 — publish cần quyền `CLEARED`), lịch/preview (WBS-025), outbox (WBS-020). Bài tài trợ chỉ hiển thị khi cờ `ads.sponsored_publication` ON **và** đã cấu hình `News:SponsoredLabel` (câu chữ Legal duyệt).
 
+### Video + media trong CMS (WBS-046, [ADR-0006](doc/adr/ADR-0006-media-upload-storage-adapter.md))
+
+- API (site `cms`): `POST /admin/media/upload-intents` → PUT tệp lên `uploadUrl` → `POST /admin/media/{id}/finalize` → `GET /admin/media/{id}` (trạng thái), `GET /admin/media` (thư viện); `GET/POST /admin/videos`, `GET/PATCH /admin/videos/{id}` (If-Match, gắn `mediaId`). Migration 0330–0332.
+- CMS: `/videos` (danh sách, lọc, tìm, xem thêm), `/videos/new` (tải lên có tiến độ, checksum, thử lại, trạng thái tự cập nhật), `/videos/{id}` (sửa + xử lý 412, đổi/chọn media), `/videos/media` (thư viện).
+- **Dev:** `Media:StorageProvider` mặc định `Local` ở Development — tệp lưu ở `Media:LocalRoot` (mặc định `%TEMP%/tinhte-media`), xử lý **giả lập** (chỉ kiểm định dạng, không transcode; `Media:SimulatedStepDelay`). Ngoài Development mặc định `None` → tải lên trả 503 cho tới khi chọn vendor (WBS-035/039). Media mới luôn PRIVATE + UNVERIFIED.
+- Chưa có: duyệt/publish video và chặn publish theo media/quyền (WBS-040), transcode/quét mã độc/CDN (WBS-036…039), xem trước/phát trong CMS.
+
 ## Đa subdomain (tóm tắt ADR-0001)
 
 - Mỗi subdomain là một mục trong `config/sites/sites.json`. Routing (Next `proxy.ts`, middleware ASP.NET), CSP, robots/sitemap, tên cookie, bề mặt API, bảng `tt.sites`, DNS/TLS/edge đều **suy ra** từ đó.
@@ -121,3 +128,4 @@ Trình duyệt tự trỏ `*.localhost` về 127.0.0.1, nên không cần sửa 
 | 019 | Audit | Lịch sử cấp/thu hồi vai trò (0313); audit chung + `GET /admin/audit-logs`: chưa |
 | 020–021 | Outbox, observability | Chưa; đã có `SiteKey` trong log scope và `X-TT-Site` |
 | 022 | Content type, article revision, publish pointer | Có (API, [ADR-0005](doc/adr/ADR-0005-news-revisions-publish-pointer.md)): tạo/sửa/đọc/danh sách bài CMS, lịch sử + diff revision, publish pointer, đọc công khai theo slug + redirect 308; migration 0320/0321. `dotnet test` sau khi gộp với WBS-115: 194/194 PASS với DB (PGlite), 151 PASS + 43 SKIP không DB. Chưa: duyệt (024), rights (023), lịch (025), outbox (020), UI CMS (030) |
+| 046 | Video upload/status/editor CMS + media library | Có (Sprint 0, [ADR-0006](doc/adr/ADR-0006-media-upload-storage-adapter.md)): API upload intent/finalize/trạng thái/thư viện + video CMS (cursor, ETag/If-Match, Idempotency-Key), kho Local + xử lý giả lập chỉ ở dev; migration 0330–0332; màn CMS Video/thư viện media. `dotnet test` 219/219 PASS với DB (PGlite), 169 PASS + 50 SKIP không DB; migration PGlite 219/219. Chưa: vendor lưu trữ/transcode (035–039), workflow publish video (040) |

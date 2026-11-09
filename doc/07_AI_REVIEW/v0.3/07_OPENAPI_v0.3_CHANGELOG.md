@@ -205,3 +205,17 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - `getPublicArticle`: ETag = `W/"<publicRevisionId>"`; bài từng public nhưng `UNPUBLISHED`/`RETRACTED`/hết quyền → 410 `CONTENT_WITHDRAWN`; slug cũ → 308 với `Location` tương đối.
 - Đề xuất (chưa sửa spec, chờ TL/PO): `summary` và `bodyBlocks` chưa có giới hạn độ dài/số phần tử; `sponsorLabel` cần câu chữ Legal duyệt (đang đọc từ cấu hình `News:SponsoredLabel`, thiếu thì không phục vụ bài tài trợ).
 - Kiểm lại: 34/34 test tĩnh PASS.
+
+## 12. Cập nhật Sprint 0 — video + media trong CMS (WBS-046, ADR-0006, 2026-11-09)
+
+- `MediaStatus` (dùng cho `getAdminMedia`, `listAdminMediaLibrary`): **thêm trường tùy chọn** `fileName`, `contentType`, `sizeBytes`, `createdBy`, `updatedAt`. Lý do: thư viện media (FR-CMS-009) cần hiển thị tệp nào, dung lượng, ai tải lên. Chỉ bổ sung, không phá vỡ.
+- `AdminVideo`: **thêm trường tùy chọn** `summary` (sapo của working revision, không có bản nháp thì của public revision). Lý do: màn sửa video cần giá trị hiện tại để sửa. Chỉ bổ sung.
+- `createUploadIntent`, `finalizeUpload`: **thêm 503 `DEPENDENCY_UNAVAILABLE`** khi kho lưu trữ media chưa cấu hình/không truy cập được (mặc định ngoài Development cho tới khi chọn vendor — WBS-035). Inventory cập nhật status/mã lỗi.
+- Không đổi đường dẫn, operationId hay schema request. Hành vi đã hiện thực (ghi rõ để TL/PO duyệt):
+  - `createUploadIntent`: MIME ngoài danh sách DRAFT (MP4/MOV/WebM, JPEG/PNG/WebP, WebVTT) → 422; vượt giới hạn theo loại (DRAFT: video 2 GiB, ảnh 20 MiB, phụ đề 1 MiB) → 413 `PAYLOAD_TOO_LARGE`; `fileName` bỏ phần thư mục; intent hạn 15 phút; `Location` → `getAdminMedia`.
+  - `finalizeUpload`: chưa có tệp → 422 `MEDIA_NOT_READY`; sai `uploadToken` hoặc tệp khác `sizeBytes`/`checksumSha256` → 422 `VALIDATION_FAILED` (tệp sai bị xóa, tải lại lên cùng URL); intent hết hạn / media đã có kết quả → 409 `STATE_CONFLICT`; gọi lại khi đang trong pipeline → 202 với trạng thái hiện tại.
+  - `errorCode` của `MediaStatus` (giá trị hiện có): `UNSUPPORTED_FORMAT` (nội dung không khớp định dạng khai báo), `OBJECT_MISSING`. Đề xuất đưa danh sách này vào spec (enum hoặc mô tả) khi pipeline thật chốt.
+  - `postAdminVideos`/`patchAdminVideosVideoid`: `rightsSource` → 422 cho tới khi có taxonomy nguồn/giấy phép (WBS-023); media phải là VIDEO, chưa `FAILED/QUARANTINED/REJECTED/RESTRICTED`, quyền không `RESTRICTED/EXPIRED/REVOKED` (422), chưa gắn video khác (409); đổi media của video đã từng public → 409 (WBS-040); PATCH khi video `IN_REVIEW`/`APPROVED`/`SCHEDULED`/`RETRACTED` → 409 như bài viết.
+- **Ngoài hợp đồng, chỉ dev:** `PUT /api/v1/admin/media/{mediaId}/dev-upload?expires=&signature=` là đích `uploadUrl` của kho Local (ADR-0006); production client PUT thẳng lên URL ký sẵn của kho. Không thêm vào spec.
+- Đề xuất (chưa sửa spec, chờ TL/PO): `UpdateVideoRequest.mediaId` không nullable → chưa gỡ được media khỏi video; `AdminVideo` chưa có `slug`/`createdAt`; chưa có endpoint xem trước media private trong CMS (cần grant qua site `media`).
+- Kiểm lại: 34/34 test tĩnh PASS.
