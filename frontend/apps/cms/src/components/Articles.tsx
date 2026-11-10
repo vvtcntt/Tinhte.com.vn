@@ -23,6 +23,7 @@ import {
   type Category,
 } from '../lib/articles';
 import { access } from '../lib/rbac';
+import { AiSuggest } from './AiSuggest';
 import { RequirePermission } from './CmsApp';
 import { useStaff } from './session';
 
@@ -537,6 +538,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
             <span>Tóm tắt</span>
             <textarea value={draft.summary} onChange={(e) => set({ summary: e.target.value })} rows={2} disabled={!editable || busy} />
           </label>
+          <AiSuggest contentId={article.id} dirty={dirty} canApply={editable && !busy} onUseSummary={(summary) => set({ summary })} />
           <div className="field">
             <span className="tabs">
               <button type="button" className={preview ? 'tab' : 'tab active'} onClick={() => setPreview(false)}>

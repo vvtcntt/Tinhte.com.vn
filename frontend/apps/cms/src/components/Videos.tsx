@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, apiFetch } from '../lib/api';
 import { access, type Access } from '../lib/rbac';
+import { AiSuggest } from './AiSuggest';
 import {
   ANY_ACCEPT, CONTENT_STATUSES, REASON_MAX, VIDEO_ACCEPT, canAttachToVideo, canSubmitVideo, contentStatusLabel, draftFromVideo, formatBytes,
   isApproved, isInReview, isMediaInFlight, isPendingDecision, mediaErrorLabel, mediaListQuery, mediaTypeLabel, pollDelayMs, publishBlockers,
@@ -469,6 +470,7 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
           <span>Mô tả ngắn</span>
           <textarea value={draft.summary} onChange={(e) => set('summary', e.target.value)} rows={4} />
         </label>
+        <AiSuggest contentId={video.id} dirty={body !== null} canApply={editable && !busy} onUseSummary={(summary) => set('summary', summary)} />
         <label className="field">
           <span>Loại nội dung</span>
           <select value={draft.contentKind} onChange={(e) => set('contentKind', e.target.value)}>

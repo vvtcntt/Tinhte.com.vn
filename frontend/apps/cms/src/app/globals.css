@@ -212,3 +212,15 @@ a.button { text-decoration: none; }
   .facts { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .facts dd { margin-bottom: 8px; }
 }
+
+/* Gợi ý bằng AI (FR-AI-001) — dưới ô tóm tắt của màn sửa bài/video */
+.ai-suggest-trigger { display: flex; justify-content: flex-start; margin-top: -4px; }
+.ai-button { color: var(--accent); border-color: var(--accent); }
+.ai-suggest { display: grid; gap: 10px; padding: 12px; border: 1px dashed var(--accent); border-radius: var(--radius); background: var(--bg); }
+.ai-suggest-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.ai-suggest .muted.small { margin: 0; }
+.ai-list { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.ai-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ai-list li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 2px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); font-size: 13px; }
