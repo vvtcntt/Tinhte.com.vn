@@ -54,7 +54,41 @@ public sealed partial class FeedCollectionService(
         var leases = await LeaseAsync(options.Parallelism, ct);
         await Parallel.ForEachAsync(leases, new ParallelOptions { MaxDegreeOfParallelism = options.Parallelism, CancellationToken = ct },
             async (lease, token) => await ProcessAsync(lease, token));
+        if (time.GetUtcNow() >= _nextMaintenance)
+        {
+            await MaintainAsync(ct);
+            _nextMaintenance = time.GetUtcNow() + options.MaintenanceInterval;
+        }
+
         return leases.Count;
+    }
+
+    private DateTimeOffset _nextMaintenance = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// Bảo trì cụm theo từng site (mỗi site một transaction, khóa tư vấn theo site): đóng cụm OPEN hết cửa sổ 48 giờ, gom bù mục chưa vào cụm,
+    /// tính lại điểm cụm đang mở. Nhiều worker chạy cùng lúc vẫn an toàn (khóa theo site, thao tác lặp lại không đổi kết quả).
+    /// </summary>
+    public async Task MaintainAsync(CancellationToken ct)
+    {
+        var sites = new List<string>();
+        await using (var connection = await database.OpenConnectionAsync(ct))
+        await using (var command = AggregationSql.Command(connection, null, """
+            SELECT site_key FROM tt.agg_clusters WHERE status IN ('OPEN', 'WATCHING')
+            UNION
+            SELECT site_key FROM tt.agg_items WHERE status = 'CLASSIFIED' AND cluster_id IS NULL AND site_key IS NOT NULL
+            """))
+        await using (var r = await command.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct)) sites.Add(r.GetString(0));
+        }
+
+        foreach (var site in sites.Order(StringComparer.Ordinal))
+        {
+            var (closed, clustered, refreshed) = await database.InTransactionAsync(null, (connection, tx) =>
+                ClusterStore.MaintainSiteAsync(connection, tx, site, options.Clustering, options.Scoring, time.GetUtcNow(), ct), ct);
+            LogMaintained(logger, site, closed, clustered, refreshed);
+        }
     }
 
     public async Task<bool> RadarEnabledAsync(CancellationToken ct)
@@ -157,7 +191,9 @@ public sealed partial class FeedCollectionService(
             var (seen, created, updated) = (0, 0, 0);
             if (feed.Collecting && attempt.Parsed is { } parsed)
             {
-                (seen, created, updated) = await UpsertItemsAsync(connection, tx, lease, feed, parsed, now, ct);
+                var changedIds = new List<Guid>();
+                (seen, created, updated) = await UpsertItemsAsync(connection, tx, lease, feed, parsed, now, changedIds, ct);
+                await ClusterStore.ClusterItemsAsync(connection, tx, changedIds, options.Clustering, options.Scoring, now, ct);   // ADR-0008 §7
             }
 
             await using (var log = AggregationSql.Command(connection, tx, """
@@ -285,7 +321,7 @@ public sealed partial class FeedCollectionService(
     // ---------------------------------------------------------------- mục tin
 
     private async Task<(int Seen, int Created, int Updated)> UpsertItemsAsync(NpgsqlConnection connection, NpgsqlTransaction tx, FeedLease lease,
-        LockedFeed feed, ParsedFeed parsed, DateTimeOffset now, CancellationToken ct)
+        LockedFeed feed, ParsedFeed parsed, DateTimeOffset now, List<Guid> changedIds, CancellationToken ct)
     {
         var classifier = await LoadClassifierAsync(connection, tx, feed, ct);
         var feedUri = new Uri(lease.Url);
@@ -297,9 +333,10 @@ public sealed partial class FeedCollectionService(
             if (item is null || !handled.Add(item.UrlHash)) continue;
             if (lease.FirstFetch && item.EffectiveAt < now - ItemNormalizer.FirstFetchWindow) continue;   // BR-14
 
-            var result = await UpsertItemAsync(connection, tx, lease, feed, item, classifier, ct);
+            var (result, id) = await UpsertItemAsync(connection, tx, lease, feed, item, classifier, ct);
             if (result == ItemChange.Created) created++;
             else if (result == ItemChange.Updated) updated++;
+            if (result != ItemChange.None && id is { } changedId) changedIds.Add(changedId);
         }
 
         return (parsed.Items.Count, created, updated);
@@ -313,7 +350,7 @@ public sealed partial class FeedCollectionService(
     }
 
     /// <summary>Khử trùng BR-10/13/20: cùng guid HOẶC cùng URL chuẩn hóa ⇒ cùng mục (chịu được guid đổi mỗi lần tải).</summary>
-    private static async Task<ItemChange> UpsertItemAsync(NpgsqlConnection connection, NpgsqlTransaction tx, FeedLease lease, LockedFeed feed,
+    private static async Task<(ItemChange Change, Guid? Id)> UpsertItemAsync(NpgsqlConnection connection, NpgsqlTransaction tx, FeedLease lease, LockedFeed feed,
         NormalizedItem item, ItemClassifier classifier, CancellationToken ct)
     {
         Guid? existingId = null;
@@ -344,6 +381,7 @@ public sealed partial class FeedCollectionService(
                 VALUES (@source, @feed, @guid, @url, @hash, @title, @summary, @author, @categories::varchar(200)[], @language,
                         @published, @reliable, @status, @site, @category, @confidence, @review, @sensitive, @content_hash, @updated)
                 ON CONFLICT DO NOTHING
+                RETURNING id
                 """)
                 .WithUuid("source", lease.SourceId).WithUuid("feed", lease.FeedId).WithText("guid", item.Guid).WithText("url", item.Url)
                 .WithText("hash", item.UrlHash).WithText("title", item.Title).WithText("summary", item.Summary).WithText("author", item.Author)
@@ -351,13 +389,13 @@ public sealed partial class FeedCollectionService(
                 .WithBool("reliable", item.TimeReliable).WithText("status", c.Status).WithText("site", c.SiteKey).WithUuid("category", c.CategoryId)
                 .WithDecimal("confidence", c.Confidence).WithBool("review", c.NeedsReview).WithBool("sensitive", c.Sensitive)
                 .WithText("content_hash", item.ContentHash).WithTime("updated", item.SourceUpdatedAt);
-            return await insert.ExecuteNonQueryAsync(ct) > 0 ? ItemChange.Created : ItemChange.None;
+            return await insert.ExecuteScalarAsync(ct) is Guid createdId ? (ItemChange.Created, createdId) : (ItemChange.None, null);
         }
 
         // Cùng bài xuất hiện ở category/feed khác ⇒ gộp category (BR-20).
         var categories = existingCategories.Concat(item.FeedCategories).Distinct(StringComparer.OrdinalIgnoreCase).Take(ItemNormalizer.MaxCategories).ToArray();
         var changed = !string.Equals(existingHash, item.ContentHash, StringComparison.Ordinal);
-        if (!changed && categories.Length == existingCategories.Length) return ItemChange.None;
+        if (!changed && categories.Length == existingCategories.Length) return (ItemChange.None, existingId);
 
         // Mục đã vào cụm/bị đánh trùng giữ phân loại (lát 3 quyết định); mục khác phân loại lại theo nội dung mới.
         var reclassify = changed && existingStatus is "NEW" or ItemClassifier.Classified or ItemClassifier.OutOfScope;
@@ -383,7 +421,7 @@ public sealed partial class FeedCollectionService(
             .WithBool("reclassify", reclassify).WithText("status", c.Status).WithText("site", c.SiteKey).WithUuid("category", c.CategoryId)
             .WithDecimal("confidence", c.Confidence).WithBool("review", c.NeedsReview).WithBool("sensitive", c.Sensitive).WithUuid("id", existingId);
         await update.ExecuteNonQueryAsync(ct);
-        return changed ? ItemChange.Updated : ItemChange.None;
+        return (changed ? ItemChange.Updated : ItemChange.None, existingId);
     }
 
     /// <summary>Ánh xạ category của feed (chỉ chuyên mục đang bật thuộc site của nguồn) + luật từ khóa của các site đó.</summary>
@@ -426,6 +464,9 @@ public sealed partial class FeedCollectionService(
     }
 
     private static string? Cap(string? value, int max) => value is null || value.Length <= max ? value : null;
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Clusters of site {SiteKey}: {Closed} closed, {Clustered} items clustered, {Refreshed} rescored")]
+    private static partial void LogMaintained(ILogger logger, string siteKey, int closed, int clustered, int refreshed);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Feed {FeedId}: parse failed ({Reason})")]
     private static partial void LogParseFailed(ILogger logger, Guid feedId, string reason);

@@ -133,6 +133,24 @@ public sealed class AggregationRadarService(ITinhteDatabase database, SiteRegist
     /// Khoảng thời gian của bộ lọc theo giờ tòa soạn: DAY = ngày lịch <paramref name="date"/> (mặc định hôm nay); LAST_24H = 24 giờ trước
     /// bây giờ (bỏ qua date).
     /// </summary>
+    /// <summary>
+    /// Đọc <c>date</c> (YYYY-MM-DD) và <c>window</c> (DAY | LAST_24H, mặc định DAY) của AggregationDate/AggregationWindow; sai → 400 BAD_REQUEST.
+    /// <c>Rolling</c> = cửa sổ trượt theo giờ hiện tại (cursor phải mang mốc bắt đầu).
+    /// </summary>
+    public (DateTimeOffset From, DateTimeOffset? To, bool Rolling) ParseWindow(string? date, string? window)
+    {
+        var day = date is null ? (DateOnly?)null : ParseDate(date);
+        var w = window ?? "DAY";
+        if (w is not ("DAY" or "LAST_24H")) throw new DomainProblemException(ErrorCodes.BadRequest, "Invalid window", "window must be DAY or LAST_24H.");
+        var (from, to) = Window(day, w);
+        return (from, to, w == "LAST_24H");
+    }
+
+    public static DateOnly ParseDate(string date) =>
+        DateOnly.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed)
+            ? parsed
+            : throw new DomainProblemException(ErrorCodes.BadRequest, "Invalid date", "date must be a calendar date (YYYY-MM-DD).");
+
     public (DateTimeOffset From, DateTimeOffset? To) Window(DateOnly? date, string window)
     {
         if (window == "LAST_24H") return (time.GetUtcNow() - TimeSpan.FromHours(24), null);
@@ -148,14 +166,8 @@ public sealed class AggregationRadarService(ITinhteDatabase database, SiteRegist
     {
         await using var connection = await database.OpenConnectionAsync(ct);
         await AggregationSql.RequireRadarEnabledAsync(connection, null, ct);
-        const string effective = "CASE WHEN i.published_at IS NOT NULL AND i.published_at <= i.first_seen_at + interval '10 minutes' THEN i.published_at ELSE i.first_seen_at END";
-        var sql = new StringBuilder("""
-            SELECT i.id, i.content_source_id, cs.name, i.feed_id, i.title, i.url, i.summary, i.author, i.published_at, i.first_seen_at, i.time_reliable,
-                   i.language, i.feed_categories, i.status, i.category_id, i.category_confidence, i.needs_review, i.sensitive, i.version, i.cluster_id
-              FROM tt.agg_items i
-              JOIN tt.content_sources cs ON cs.id = i.content_source_id
-             WHERE i.site_key = @site AND i.url IS NOT NULL
-            """);
+        const string effective = AggregationSql.ItemEffectiveAt;
+        var sql = new StringBuilder(AggregationSql.ItemSelect).Append(" WHERE i.site_key = @site AND i.url IS NOT NULL");
         await using var command = AggregationSql.Command(connection, null, "").WithText("site", filter.SiteKey);
         sql.Append($" AND {effective} >= @from");
         command.WithTime("from", filter.From);
@@ -201,30 +213,7 @@ public sealed class AggregationRadarService(ITinhteDatabase database, SiteRegist
 
         var items = new List<AggregationItem>();
         await using var r = await command.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct))
-        {
-            items.Add(new AggregationItem(
-                Id: r.GetGuid(0),
-                SourceId: r.GetGuid(1),
-                SourceName: r.GetString(2),
-                FeedId: r.GetGuid(3),
-                Title: r.GetString(4),
-                Url: r.GetString(5),
-                Summary: AggregationSql.NullableText(r, 6),
-                Author: AggregationSql.NullableText(r, 7),
-                PublishedAt: AggregationSql.NullableTime(r, 8),
-                FirstSeenAt: r.GetFieldValue<DateTimeOffset>(9),
-                TimeReliable: r.GetBoolean(10),
-                Language: AggregationSql.NullableText(r, 11),
-                FeedCategories: r.GetFieldValue<string[]>(12),
-                Status: r.GetString(13),
-                CategoryId: AggregationSql.NullableGuid(r, 14),
-                Confidence: r.IsDBNull(15) ? null : r.GetDecimal(15),
-                NeedsReview: r.GetBoolean(16),
-                Sensitive: r.GetBoolean(17),
-                Version: r.GetInt32(18),
-                ClusterId: AggregationSql.NullableGuid(r, 19)));
-        }
+        while (await r.ReadAsync(ct)) items.Add(AggregationSql.ReadItem(r));
 
         return items;
     }

@@ -70,19 +70,7 @@ public sealed class AdminAggregationItemsController(AggregationRadarService rada
         CancellationToken cancellationToken)
     {
         var site = radar.RequireContentSite(siteKey);
-        DateOnly? day = null;
-        if (date is not null)
-        {
-            if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
-            {
-                throw new DomainProblemException(ErrorCodes.BadRequest, "Invalid date", "date must be a calendar date (YYYY-MM-DD).");
-            }
-
-            day = parsed;
-        }
-
-        var w = window ?? "DAY";
-        if (w is not ("DAY" or "LAST_24H")) throw new DomainProblemException(ErrorCodes.BadRequest, "Invalid window", "window must be DAY or LAST_24H.");
+        var (from, to, rolling) = radar.ParseWindow(date, window);
 
         var statuses = (status ?? []).SelectMany(s => s.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
@@ -91,11 +79,9 @@ public sealed class AdminAggregationItemsController(AggregationRadarService rada
             throw new DomainProblemException(ErrorCodes.BadRequest, "Invalid status filter", $"Unknown status '{unknown}'.");
         }
 
-        var (from, to) = radar.Window(day, w);
         var filter = new AggregationItemFilter(site, from, to, sourceId, categoryId, statuses, string.IsNullOrWhiteSpace(q) ? null : q.Trim());
 
         // LAST_24H trượt theo thời gian: cursor mang mốc bắt đầu cửa sổ của trang đầu để các trang sau không lệch; DAY gắn mốc vào scope.
-        var rolling = w == "LAST_24H";
         var scope = CursorScope(rolling ? "admin-aggregation-items-24h" : "admin-aggregation-items", (rolling ? filter with { From = default } : filter).ScopeKey());
         AggregationItemPosition? after = null;
         if (page.Cursor is { } cursor)

@@ -7,7 +7,8 @@ namespace Tinhte.Worker;
 
 /// <summary>
 /// Vòng quét của worker (ADR-0008 §3–§4): mỗi vòng kiểm cờ aggregation.radar, thuê tối đa <c>Aggregation:Worker:Parallelism</c> feed đến hạn
-/// và xử lý song song (timeout từng request nên một feed treo không chặn feed khác). Thuê đủ một lô ⇒ quét tiếp ngay; ít hơn ⇒ chờ
+/// và xử lý song song (timeout từng request nên một feed treo không chặn feed khác); mục mới được gom cụm ngay trong transaction ghi mục, và mỗi
+/// <c>Aggregation:Worker:MaintenanceMinutes</c> phút chạy bảo trì cụm (đóng cụm hết cửa sổ 48 giờ, gom bù, tính lại điểm). Thuê đủ một lô ⇒ quét tiếp ngay; ít hơn ⇒ chờ
 /// <c>Aggregation:Worker:PollSeconds</c>. Lỗi hạ tầng (DB mất kết nối…) được ghi log rồi thử lại ở vòng sau — worker không sập theo.
 /// </summary>
 public sealed partial class FeedCollectorWorker(FeedCollectionService collector, AggregationOptions options, ILogger<FeedCollectorWorker> logger)

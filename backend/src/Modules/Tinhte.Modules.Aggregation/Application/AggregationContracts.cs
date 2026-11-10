@@ -196,3 +196,104 @@ public sealed record AggregationItemFilter(
 
 /// <summary>Vị trí cursor mục tin: mới thấy trước (first_seen_at giảm dần, id giảm dần).</summary>
 public sealed record AggregationItemPosition(DateTimeOffset FirstSeenAt, Guid Id);
+
+// ---------------------------------------------------------------- lát 3: cụm sự kiện, thống kê (FR-AGG-004/005)
+
+/// <summary>
+/// AggregationClusterSummary. <c>sourceCount</c> = số feed khác nhau, <c>independentSourceCount</c> = số nguồn khác nhau (BR-32);
+/// <c>maxUsageMode</c> = chế độ khai thác cao nhất trong các nguồn của cụm.
+/// </summary>
+public sealed record AggregationClusterSummary(
+    Guid Id,
+    string SiteKey,
+    string Title,
+    Guid RepresentativeItemId,
+    Guid? PrimaryCategoryId,
+    bool CategoryNeedsReview,
+    decimal Score,
+    string Status,
+    int SourceCount,
+    int IndependentSourceCount,
+    int ItemCount,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastItemAt,
+    IReadOnlyList<string> Labels,
+    string MaxUsageMode,
+    Guid? AssigneeId,
+    Guid? CoveredArticleId,
+    long RowVersion);
+
+/// <summary>AggregationClusterAction (lịch sử chỉ thêm, mới nhất trước).</summary>
+public sealed record AggregationClusterAction(string Action, Guid ActorId, DateTimeOffset At, string? Reason, Guid? RelatedClusterId, Guid? ArticleId);
+
+/// <summary>AggregationClusterDetail = summary + mục tin (theo thời gian) + lịch sử thao tác.</summary>
+public sealed record AggregationClusterDetail(
+    Guid Id,
+    string SiteKey,
+    string Title,
+    Guid RepresentativeItemId,
+    Guid? PrimaryCategoryId,
+    bool CategoryNeedsReview,
+    decimal Score,
+    string Status,
+    int SourceCount,
+    int IndependentSourceCount,
+    int ItemCount,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastItemAt,
+    IReadOnlyList<string> Labels,
+    string MaxUsageMode,
+    Guid? AssigneeId,
+    Guid? CoveredArticleId,
+    long RowVersion,
+    IReadOnlyList<AggregationItem> Items,
+    IReadOnlyList<AggregationClusterAction> Actions)
+{
+    public static AggregationClusterDetail From(AggregationClusterSummary s, IReadOnlyList<AggregationItem> items, IReadOnlyList<AggregationClusterAction> actions) =>
+        new(s.Id, s.SiteKey, s.Title, s.RepresentativeItemId, s.PrimaryCategoryId, s.CategoryNeedsReview, s.Score, s.Status, s.SourceCount,
+            s.IndependentSourceCount, s.ItemCount, s.FirstSeenAt, s.LastItemAt, s.Labels, s.MaxUsageMode, s.AssigneeId, s.CoveredArticleId, s.RowVersion,
+            items, actions);
+}
+
+/// <summary>AggregationCoverageRequest.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AggregationCoverageRequest([Required] Guid? ArticleId);
+
+/// <summary>AggregationSplitRequest (itemIds ≥ 1, không trùng).</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AggregationSplitRequest([Required, MinLength(1)] IReadOnlyList<Guid>? ItemIds, [StringLength(2000)] string? Reason);
+
+/// <summary>AggregationMergeRequest.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AggregationMergeRequest([Required] Guid? TargetClusterId, [StringLength(2000)] string? Reason);
+
+/// <summary>Bộ lọc listAdminAggregationClusters (cụm có hoạt động trong cửa sổ: first_seen_at &lt; to và last_item_at ≥ from).</summary>
+public sealed record AggregationClusterFilter(
+    string SiteKey,
+    DateTimeOffset From,
+    DateTimeOffset? To,
+    Guid? CategoryId,
+    IReadOnlyList<string> Statuses,
+    decimal? MinScore)
+{
+    public string ScopeKey() => string.Join('|', SiteKey, From.UtcTicks, To?.UtcTicks, CategoryId, string.Join(',', Statuses),
+        MinScore?.ToString(System.Globalization.CultureInfo.InvariantCulture));
+}
+
+/// <summary>Vị trí cursor cụm: điểm giảm dần, rồi lúc thấy đầu tiên, rồi id.</summary>
+public sealed record AggregationClusterPosition(decimal Score, DateTimeOffset FirstSeenAt, Guid Id);
+
+/// <summary>AggregationSourceHealth.</summary>
+public sealed record AggregationSourceHealth(Guid SourceId, string Name, string Status, string? WorstFeedHealth, int ItemsToday, DateTimeOffset? LastSuccessAt);
+
+/// <summary>AggregationStats.</summary>
+public sealed record AggregationStats(
+    string SiteKey,
+    DateOnly Date,
+    string TimeZone,
+    int ItemsToday,
+    int ClustersToday,
+    int OpenClustersToday,
+    double? FetchSuccessRate24h,
+    IReadOnlyDictionary<string, int> SourcesByStatus,
+    IReadOnlyList<AggregationSourceHealth> Sources);

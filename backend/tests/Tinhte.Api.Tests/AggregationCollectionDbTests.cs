@@ -25,7 +25,7 @@ namespace Tinhte.Api.Tests;
 /// Feed của test có next_fetch_at ở năm 2000 để luôn đứng đầu hàng đợi, không đụng feed của test khác.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
-public sealed class AggregationCollectionDbTests(MigratedDatabaseFixture db, WebApplicationFactory<Program> factory)
+public sealed partial class AggregationCollectionDbTests(MigratedDatabaseFixture db, WebApplicationFactory<Program> factory)
     : IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
 {
     private const string Base = "/api/v1/admin/aggregation";
@@ -219,8 +219,8 @@ public sealed class AggregationCollectionDbTests(MigratedDatabaseFixture db, Web
                 }
 
                 Assert.Equal(["g-a", "g-b", "g-c"], rows.Select(x => x.Guid));
-                Assert.Equal(("CLASSIFIED", _phones, 0.95m, false, false, "Mỏng 6mm"), (rows[0].Status, rows[0].Category!.Value, rows[0].Confidence!.Value, rows[0].Review, rows[0].Sensitive, rows[0].Summary!));
-                Assert.Equal(("CLASSIFIED", _laptops, 1.000m), (rows[1].Status, rows[1].Category!.Value, rows[1].Confidence!.Value));   // ánh xạ category của feed
+                Assert.Equal(("CLUSTERED", _phones, 0.95m, false, false, "Mỏng 6mm"), (rows[0].Status, rows[0].Category!.Value, rows[0].Confidence!.Value, rows[0].Review, rows[0].Sensitive, rows[0].Summary!));
+                Assert.Equal(("CLUSTERED", _laptops, 1.000m), (rows[1].Status, rows[1].Category!.Value, rows[1].Confidence!.Value));   // ánh xạ category của feed
                 Assert.Equal(("OUT_OF_SCOPE", (Guid?)null, true), (rows[2].Status, rows[2].Category, rows[2].Sensitive));                // "tin đồn" — chủ đề nhạy cảm
                 Assert.All(rows, x => Assert.Equal(("www", "vi", true, 1), (x.Site, x.Lang, x.Reliable, x.Version)));
             }

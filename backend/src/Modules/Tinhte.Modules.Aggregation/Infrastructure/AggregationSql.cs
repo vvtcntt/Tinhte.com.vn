@@ -55,6 +55,42 @@ internal static class AggregationSql
             RowVersion: r.GetInt64(11)),
         new SourceApprovalState(NullableText(r, 12), r.GetGuid(13), NullableGuid(r, 14), NullableTime(r, 15)));
 
+    /// <summary>
+    /// Thời điểm hiệu lực của mục (ADR-0008 §6, BR-11/12): published_at nếu có và không ở tương lai quá 10 phút so với lúc thấy, ngược lại first_seen_at.
+    /// </summary>
+    public const string ItemEffectiveAt =
+        "CASE WHEN i.published_at IS NOT NULL AND i.published_at <= i.first_seen_at + interval '10 minutes' THEN i.published_at ELSE i.first_seen_at END";
+
+    /// <summary>AggregationItem (bí danh i, cs). Thứ tự cột khớp <see cref="ReadItem"/>.</summary>
+    public const string ItemSelect = """
+        SELECT i.id, i.content_source_id, cs.name, i.feed_id, i.title, i.url, i.summary, i.author, i.published_at, i.first_seen_at, i.time_reliable,
+               i.language, i.feed_categories, i.status, i.category_id, i.category_confidence, i.needs_review, i.sensitive, i.version, i.cluster_id
+          FROM tt.agg_items i
+          JOIN tt.content_sources cs ON cs.id = i.content_source_id
+        """;
+
+    public static AggregationItem ReadItem(DbDataReader r) => new(
+        Id: r.GetGuid(0),
+        SourceId: r.GetGuid(1),
+        SourceName: r.GetString(2),
+        FeedId: r.GetGuid(3),
+        Title: r.GetString(4),
+        Url: r.GetString(5),
+        Summary: NullableText(r, 6),
+        Author: NullableText(r, 7),
+        PublishedAt: NullableTime(r, 8),
+        FirstSeenAt: r.GetFieldValue<DateTimeOffset>(9),
+        TimeReliable: r.GetBoolean(10),
+        Language: NullableText(r, 11),
+        FeedCategories: r.GetFieldValue<string[]>(12),
+        Status: r.GetString(13),
+        CategoryId: NullableGuid(r, 14),
+        Confidence: r.IsDBNull(15) ? null : r.GetDecimal(15),
+        NeedsReview: r.GetBoolean(16),
+        Sensitive: r.GetBoolean(17),
+        Version: r.GetInt32(18),
+        ClusterId: NullableGuid(r, 19));
+
     public static AggregationFeed ReadFeed(DbDataReader r)
     {
         var enabled = r.GetBoolean(4);
@@ -144,6 +180,12 @@ internal static class AggregationSql
 
     public static NpgsqlCommand WithSmallInt(this NpgsqlCommand command, string name, int? value) =>
         command.With(name, NpgsqlDbType.Smallint, value is { } v ? (short)Math.Clamp(v, short.MinValue, short.MaxValue) : null);
+
+    public static NpgsqlCommand WithIntArray(this NpgsqlCommand command, string name, IReadOnlyList<int>? value) =>
+        command.With(name, NpgsqlDbType.Array | NpgsqlDbType.Integer, value?.ToArray());
+
+    public static NpgsqlCommand WithLongArray(this NpgsqlCommand command, string name, IReadOnlyList<long>? value) =>
+        command.With(name, NpgsqlDbType.Array | NpgsqlDbType.Bigint, value?.ToArray());
 
     public static NpgsqlCommand WithDecimal(this NpgsqlCommand command, string name, decimal? value) =>
         command.With(name, NpgsqlDbType.Numeric, value);

@@ -431,6 +431,23 @@ async function behaviour(sc, db) {
     DO $$ BEGIN IF (${FEED_RV}) <> 2 OR to_regclass('tt.ix_agg_items_site_recent') IS NOT NULL
       OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_feeds' AND column_name = 'failing_since')
       THEN RAISE EXCEPTION 'down 0342'; END IF; END $$;`);
+  // Gom cụm (0343): row_version của cụm chỉ đổi theo thao tác CMS; down tạo lại trigger cũ.
+  const CL = `INSERT INTO tt.agg_clusters (id, site_key, title) VALUES ('${id('c1b')}', 'www', 'Sự kiện');`;
+  const CL_RV = `SELECT row_version FROM tt.agg_clusters WHERE id = '${id('c1b')}'`;
+  await expectOk(sc, db, 'AG28 worker cập nhật điểm/bộ đếm/nhãn cụm không đổi row_version; đổi trạng thái thì tăng; mục có chữ ký MinHash', `${CL}
+    UPDATE tt.agg_clusters SET score = 42.5, item_count = 3, feed_count = 2, source_count = 2, labels = ARRAY['SENSITIVE']::varchar(20)[], last_item_at = now();
+    DO $$ BEGIN IF (${CL_RV}) <> 1 THEN RAISE EXCEPTION 'worker bumped cluster row_version'; END IF; END $$;
+    UPDATE tt.agg_clusters SET status = 'WATCHING';
+    DO $$ BEGIN IF (${CL_RV}) <> 2 THEN RAISE EXCEPTION 'cms did not bump cluster row_version'; END IF; END $$;
+    ${AGG} ${FEED()} INSERT INTO tt.agg_items (content_source_id, feed_id, url, url_hash, title, content_hash, minhash, minhash_bands, cluster_id, status)
+      VALUES ('${SRC}', '${id('fe1')}', 'https://bao-cong-nghe.example/a', repeat('a', 64), 'Tin', repeat('c', 64), ARRAY[1,2], ARRAY[3,4]::bigint[], '${id('c1b')}', 'CLUSTERED');
+    DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM tt.agg_items WHERE minhash_bands && ARRAY[4]::bigint[]) THEN RAISE EXCEPTION 'bands'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG29 down 0343 tạo lại trigger tăng row_version cụm ở mọi UPDATE', `${CL}
+    ${read(path.join(MIG_DIR, '0343_aggregation_clustering.down.sql'))}
+    UPDATE tt.agg_clusters SET score = 1;
+    DO $$ BEGIN IF (${CL_RV}) <> 2 OR to_regclass('tt.ix_agg_items_minhash_bands') IS NOT NULL
+      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_clusters' AND column_name = 'covered_at')
+      THEN RAISE EXCEPTION 'down 0343'; END IF; END $$;`);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
