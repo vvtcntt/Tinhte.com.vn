@@ -405,6 +405,28 @@ async function behaviour(sc, db) {
     ${GRANT('EDITOR')}`);
   await expectError(sc, db, 'K6 sau down 0351, AD_OPS bị chặn lại', `${DOWN_0351} ${GRANT('AD_OPS')}`, /ck_user_roles_role/);
 
+  // Nhật ký gọi AI (0353, FR-AI-001/004; cờ ai.assistance)
+  const AI = (status = 'PENDING', extra = '') => `INSERT INTO tt.ai_requests (id, actor_id, action, object_type, object_id, provider_key, model, status,
+      input_chars, input_sha256${extra ? ', completed_at, error_code' : ''})
+    VALUES ('${id('a11')}', '${U1}', 'ai.suggest_tags', 'ARTICLE', '${id('b1')}', 'yescale', 'gpt-5.4-mini', '${status}', 120, repeat('a', 64)${extra});`;
+  const DOWN_0353 = read(path.join(MIG_DIR, '0353_ai_requests.down.sql'));
+  await expectError(sc, db, 'AI1 ghi nhật ký AI khi ai.assistance OFF bị chặn (FEATURE_DISABLED)', AI(), /FEATURE_DISABLED/);
+  await expectOk(sc, db, 'AI2 cờ ON: PENDING → SUCCEEDED có token', `${APPROVE('ai.assistance')} ${AI()}
+    UPDATE tt.ai_requests SET status = 'SUCCEEDED', completed_at = now(), prompt_tokens = 300, completion_tokens = 40, latency_ms = 900 WHERE id = '${id('a11')}';`);
+  await expectError(sc, db, 'AI3 dòng đã kết thúc không sửa lại được (STATE_CONFLICT)', `${APPROVE('ai.assistance')} ${AI()}
+    UPDATE tt.ai_requests SET status = 'SUCCEEDED', completed_at = now() WHERE id = '${id('a11')}';
+    UPDATE tt.ai_requests SET status = 'FAILED', error_code = 'X' WHERE id = '${id('a11')}';`, /STATE_CONFLICT/);
+  await expectError(sc, db, 'AI4 không đổi được người/nội dung của dòng nhật ký', `${APPROVE('ai.assistance')} ${AI()}
+    UPDATE tt.ai_requests SET status = 'FAILED', completed_at = now(), error_code = 'TIMEOUT', object_id = '${id('b2')}' WHERE id = '${id('a11')}';`, /STATE_CONFLICT/);
+  await expectError(sc, db, 'AI5 FAILED thiếu mã lỗi bị chặn', `${APPROVE('ai.assistance')} ${AI()}
+    UPDATE tt.ai_requests SET status = 'FAILED', completed_at = now() WHERE id = '${id('a11')}';`, /ck_ai_requests_completion/);
+  await expectError(sc, db, 'AI6 xóa nhật ký AI bị chặn', `${APPROVE('ai.assistance')} ${AI()} DELETE FROM tt.ai_requests`, /APPEND_ONLY/);
+  await expectError(sc, db, 'AI7 TRUNCATE nhật ký AI bị chặn', `TRUNCATE tt.ai_requests`, /APPEND_ONLY/);
+  await expectError(sc, db, 'AI8 hash nội dung sai định dạng bị chặn', `${APPROVE('ai.assistance')}
+    INSERT INTO tt.ai_requests (actor_id, action, object_type, object_id, provider_key, model, input_chars, input_sha256)
+    VALUES ('${U1}', 'ai.suggest_summary', 'VIDEO', '${id('d1')}', 'yescale', 'gpt', 1, repeat('Z', 64))`, /ck_ai_requests_input/);
+  await expectError(sc, db, 'AI9 down 0353 từ chối khi đã có nhật ký AI', `${APPROVE('ai.assistance')} ${AI()} ${DOWN_0353}`, /Refusing to roll back 0353/);
+
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
 }

@@ -11,6 +11,7 @@
     <ProjectReference Include="../Modules/Tinhte.Modules.Video/Tinhte.Modules.Video.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Community/Tinhte.Modules.Community.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Ads/Tinhte.Modules.Ads.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Ai/Tinhte.Modules.Ai.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Identity/Tinhte.Modules.Identity.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,4 +1,5 @@
 using Tinhte.Modules.Ads;
+using Tinhte.Modules.Ai;
 using Tinhte.Modules.Community;
 using Tinhte.Modules.Identity;
 using Tinhte.Modules.News;
@@ -9,7 +10,7 @@ using Tinhte.Platform.Modules;
 var builder = WebApplication.CreateBuilder(args);
 
 // ASP.NET Core Web API dạng Controller (ADR-0002) + module (ADR-0001 cho đa subdomain).
-IModule[] modules = [new NewsModule(), new VideoModule(), new CommunityModule(), new AdsModule(), new IdentityModule()];
+IModule[] modules = [new NewsModule(), new VideoModule(), new CommunityModule(), new AdsModule(), new IdentityModule(), new AiModule()];
 builder.Services.AddTinhtePlatform(builder.Configuration, modules);   // AddControllers + ApplicationPart của module
 builder.Services.AddOpenApi();                                         // tài liệu sinh từ code, chỉ để xem khi dev
 

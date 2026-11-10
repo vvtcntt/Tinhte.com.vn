@@ -44,7 +44,7 @@ public sealed partial class ContractConsistencyTests
             .Where(a => a.Name!.StartsWith("Tinhte.Modules.", StringComparison.Ordinal))
             .Select(Assembly.Load)
             .ToList();
-        Assert.Equal(5, moduleAssemblies.Count);
+        Assert.Equal(6, moduleAssemblies.Count);
         foreach (var assembly in moduleAssemblies)
         {
             var illegal = assembly.GetReferencedAssemblies().Where(r => r.Name!.StartsWith("Tinhte.", StringComparison.Ordinal) && r.Name != "Tinhte.Platform");

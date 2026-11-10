@@ -59,6 +59,9 @@ public static class Permissions
 
     /// <summary>Duyệt và mở (APPROVED/ACTIVE) vị trí, đặt chỗ quảng cáo; cần MFA — ĐỀ XUẤT, chờ BA/PO duyệt.</summary>
     public const string AdsApprove = "ads.approve";
+
+    /// <summary>Gửi nội dung bài/video ra nhà cung cấp AI để lấy gợi ý tag/tóm tắt (FR-AI-001) — ĐỀ XUẤT, chờ BA/PO duyệt.</summary>
+    public const string AiAssist = "ai.assist";
 }
 
 /// <summary>

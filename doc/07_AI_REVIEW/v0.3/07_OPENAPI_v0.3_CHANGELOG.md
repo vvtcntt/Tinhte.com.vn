@@ -335,3 +335,16 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - **Không đổi hợp đồng** — chỉ hiện thực phần còn thiếu của mục 17: `Article` kế thừa `ArticleSummary` nên đã có `category` (`CategoryRef`, có thể `null`). Backend nay trả `category` ở `GET /articles/{slug}`: chuyên mục theo `tt.articles.category_id`, chỉ khi đang bật và cùng site với bài (cùng quy tắc với `GET /home`); ngược lại `null`. **Giữ `categorySlug`** cho client cũ.
 - FE trang bài dùng `category` của API (null = không hiện chuyên mục); chỉ khi API cũ chưa có trường này mới tra theo `categorySlug`.
 - Danh sách `/articles`, `/categories/{slug}/articles` đang làm ở nhánh khác: gộp bằng cách nối `PublicArticleCategorySql` (alias `cat`) vào truy vấn thẻ bài.
+
+## 21. Module AI — gợi ý metadata qua cổng AI tương thích OpenAI, nhật ký gọi AI (FR-AI-001, FR-AI-004, 2026-11-10)
+
+- **DRAFT, chờ TL/PO/Legal duyệt. Cờ `ai.assistance` giữ OFF ở production** (P2; bật cần PO + Legal theo `x-feature-flags`). Chưa giải quyết **D5 của BA-01** (có được gửi nội dung ra nhà cung cấp AI ở nước ngoài không) — đây là điều kiện trước khi bật cờ, không phải trước khi viết code.
+- Hiện thực `postAdminAiMetadataSuggestions` và `getAdminAiAudit` (module `Tinhte.Modules.Ai`). Chưa làm `postAdminAiTranscriptJobs` (cần pipeline media) và `postAiSearch` (cần chỉ mục tìm kiếm + nguồn dẫn).
+- `postAdminAiMetadataSuggestions` — **thay đổi hợp đồng:**
+  - thêm `404 NOT_FOUND` (contentId không phải bài/video) và `503 DEPENDENCY_UNAVAILABLE` (chưa cấu hình nhà cung cấp AI, quá thời gian, lỗi hoặc câu trả lời không dùng được);
+  - ghi rõ thứ tự kiểm, quyền đề xuất `ai.assist`, nội dung gửi đi (tiêu đề + tóm tắt + văn bản thân bài của revision working, nếu không có thì public; cắt ở phía server), giới hạn kết quả (tối đa 8 tag / 3 tóm tắt), `requiresHumanApproval` luôn `true`, không ghi gì vào nội dung;
+  - hạn mức theo người (`429 RATE_LIMITED` + `Retry-After`) đã có trong hợp đồng, nay nêu rõ.
+- `getAdminAiAudit` — chỉ làm rõ mô tả: quyền `audit.read` (MFA), mỗi lần gọi nhà cung cấp là một dòng (kể cả thất bại), `action` = `ai.suggest_tags` | `ai.suggest_summary`, `objectId` = id bài/video. Không đổi schema.
+- **Kiểm soát dữ liệu (FR-AI-004):** migration `0353_ai_requests` lưu ai gọi, nội dung nào, nhà cung cấp/model, kết quả, token, thời gian, **độ dài + sha256 của nội dung gửi đi** — không lưu prompt hay câu trả lời. Bảng chỉ thêm (xóa/TRUNCATE → `APPEND_ONLY`, sửa dòng đã kết thúc → `STATE_CONFLICT`); INSERT bị trigger chặn khi cờ OFF (`FEATURE_DISABLED`). Down từ chối khi đã có dòng.
+- **Ma trận quyền (DRAFT, chờ BA/PO — không coi là đã duyệt):** `config/rbac/rbac.json` thêm `ai.assist` (không MFA) cho `AUTHOR`, `EDITOR`. Tách khỏi `content.*` để có thể tắt việc gửi nội dung ra ngoài theo vai trò mà không ảnh hưởng soạn bài.
+- Nhà cung cấp: cấu hình `Ai:Provider` (mặc định cổng YesScale, `BaseUrl` + `Model` trong appsettings, `ApiKey` chỉ qua biến môi trường/secret store — không ghi vào repo, không lưu DB).

@@ -103,6 +103,12 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     [InlineData("APPROVER", true, Permissions.AdsApprove, AccessDecision.Allowed)]
     [InlineData("EDITOR", false, Permissions.AdsManage, AccessDecision.MissingPermission)]
     [InlineData("ADMIN", false, Permissions.UsersManage, AccessDecision.MfaRequired)]
+    // AI gợi ý (ĐỀ XUẤT, chờ BA/PO): người soạn bài được dùng; vai trò không soạn bài thì không.
+    [InlineData("AUTHOR", false, Permissions.AiAssist, AccessDecision.Allowed)]
+    [InlineData("EDITOR", false, Permissions.AiAssist, AccessDecision.Allowed)]
+    [InlineData("APPROVER", true, Permissions.AiAssist, AccessDecision.MissingPermission)]
+    [InlineData("MODERATOR", true, Permissions.AiAssist, AccessDecision.MissingPermission)]
+    [InlineData("AD_OPS", true, Permissions.AiAssist, AccessDecision.MissingPermission)]
     [InlineData("UNKNOWN_ROLE", true, Permissions.ContentRead, AccessDecision.MissingPermission)]
     public void Matrix_decisions(string role, bool mfa, string permission, AccessDecision expected) =>
         Assert.Equal(expected, PermissionMatrix.Evaluate([role], mfa, permission));

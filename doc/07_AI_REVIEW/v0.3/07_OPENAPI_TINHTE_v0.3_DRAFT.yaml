@@ -5560,8 +5560,15 @@ paths:
       tags:
       - AiOptional
       summary: AI metadata suggestions for human approval
-      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Feature gate `ai.assistance` (production default
-        OFF), enforced server-side inside the write transaction. Retry-safe with Idempotency-Key.'
+      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer (proposed permission ai.assist in config/rbac/rbac.json
+        — DRAFT, pending BA/PO approval). Feature gate `ai.assistance` (production default OFF), enforced server-side inside the write
+        transaction, before any content leaves the system. Retry-safe with Idempotency-Key. contentId is an article or a video; the working
+        revision (else the public one) is used: title, summary and body text, truncated server-side. The tag task returns up to 8 tags, the
+        summary task up to 3 candidate summaries; nothing is saved to the content and requiresHumanApproval is always true (FR-AI-001). Every call
+        that reaches the AI provider is recorded for GET /admin/ai/audit with a hash and length of the input, never the input or output text
+        (FR-AI-004). Order of checks: 401 → 403 CSRF → 403 permission → 422 body → 403 FEATURE_DISABLED → 404 unknown content → 429 per-user
+        quota (with Retry-After) → 503 DEPENDENCY_UNAVAILABLE when no AI provider is configured, it times out or it returns an error/unusable
+        answer.'
       operationId: postAdminAiMetadataSuggestions
       security:
       - cmsSession: []
@@ -5587,12 +5594,16 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
       x-requirements:
       - FR-AI-001
       x-scope: P2
@@ -5603,10 +5614,12 @@ paths:
       - CSRF_INVALID
       - FEATURE_DISABLED
       - FORBIDDEN
+      - NOT_FOUND
       - STATE_CONFLICT
       - IDEMPOTENCY_KEY_REUSED
       - VALIDATION_FAILED
       - RATE_LIMITED
+      - DEPENDENCY_UNAVAILABLE
   /admin/ai/transcript-jobs:
     post:
       tags:
@@ -5664,8 +5677,10 @@ paths:
       tags:
       - AiOptional
       summary: Audit AI operation requests
-      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Feature gate `ai.assistance` (production default
-        OFF), enforced server-side.'
+      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer (permission audit.read, MFA). Feature gate `ai.assistance`
+        (production default OFF), enforced server-side. Newest first. One item per call sent to the AI provider (successful or failed):
+        actorId = staff user, objectId = article or video id, action = ai.suggest_tags or ai.suggest_summary. from/to filter on the request
+        time (from inclusive, to exclusive).'
       operationId: getAdminAiAudit
       security:
       - cmsSession: []

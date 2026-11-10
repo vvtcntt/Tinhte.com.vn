@@ -3,6 +3,7 @@
   "version": 1,
   "status": "DRAFT — chờ BA/TL/PO duyệt (07_API_IMPLEMENTATION_GUIDE: role-policy matrix trước sign-off)",
   "$comment_ads": "ĐỀ XUẤT 10/11/2026, chờ BA/PO duyệt riêng: quyền ads.manage (không MFA), ads.approve (MFA), vai trò AD_OPS (chuẩn bị vị trí/đặt chỗ, chọn/tải banner từ thư viện media — cần content.read để mở thư viện, media.upload để tải banner) và APPROVER thêm ads.manage + ads.approve (mở vị trí/đặt chỗ là quyết định đưa nội dung tài trợ lên trang công khai, cùng nhóm với content.publish; tách người chuẩn bị và người mở theo vai trò). Chưa có SoD theo dữ liệu (người duyệt tự duyệt đặt chỗ mình tạo) — cần thêm mã lỗi vào hợp đồng nếu BA/PO yêu cầu.",
+  "$comment_ai": "ĐỀ XUẤT 10/11/2026, chờ BA/PO duyệt riêng: quyền ai.assist (không MFA) = được gửi nội dung bài/video ra nhà cung cấp AI để lấy gợi ý tag/tóm tắt (FR-AI-001). Tách khỏi content.* để tắt theo vai trò mà không ảnh hưởng soạn bài. Cấp cho AUTHOR, EDITOR. Còn phụ thuộc cờ ai.assistance (PO + Legal) và quyết định D5 của BA-01.",
   "permissions": {
     "content.read": { "label": "Xem nội dung trong CMS", "mfa": false },
     "content.write_own": { "label": "Soạn và sửa bài của mình", "mfa": false },
@@ -18,13 +19,14 @@
     "users.manage": { "label": "Đình chỉ tài khoản, cấp/thu hồi vai trò", "mfa": true },
     "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true },
     "ads.manage": { "label": "Quản lý vị trí và đặt chỗ quảng cáo", "mfa": false },
-    "ads.approve": { "label": "Duyệt, mở vị trí và đặt chỗ quảng cáo", "mfa": true }
+    "ads.approve": { "label": "Duyệt, mở vị trí và đặt chỗ quảng cáo", "mfa": true },
+    "ai.assist": { "label": "Dùng AI gợi ý tag, tóm tắt (gửi nội dung ra nhà cung cấp AI)", "mfa": false }
   },
   "roles": {
-    "AUTHOR": { "label": "Tác giả", "permissions": ["content.read", "content.write_own", "media.upload"] },
+    "AUTHOR": { "label": "Tác giả", "permissions": ["content.read", "content.write_own", "media.upload", "ai.assist"] },
     "EDITOR": {
       "label": "Biên tập viên",
-      "permissions": ["content.read", "content.write_own", "content.write_any", "content.review", "media.upload", "taxonomy.manage"]
+      "permissions": ["content.read", "content.write_own", "content.write_any", "content.review", "media.upload", "taxonomy.manage", "ai.assist"]
     },
     "APPROVER": {
       "label": "Người duyệt xuất bản",
