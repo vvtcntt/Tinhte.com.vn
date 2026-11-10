@@ -1,7 +1,5 @@
-using System.Data.Common;
 using Microsoft.Extensions.Options;
 using Npgsql;
-using Tinhte.Modules.News.Domain;
 using Tinhte.Modules.News.Infrastructure;
 using Tinhte.Platform.Data;
 using Tinhte.Platform.Flags;
@@ -35,8 +33,8 @@ public sealed class HomeService(ITinhteDatabase database, IOptions<NewsOptions> 
     public const int FeaturedLimit = 5;
     public const int RecentLimit = 12;
 
-    private const string Columns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind";
-    private const string Join = "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id";
+    private const string Columns = PublicArticleSql.SummaryColumns;
+    private const string Join = PublicArticleSql.JoinPublicRevision;
 
     private const string PickedSql = $"""
         SELECT {Columns}
@@ -77,21 +75,7 @@ public sealed class HomeService(ITinhteDatabase database, IOptions<NewsOptions> 
         command.Parameters.AddWithValue("exclude", exclude);
         var items = new List<PublicArticleSummary>();
         await using var r = await command.ExecuteReaderAsync(ct);
-        while (await r.ReadAsync(ct)) items.Add(Read(r, label));
+        while (await r.ReadAsync(ct)) items.Add(PublicArticleSql.ReadSummary(r, label));
         return items;
-    }
-
-    private static PublicArticleSummary Read(DbDataReader r, string? label)
-    {
-        var kind = r.GetString(5);
-        return new PublicArticleSummary(
-            Id: r.GetGuid(0),
-            Slug: r.GetString(1),
-            Title: r.GetString(2),
-            Summary: r.IsDBNull(3) ? null : r.GetString(3),
-            PublishedAt: ArticleSql.Time(r, 4),
-            ThumbnailUrl: null,                 // ảnh đại diện: thuộc WBS media
-            ContentKind: kind,
-            SponsorLabel: kind == ContentKinds.Sponsored ? label : null);
     }
 }

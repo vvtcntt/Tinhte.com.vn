@@ -52,5 +52,8 @@ DESKTOP ≥ 1024px                                      MOBILE < 768px
 
 1. URL công khai `/articles/{slug}` chưa chốt (AIR-026); đổi ở `src/lib/routes.ts`.
 2. `Article` chưa có `updatedAt`, nên chưa hiện "cập nhật lúc…" (FR-NEWS-001 "khi áp dụng").
-3. Chưa có nút chia sẻ, chưa có ảnh đại diện (media WBS), chưa có trang chuyên mục `/categories/{slug}` (WBS-028) và danh sách `/articles`; link tới các trang này hiện ra 404.
+3. Chưa có nút chia sẻ và ảnh đại diện (media WBS). Trang chuyên mục `/categories/{slug}` (WBS-028) và Tin mới `/articles` đã có.
+   - Dùng `getCategoriesSlugArticles` / `listPublicArticles`, phân trang bằng `?cursor=`.
+   - Trang sau đặt `noindex, follow`, canonical về trang đầu.
+   - Cursor hỏng thì chuyển về trang đầu; chuyên mục không có hoặc đã tắt trả 404.
 4. Mã slot `article_bottom` chờ WBS-131 duyệt.

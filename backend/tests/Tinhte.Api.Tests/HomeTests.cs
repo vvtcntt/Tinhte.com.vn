@@ -225,6 +225,66 @@ public sealed class HomeDbTests(MigratedDatabaseFixture db, WebApplicationFactor
         Assert.Equal(c, featured[0]);
     }
 
+    private static async Task<(Guid[] Ids, string? Next)> PageAsync(HttpClient www, string path)
+    {
+        using var response = await www.GetAsync(path);
+        var body = await NewsHttp.JsonAsync(response, HttpStatusCode.OK);
+        var next = body.GetProperty("nextCursor");
+        return ([.. body.GetProperty("items").EnumerateArray().Select(a => a.GetProperty("id").GetGuid())],
+            next.ValueKind == JsonValueKind.Null ? null : next.GetString());
+    }
+
+    [DbFact]
+    public async Task Category_and_latest_lists_page_newest_first_and_hide_unpublished()
+    {
+        using var cms = Cms();
+        using var www = Www();
+        var oldest = await PublishedAsync(cms, "Cũ nhất");
+        var middle = await PublishedAsync(cms, "Ở giữa");
+        var draft = await DraftAsync(cms, "Nháp trong chuyên mục");
+        var newest = await PublishedAsync(cms, "Mới nhất");
+        var withdrawn = await PublishedAsync(cms, "Sẽ bị gỡ");
+        await ExecAsync($"UPDATE tt.articles SET status = 'UNPUBLISHED' WHERE id = '{withdrawn}'");
+        var slug = $"home-{_category:N}";
+
+        // Chuyên mục: đi hết các trang, mỗi bài đúng một lần, mới nhất trước; nháp/đã gỡ không có.
+        var (page1, cursor) = await PageAsync(www, $"/api/v1/categories/{slug}/articles?limit=2");
+        Assert.Equal([newest, middle], page1);
+        Assert.NotNull(cursor);
+        var (page2, end) = await PageAsync(www, $"/api/v1/categories/{slug}/articles?limit=2&cursor={Uri.EscapeDataString(cursor!)}");
+        Assert.Equal([oldest], page2);
+        Assert.Null(end);
+        Assert.DoesNotContain(draft, page1.Concat(page2));
+        Assert.DoesNotContain(withdrawn, page1.Concat(page2));
+
+        // Cursor gắn với danh sách: dùng cursor của chuyên mục cho /articles → 400 INVALID_CURSOR.
+        using (var foreign = await www.GetAsync($"/api/v1/articles?cursor={Uri.EscapeDataString(cursor!)}"))
+        {
+            await NewsHttp.ProblemAsync(foreign, HttpStatusCode.BadRequest, ErrorCodes.InvalidCursor);
+        }
+
+        // /articles: bài mới nhất của site lên đầu; lọc category cho cùng kết quả; category lạ → rỗng (không 404).
+        var (latest, _) = await PageAsync(www, "/api/v1/articles?limit=3");
+        Assert.Equal(newest, latest[0]);
+        var (filtered, _) = await PageAsync(www, $"/api/v1/articles?category={slug}");
+        Assert.Equal([newest, middle, oldest], filtered);
+        var (none, noneNext) = await PageAsync(www, "/api/v1/articles?category=khong-co-chuyen-muc-nay");
+        Assert.Empty(none);
+        Assert.Null(noneNext);
+
+        // Chuyên mục không có hoặc đã tắt → 404.
+        using (var missing = await www.GetAsync("/api/v1/categories/khong-co-chuyen-muc-nay/articles"))
+        {
+            await NewsHttp.ProblemAsync(missing, HttpStatusCode.NotFound, ErrorCodes.NotFound);
+        }
+
+        await ExecAsync($"UPDATE tt.categories SET is_enabled = false WHERE id = '{_category}'");
+        using (var disabled = await www.GetAsync($"/api/v1/categories/{slug}/articles"))
+        {
+            await NewsHttp.ProblemAsync(disabled, HttpStatusCode.NotFound, ErrorCodes.NotFound);
+        }
+    }
+
     [DbFact]
     public async Task Public_categories_list_only_enabled_categories_of_the_site()
     {

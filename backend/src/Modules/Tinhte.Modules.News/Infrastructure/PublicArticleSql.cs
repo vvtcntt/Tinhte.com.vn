@@ -1,3 +1,7 @@
+using System.Data.Common;
+using Tinhte.Modules.News.Application;
+using Tinhte.Modules.News.Domain;
+
 namespace Tinhte.Modules.News.Infrastructure;
 
 /// <summary>
@@ -26,4 +30,24 @@ internal static class PublicArticleSql
         (a.published_at IS NOT NULL AND a.status NOT IN ('UNPUBLISHED', 'RETRACTED') AND {RightsOk} AND {SponsorOk}
          AND (r.content_kind <> 'SPONSORED' OR @sponsorLabel))
         """;
+
+    /// <summary>Cột của thẻ bài công khai, đọc bằng <see cref="ReadSummary"/>.</summary>
+    public const string SummaryColumns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind";
+
+    public const string JoinPublicRevision = "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id";
+
+    /// <summary>Schema ArticleSummary. Nhãn tài trợ chỉ gắn cho SPONSORED (đã lọc bằng <see cref="Visible"/>).</summary>
+    public static PublicArticleSummary ReadSummary(DbDataReader r, string? sponsorLabel)
+    {
+        var kind = r.GetString(5);
+        return new PublicArticleSummary(
+            Id: r.GetGuid(0),
+            Slug: r.GetString(1),
+            Title: r.GetString(2),
+            Summary: r.IsDBNull(3) ? null : r.GetString(3),
+            PublishedAt: ArticleSql.Time(r, 4),
+            ThumbnailUrl: null,                 // ảnh đại diện: thuộc WBS media
+            ContentKind: kind,
+            SponsorLabel: kind == ContentKinds.Sponsored ? sponsorLabel : null);
+    }
 }
