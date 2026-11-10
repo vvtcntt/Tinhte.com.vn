@@ -1,6 +1,6 @@
 # BA-01 — Phiếu xin quyết định: Radar tin (GĐ1) và AI viết lại (GĐ2) — v0.1
 
-**Trạng thái:** DRAFT, lập ngày 10/11/2026. Mỗi phiếu gửi cho một bên. Người nhận điền mục **Trả lời**, ký tên, ghi ngày rồi gửi lại nhóm dự án.
+**Trạng thái:** DRAFT, lập ngày 10/11/2026; chủ dự án đã chốt 17 câu cùng ngày (xem [Kết quả chốt](#kết-quả-chốt-ngày-10112026)). Mỗi phiếu gửi cho một bên. Người nhận điền mục **Trả lời**, ký tên, ghi ngày rồi gửi lại nhóm dự án.
 **Căn cứ:**
 - `doc/ba/BA-01_TONG_HOP_TIN_RSS_AI_v0.1_DRAFT.md` §18
 - `doc/adr/ADR-0007-content-sources-licenses-rights.md`
@@ -46,6 +46,33 @@
 
 Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù GĐ2 chưa làm.
 
+## Kết quả chốt ngày 10/11/2026
+
+Chủ dự án đã chốt 17 câu, ghi ở mục **Trả lời** của từng câu: P-01, P-02, P-03, L-01, L-02, L-03, L-04 (giả định làm việc), S-01, T-01, T-02, T-05, T-07, E-01, E-02, E-03, F-01, O-01. Các câu thuộc chuyên môn Legal, Security, TL, Ban biên tập vẫn chờ bên đó ký ở bảng **Ký nhận**.
+
+**Đã chốt bổ sung cùng ngày:**
+- T-05: Grafana Cloud, cảnh báo qua email, 2 thành viên quản lý trực.
+- T-07: PR vào `sprint-0/scaffold`.
+- P-02: quét 30 phút/lần, chỉ lấy tin trong ngày, chỉ so trùng trong cùng chuyên mục, **dùng AI xác định tin trùng chủ đề**.
+
+**Còn thiếu để bật Radar trên staging:**
+- Danh sách nguồn cụ thể (E-02 → L-01). Đã có nghiệp vụ cài đặt và cấu hình mẫu ở `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md`.
+- Legal chốt cách xử lý điều khoản "RSS miễn phí cho phi lợi nhuận" của VnExpress, Dân trí, Tuổi Trẻ (N-01 trong tài liệu trên).
+- Site và ngày bắt đầu thí điểm; ai trong 2 thành viên giữ vai trò đề xuất, ai duyệt (P-02).
+- S-02 (thêm giá trị lỗi `UNSAFE_TARGET`) chưa trả lời; không chặn thí điểm.
+
+**Việc phát sinh từ các câu đã chốt** (làm trên nhánh Radar, không làm trên `feat/article-page`):
+1. P-01: đổi mức ưu tiên Radar từ P2 sang P1 trong spec v0.3 (cờ `aggregation.radar`), FR addendum và WBS-140…145.
+2. L-03: job xóa mục tin không thuộc cụm sau 90 ngày.
+3. S-01: ghi điều kiện mạng riêng và tường lửa vào runbook worker và ADR-0008.
+4. E-01: thêm 3 nhóm chủ đề nhạy cảm vào `config/aggregation/sensitive-topics.json`.
+5. A-1…A-5 trong ADR-0008: ghi kết quả chốt (A-1, A-2, A-3, A-5 đã chốt; A-4 chốt kèm điều kiện).
+6. P-02: mặc định chu kỳ đọc 30 phút; worker bỏ qua tin đăng trước 00:00 hôm nay (giờ tòa soạn); Radar mặc định mở "Hôm nay"; gom cụm chỉ trong cùng chuyên mục.
+7. P-02: AI xác định tin trùng chủ đề qua module YesScale. Sửa ADR-0008 §7 và thêm cờ riêng cho phần AI. Phụ thuộc module AI ở phiên riêng; chỉ bật sau L-07, S-03, F-02.
+8. T-05: cảnh báo qua email trên Grafana Cloud thay cho webhook chat.
+
+**L-04 — giả định làm việc, không phải giấy phép đã có:** GĐ2 được thiết kế theo giả định Tinhte sẽ được cấp giấy phép, nhưng không bật ở production cho tới khi giấy phép được cấp. Cần ghi rõ loại giấy phép đang xin.
+
 ---
 
 ## Phiếu 1 — PO
@@ -60,7 +87,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Code đã xong; giữ P2 thì code nằm chờ mà không giảm rủi ro nào.
 - **Đang tạm làm:** P2.
 - **Nếu chưa trả lời:** chưa xếp được vào sprint phát hành.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** (b). Radar (GĐ1: cờ `aggregation.radar`, FR-AGG-001…005) xếp **P1**. AI viết lại (GĐ2) giữ **P2**.
 
 ### P-02 · Thí điểm Radar
 - **Câu hỏi:** bật cờ `aggregation.radar` ở môi trường nào, từ khi nào, cho site nào và nhóm BTV nào?
@@ -73,7 +100,14 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Lý do: ngưỡng gom cụm cần ít nhất 30 cặp nhãn mỗi loại mới hiệu chỉnh được (xem E-03), mà nhãn chỉ có khi BTV dùng thật.
 - **Đang tạm làm:** cờ tắt ở mọi nơi.
 - **Nếu chưa trả lời:** không có dữ liệu thật để hiệu chỉnh.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** (a). Bật trên staging cho 1 site và 2–3 BTV, trong 3 tuần; hết 3 tuần xem số liệu rồi mới quyết định lên production.
+  - *Chưa chốt:* site nào, ngày bắt đầu, tên BTV. Tòa soạn ban đầu chỉ có 2 thành viên quản lý (xem T-05), nên thí điểm dùng chính 2 người này.
+  - **Bổ sung (chủ dự án, 10/11/2026) — quy tắc quét:**
+    - quét 30 phút một lần;
+    - chỉ lấy tin trong ngày;
+    - chỉ so trùng giữa các tin **cùng chuyên mục** (chủ dự án xác nhận ngày 10/11/2026);
+    - **AI phân tích nội dung từ nhiều nguồn để xác định tin trùng chủ đề.**
+  - Quy tắc cuối **đổi quyết định "GĐ1 không dùng AI"** của ADR-0008 §7. Cách làm đề xuất và điều kiện trước khi bật ở `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md` mục 5. Cần L-07, S-03, F-02 trước khi bật phần AI.
 
 ### P-03 · Ai được duyệt nguồn (A-3, Q-AGG-07; cùng BA)
 - **Câu hỏi:** chốt ma trận quyền của Radar. Có cần thêm vai trò mới không?
@@ -86,7 +120,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Đề xuất:** (a), không thêm vai trò mới.
   - Hệ thống đã tách nhiệm vụ: người tự đề xuất nguồn M2/M3 không tự duyệt được.
   - Chỉ cần vai trò riêng khi có người của Legal trực tiếp vào CMS duyệt; khi đó xem lại cùng L-02.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** (a). Giữ ma trận đang cấp tạm (EDITOR đề xuất và sửa nguồn; APPROVER duyệt, có MFA), không thêm vai trò mới. Xem lại khi có người của Legal trực tiếp duyệt trong CMS.
 
 ### P-04 · Mức ưu tiên của AI viết lại (B-3)
 - **Câu hỏi:** cờ `ai.aggregation_drafts` của GĐ2 xếp P1 hay P2?
@@ -136,7 +170,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Chưa nâng nguồn nào lên M2/M3 vì GĐ1 chưa có AI. Nguồn nào chưa rõ điều khoản thì để M0.
   - Ban biên tập đưa danh sách (E-02), Legal gán chế độ.
 - **Nếu chưa trả lời:** Radar không có nguồn thật để chạy.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** 10–20 nguồn thí điểm, tất cả M0, tối đa M1. Ưu tiên newsroom/thông cáo của hãng công nghệ, trang công nghệ lớn có RSS công khai, trang thông báo của cơ quan nhà nước. Chưa nâng nguồn nào lên M2/M3.
+  - *Chưa có:* danh sách nguồn cụ thể (chờ E-02).
 
 ### L-02 · Ai được tạo và sửa giấy phép (ADR-0007 Q2)
 - **Câu hỏi:** ai được tạo và sửa giấy phép trong danh mục? Có bắt buộc nhập bằng chứng (`evidenceRef`) không?
@@ -150,7 +185,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - không xóa giấy phép, chỉ được tắt.
   - Ở GĐ1 chưa cần nhập giấy phép nào, vì mọi nguồn đều ở M0/M1.
 - **Lưu ý:** có bản ghi giấy phép trong hệ thống **không** có nghĩa là đã được phép khai thác. Người nhập chịu trách nhiệm về bản ghi đó.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** giữ đúng như code: chỉ APPROVER (MFA) tạo/sửa giấy phép; bắt buộc bằng chứng; không xóa, chỉ tắt. GĐ1 không nhập giấy phép nào.
 
 ### L-03 · Thời gian lưu dữ liệu (Q-AGG-14)
 - **Câu hỏi:** giữ mục tin thô (tiêu đề, tóm tắt, link) và nhật ký thu thập bao lâu? Ở GĐ2, giữ toàn văn nguồn bao lâu?
@@ -162,7 +197,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Mục tin không thuộc cụm nào: xóa sau 90 ngày.
   - Mục tin thuộc cụm đã có bài: giữ cùng bài để còn đối chiếu nguồn.
   - Nếu đồng ý thì cần thêm job xóa mục tin sau 90 ngày (khoảng nửa ngày làm).
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** nhật ký thu thập giữ 30 ngày; mục tin không thuộc cụm nào xóa sau 90 ngày; mục tin thuộc cụm đã có bài giữ cùng bài.
+  - *Việc phát sinh:* thêm job xóa mục tin sau 90 ngày.
 
 ### L-04 · Tinhte xuất bản theo loại giấy phép nào (Q-AGG-01, D1) — câu quyết định GĐ2
 - **Câu hỏi:** Tinhte hoạt động theo loại giấy phép nào?
@@ -173,7 +209,9 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Câu hỏi kèm theo:** với loại đó, Tinhte được viết bài mới từ sự kiện của báo khác, hay chỉ được trích nguyên văn khi có thỏa thuận?
 - **Hệ quả:** nếu là (b), "AI viết lại" có thể không phù hợp. Khi đó GĐ2 phải đổi sang mô hình trích nguyên văn và cần phân tích lại.
 - **Đề xuất:** Legal chỉ cần đối chiếu giấy phép hiện có của Tinhte là trả lời được. Nên hỏi ngay dù GĐ2 chưa làm, vì câu này quyết định GĐ2 có làm được hay không. Câu này không chặn GĐ1.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** **giả định làm việc** — Tinhte đang xin giấy phép, chờ cấp; thiết kế GĐ2 theo giả định sẽ có giấy phép.
+  - Đây **không** phải giấy phép đã có: GĐ2 chỉ chạy ở dev/staging, không bật ở production cho tới khi giấy phép được cấp.
+  - *Cần ghi rõ:* loại giấy phép đang xin — (a), (b), (c) hay (d). Nếu là (b) thì GĐ2 phải đổi sang mô hình trích nguyên văn.
 
 ### L-05 · Viết bài mới từ sự kiện (Q-AGG-02)
 - **Câu hỏi:**
@@ -231,7 +269,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Phương án:** duyệt nguyên trạng, hoặc ghi rõ điểm cần đổi.
 - **Đề xuất:** duyệt nguyên trạng, **kèm một điều kiện hạ tầng**: worker chạy trong mạng riêng, tường lửa chỉ cho kết nối ra Internet cổng 443 và kết nối tới DB. Nếu code có lỗ hổng thì lớp mạng này vẫn chặn được truy cập vào hệ thống nội bộ.
 - **Nếu chưa trả lời:** không được bật Radar trên môi trường có mạng nội bộ thật.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** duyệt nguyên trạng, **kèm điều kiện**: worker chạy trong mạng riêng, tường lửa chỉ cho ra Internet cổng 443 và kết nối tới DB.
+  - *Việc phát sinh:* ghi điều kiện này vào runbook worker và ADR-0008.
 
 ### S-02 · Lỗi riêng cho đích nội bộ phát hiện lúc thu thập
 - **Câu hỏi:** có cần thêm giá trị `UNSAFE_TARGET` vào enum `AggregationFeedFailure` ở bản spec sau không?
@@ -262,7 +301,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Đang tạm làm:** đã làm như vậy, gồm Dockerfile, liveness, nhịp tim, số đo OTLP và runbook.
 - **Đề xuất:** đồng ý. Nguồn chậm hay lỗi không ảnh hưởng API phục vụ CMS; muốn đọc nhanh hơn chỉ cần chạy thêm bản worker.
 - **Nếu chưa trả lời:** ADR-0008 chưa chuyển được sang ACCEPTED.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** đồng ý worker là project riêng `Tinhte.Worker`, deploy riêng, chạy được nhiều bản.
 
 ### T-02 · Bảng hồ sơ thu thập và thứ tự migration (A-2, ADR-0007 Q4; cùng DBA)
 - **Câu hỏi:**
@@ -271,7 +310,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Schema 04 đã có bảng nguồn và giấy phép chưa? Nếu có thì tên cột là gì?
 - **Đang tạm làm:** đã làm như vậy và chạy qua PGlite.
 - **Đề xuất:** đồng ý cả hai ý đầu. Với ý thứ ba, nếu schema 04 chưa có bảng nguồn và giấy phép thì giữ nguyên; nếu đã có thì đổi tên cột cho khớp trước khi lên production.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** đồng ý bảng `agg_source_profiles` 1–1 và thứ tự 0340 → 0345.
+  - *Còn chờ DBA:* schema 04 đã có bảng nguồn và giấy phép chưa; nếu có thì đổi tên cột cho khớp trước production.
 
 ### T-03 · Lưu nguồn ở cấp revision (Q-AGG-09, ADR-0007 Q5)
 - **Câu hỏi:** đồng ý lưu danh sách nguồn trên revision thay vì trên bài (sửa ADR-0007 §2)?
@@ -294,7 +334,12 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Nơi nhận số đo: nhóm nhỏ dùng Grafana Cloud (có gói miễn phí, nhận OTLP trực tiếp, không phải tự vận hành); đã có hạ tầng riêng thì dựng OpenTelemetry Collector, Prometheus và Grafana.
   - Kênh cảnh báo: webhook về công cụ chat team đang dùng.
   - Người trực: 1 người phía kỹ thuật.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** nhóm nhỏ dùng Grafana Cloud; đã có hạ tầng riêng thì dựng OpenTelemetry Collector + Prometheus + Grafana. Cảnh báo qua webhook về công cụ chat của team; 1 người kỹ thuật trực. Chạy job CI `worker-image` lần đầu.
+  - **Chốt bổ sung (10/11/2026):**
+    - **Grafana Cloud**.
+    - Cảnh báo gửi qua **email** (dùng điểm nhận email sẵn có của Grafana Cloud). Không cần webhook chat.
+    - Người được phân công trực sẽ trực. Ban đầu tòa soạn chỉ có **2 thành viên** quản lý báo điện tử.
+  - *Việc phát sinh:* cảnh báo nguồn tự tạm dừng hiện gửi qua webhook. Cần chuyển sang luật cảnh báo trên Grafana gửi email, hoặc thêm gửi email từ worker.
 
 ### T-06 · Hàng đợi nháp AI (B-1)
 - **Câu hỏi:** hàng đợi nháp AI đặt trong DB và chạy bằng worker hiện có, hay chờ outbox WBS-020?
@@ -304,7 +349,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 ### T-07 · Merge nhánh Radar tin
 - **Câu hỏi:** review nhánh `claude/agg-radar-slice2-029e01` (6 commit, từ `8a54754` tới `afe1405`) và merge vào nhánh nào?
 - **Đề xuất:** mở PR vào nhánh tích hợp đang dùng (`sprint-0/scaffold` hoặc `main`) để review và merge, không merge thẳng vào `feat/article-page`. Module AI (YesScale) cũng sửa `rbac.json` và spec, nên merge Radar trước rồi nhánh AI rebase lên để giảm xung đột.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** mở PR vào nhánh tích hợp (`sprint-0/scaffold` hoặc `main`), không merge thẳng vào `feat/article-page`. Merge Radar trước, nhánh module AI (YesScale) rebase sau.
+  - **Chốt bổ sung (10/11/2026):** nhánh đích là `sprint-0/scaffold`.
 
 ---
 
@@ -326,18 +372,25 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
     - độ liên quan chuyên mục (15): tin càng đúng chuyên mục điểm càng cao;
     - tốc độ lan (15): nhiều nguồn đưa tin trong 2 giờ thì tin đang nóng.
   - "Chủ đề nóng" và quy tắc "ít nhất 2 nguồn": để sau thí điểm.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):**
+  - Chủ đề nhạy cảm: giữ 5 nhóm có sẵn, thêm **pháp luật/vụ án**, **y tế/dịch bệnh**, **trẻ em**.
+  - Trọng số điểm giữ nguyên trong thí điểm; chỉnh sau 3 tuần theo góp ý BTV.
+  - "Chủ đề nóng" và quy tắc "ít nhất 2 nguồn": để sau thí điểm.
+  - *Việc phát sinh:* thêm 3 nhóm chủ đề vào `config/aggregation/sensitive-topics.json`.
 
 ### E-02 · Danh sách nguồn ban đầu (cùng Legal, xem L-01)
 - **Câu hỏi:** Ban biên tập đề xuất nguồn và chuyên mục tương ứng; Legal chốt chế độ khai thác.
 - **Đề xuất:** đưa 10–20 trang mà BTV vẫn theo dõi hằng ngày, kèm chuyên mục tương ứng, theo mẫu ở L-01.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** Ban biên tập đưa 10–20 trang BTV vẫn theo dõi hằng ngày, kèm chuyên mục; Legal gán M0/M1.
+  - *Chưa có:* danh sách đầy đủ.
+  - Nghiệp vụ cài đặt từng nguồn và cấu hình mẫu cho VnExpress, Dân trí, Tuổi Trẻ, Thanh Niên, GenK: `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md`.
+  - **Lưu ý:** trang RSS của VnExpress, Dân trí và Tuổi Trẻ ghi RSS miễn phí cho cá nhân và tổ chức phi lợi nhuận. Legal cần chốt (câu N-01 trong tài liệu trên).
 
 ### E-03 · Gán nhãn trong giai đoạn thí điểm
 - **Câu hỏi:** cử BTV dùng thao tác tách và gộp cụm trên Radar trong thời gian thí điểm (xem P-02), để có ít nhất 30 cặp nhãn mỗi loại.
 - **Cách dùng nhãn:** lệnh `Tinhte.Worker calibrate` dùng các cặp này để đề xuất ngưỡng gom cụm. Ngưỡng hiện tại chưa được hiệu chỉnh bằng dữ liệu thật.
 - **Đề xuất:** 2–3 BTV, mỗi người 10–15 phút/ngày rà Radar. Thấy cụm gom nhầm hai sự kiện thì **tách**; thấy hai cụm thực ra là một sự kiện thì **gộp**. Sau 3 tuần là đủ dữ liệu.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** 2–3 BTV, mỗi người 10–15 phút/ngày rà Radar, tách/gộp khi gom sai; 3 tuần.
 
 ### E-04 · Kiểm duyệt bài AI (Q-AGG-16)
 - **Câu hỏi:**
@@ -360,7 +413,8 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Câu hỏi:** ước lượng và ký effort cho các mục WBS-140…145.
 - **Lưu ý:** phần code GĐ1 đã làm trên nhánh, nhưng nhóm dự án không tự điền effort.
 - **Đề xuất:** ghi phần đã làm là effort thực tế; PM chỉ cần ước phần còn lại: review và merge, dựng staging cùng giám sát, hỗ trợ 3 tuần thí điểm, chỉnh ngưỡng sau thí điểm.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** phần đã làm ghi là effort thực tế. PM ước phần còn lại: review và merge, dựng staging cùng giám sát, hỗ trợ 3 tuần thí điểm, chỉnh ngưỡng sau thí điểm.
+  - *Chưa có:* số effort (PM ký).
 
 ### F-02 · Ngân sách AI (Q-AGG-10)
 - **Câu hỏi:** ngân sách AI mỗi tháng là bao nhiêu? Ngưỡng cứng mỗi ngày là bao nhiêu?
@@ -377,7 +431,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Trang dạng "điểm tin" có đặt `noindex` không?
 - **Ghi chú:** GĐ1 chỉ dùng nội bộ, nên câu này chưa gấp.
 - **Đề xuất:** chưa cần trả lời; hỏi lại khi GĐ2 có bài công khai dẫn link nguồn.
-- **Trả lời:** ………
+- **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** chưa cần trả lời; hỏi lại khi GĐ2 có bài công khai dẫn link nguồn.
 
 ---
 
