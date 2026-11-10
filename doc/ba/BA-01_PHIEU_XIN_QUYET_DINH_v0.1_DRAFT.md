@@ -55,7 +55,9 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Phương án:**
   - (a) Giữ P2, làm cùng nhóm AI.
   - (b) Nâng P1 để dùng Radar nội bộ sớm.
-- **Đề xuất:** (b). Radar không dùng AI và không hiển thị công khai, nên rủi ro pháp lý thấp.
+- **Đề xuất:** (b) cho Radar (GĐ1); AI viết lại (GĐ2) giữ P2.
+  - Radar chỉ đọc tiêu đề và link để BTV xem nội bộ, không đăng gì ra ngoài, nên rủi ro pháp lý thấp.
+  - Code đã xong; giữ P2 thì code nằm chờ mà không giảm rủi ro nào.
 - **Đang tạm làm:** P2.
 - **Nếu chưa trả lời:** chưa xếp được vào sprint phát hành.
 - **Trả lời:** ………
@@ -65,7 +67,10 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Phương án:**
   - (a) Bật ở staging với dữ liệu nguồn thật, chạy 2–4 tuần để BTV dùng thử và gom nhãn tách/gộp cụm.
   - (b) Chờ đủ các phiếu khác rồi bật thẳng production.
-- **Đề xuất:** (a). Ngưỡng gom cụm cần ít nhất 30 cặp nhãn mỗi loại mới hiệu chỉnh được (xem E-03).
+- **Đề xuất:** (a), cụ thể:
+  - bật trên **staging**, cho **1 site** và **2–3 BTV**, trong **3 tuần**;
+  - hết 3 tuần, xem số liệu (số tin mỗi ngày, tỷ lệ gom đúng, góp ý của BTV) rồi mới quyết định lên production.
+  - Lý do: ngưỡng gom cụm cần ít nhất 30 cặp nhãn mỗi loại mới hiệu chỉnh được (xem E-03), mà nhãn chỉ có khi BTV dùng thật.
 - **Đang tạm làm:** cờ tắt ở mọi nơi.
 - **Nếu chưa trả lời:** không có dữ liệu thật để hiệu chỉnh.
 - **Trả lời:** ………
@@ -78,7 +83,9 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Phương án:**
   - (a) Giữ như đang tạm làm.
   - (b) Thêm vai trò mới, ví dụ người phụ trách nguồn. Phải sửa `rbac.json` và CHECK `ck_user_roles_role` bằng migration mới.
-- **Đề xuất:** (a). Câu này liên quan tới L-02: người duyệt chế độ M2/M3 có cần là người của Legal không.
+- **Đề xuất:** (a), không thêm vai trò mới.
+  - Hệ thống đã tách nhiệm vụ: người tự đề xuất nguồn M2/M3 không tự duyệt được.
+  - Chỉ cần vai trò riêng khi có người của Legal trực tiếp vào CMS duyệt; khi đó xem lại cùng L-02.
 - **Trả lời:** ………
 
 ### P-04 · Mức ưu tiên của AI viết lại (B-3)
@@ -123,7 +130,11 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   |---|---|---|---|---|---|
   | | | M0 / M1 / M2 / M3 | | | |
 
-- **Đề xuất:** GĐ1 chỉ cần M0/M1. Nguồn nào chưa rõ điều khoản thì để M0.
+- **Đề xuất:** 10–20 nguồn cho thí điểm, **tất cả ở M0, cùng lắm M1**.
+  - Ưu tiên: newsroom và thông cáo báo chí của các hãng công nghệ; trang công nghệ lớn có RSS công khai; trang thông báo của cơ quan nhà nước.
+  - Ở M0/M1 hệ thống chỉ lưu tiêu đề, tóm tắt và link, không lấy toàn văn, nên duyệt nhanh được.
+  - Chưa nâng nguồn nào lên M2/M3 vì GĐ1 chưa có AI. Nguồn nào chưa rõ điều khoản thì để M0.
+  - Ban biên tập đưa danh sách (E-02), Legal gán chế độ.
 - **Nếu chưa trả lời:** Radar không có nguồn thật để chạy.
 - **Trả lời:** ………
 
@@ -133,6 +144,11 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Quyền `licenses.manage` cấp tạm cho APPROVER, cần MFA.
   - `evidenceRef` bắt buộc và không xóa được.
   - Mã giấy phép không đổi được.
+- **Đề xuất:** giữ đúng như đang tạm làm:
+  - chỉ APPROVER, có MFA, được tạo và sửa giấy phép;
+  - **bắt buộc** đính kèm bằng chứng (link hợp đồng hoặc ảnh chụp điều khoản);
+  - không xóa giấy phép, chỉ được tắt.
+  - Ở GĐ1 chưa cần nhập giấy phép nào, vì mọi nguồn đều ở M0/M1.
 - **Lưu ý:** có bản ghi giấy phép trong hệ thống **không** có nghĩa là đã được phép khai thác. Người nhập chịu trách nhiệm về bản ghi đó.
 - **Trả lời:** ………
 
@@ -141,7 +157,11 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 - **Đang tạm làm:**
   - Nhật ký thu thập xóa sau 30 ngày.
   - Mục tin thô **chưa có hạn xóa**.
-- **Đề xuất:** mục tin không thuộc cụm nào xóa sau 90 ngày. Mục tin thuộc cụm đã đưa tin thì giữ theo vòng đời của bài.
+- **Đề xuất:**
+  - Nhật ký thu thập: giữ 30 ngày, như đang tạm làm.
+  - Mục tin không thuộc cụm nào: xóa sau 90 ngày.
+  - Mục tin thuộc cụm đã có bài: giữ cùng bài để còn đối chiếu nguồn.
+  - Nếu đồng ý thì cần thêm job xóa mục tin sau 90 ngày (khoảng nửa ngày làm).
 - **Trả lời:** ………
 
 ### L-04 · Tinhte xuất bản theo loại giấy phép nào (Q-AGG-01, D1) — câu quyết định GĐ2
@@ -152,6 +172,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - (d) Loại khác.
 - **Câu hỏi kèm theo:** với loại đó, Tinhte được viết bài mới từ sự kiện của báo khác, hay chỉ được trích nguyên văn khi có thỏa thuận?
 - **Hệ quả:** nếu là (b), "AI viết lại" có thể không phù hợp. Khi đó GĐ2 phải đổi sang mô hình trích nguyên văn và cần phân tích lại.
+- **Đề xuất:** Legal chỉ cần đối chiếu giấy phép hiện có của Tinhte là trả lời được. Nên hỏi ngay dù GĐ2 chưa làm, vì câu này quyết định GĐ2 có làm được hay không. Câu này không chặn GĐ1.
 - **Trả lời:** ………
 
 ### L-05 · Viết bài mới từ sự kiện (Q-AGG-02)
@@ -208,6 +229,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - `robots.txt` cache 24 giờ. Lỗi 4xx thì coi như được phép. Lỗi 5xx hoặc 429 thì coi như bị cấm 1 giờ. Lỗi mạng thì bỏ qua `robots.txt`.
   - Mỗi người thử đọc feed tối đa 10 lần/phút. Giới hạn đếm trong bộ nhớ của từng bản API, nên chạy nhiều bản thì tổng thực tế cao hơn.
 - **Phương án:** duyệt nguyên trạng, hoặc ghi rõ điểm cần đổi.
+- **Đề xuất:** duyệt nguyên trạng, **kèm một điều kiện hạ tầng**: worker chạy trong mạng riêng, tường lửa chỉ cho kết nối ra Internet cổng 443 và kết nối tới DB. Nếu code có lỗ hổng thì lớp mạng này vẫn chặn được truy cập vào hệ thống nội bộ.
 - **Nếu chưa trả lời:** không được bật Radar trên môi trường có mạng nội bộ thật.
 - **Trả lời:** ………
 
@@ -238,6 +260,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 ### T-01 · Worker là project riêng (A-1)
 - **Câu hỏi:** đồng ý worker là project riêng `Tinhte.Worker`, deploy riêng và chạy được nhiều bản song song?
 - **Đang tạm làm:** đã làm như vậy, gồm Dockerfile, liveness, nhịp tim, số đo OTLP và runbook.
+- **Đề xuất:** đồng ý. Nguồn chậm hay lỗi không ảnh hưởng API phục vụ CMS; muốn đọc nhanh hơn chỉ cần chạy thêm bản worker.
 - **Nếu chưa trả lời:** ADR-0008 chưa chuyển được sang ACCEPTED.
 - **Trả lời:** ………
 
@@ -247,6 +270,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Đồng ý thứ tự migration 0340 → 0345?
   - Schema 04 đã có bảng nguồn và giấy phép chưa? Nếu có thì tên cột là gì?
 - **Đang tạm làm:** đã làm như vậy và chạy qua PGlite.
+- **Đề xuất:** đồng ý cả hai ý đầu. Với ý thứ ba, nếu schema 04 chưa có bảng nguồn và giấy phép thì giữ nguyên; nếu đã có thì đổi tên cột cho khớp trước khi lên production.
 - **Trả lời:** ………
 
 ### T-03 · Lưu nguồn ở cấp revision (Q-AGG-09, ADR-0007 Q5)
@@ -266,6 +290,10 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Ai trực các cảnh báo trong `infra/monitoring/aggregation-worker.rules.yml`?
 - **Đang tạm làm:** chủ dự án đã chọn OTLP ngày 10/11/2026. Exporter chỉ bật khi có endpoint. Webhook chưa cấu hình.
 - **Việc cần làm kèm:** chạy job CI `worker-image` lần đầu (build image, quét Trivy, `promtool`). Job chưa chạy lần nào vì máy dựng không có Docker.
+- **Đề xuất:**
+  - Nơi nhận số đo: nhóm nhỏ dùng Grafana Cloud (có gói miễn phí, nhận OTLP trực tiếp, không phải tự vận hành); đã có hạ tầng riêng thì dựng OpenTelemetry Collector, Prometheus và Grafana.
+  - Kênh cảnh báo: webhook về công cụ chat team đang dùng.
+  - Người trực: 1 người phía kỹ thuật.
 - **Trả lời:** ………
 
 ### T-06 · Hàng đợi nháp AI (B-1)
@@ -275,6 +303,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 
 ### T-07 · Merge nhánh Radar tin
 - **Câu hỏi:** review nhánh `claude/agg-radar-slice2-029e01` (6 commit, từ `8a54754` tới `afe1405`) và merge vào nhánh nào?
+- **Đề xuất:** mở PR vào nhánh tích hợp đang dùng (`sprint-0/scaffold` hoặc `main`) để review và merge, không merge thẳng vào `feat/article-page`. Module AI (YesScale) cũng sửa `rbac.json` và spec, nên merge Radar trước rồi nhánh AI rebase lên để giảm xung đột.
 - **Trả lời:** ………
 
 ---
@@ -288,15 +317,26 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Trọng số chấm điểm cụm (BR-32). Đang tạm đặt: số nguồn độc lập 35, uy tín 15, độ liên quan 15, tốc độ lan 15, độ mới 20.
   - Có cần cơ chế "chủ đề nóng trong ngày" để cộng điểm không? Ai đặt chủ đề nóng?
   - Quy tắc "cần ít nhất 2 nguồn" áp dụng ở đâu?
+- **Đề xuất:**
+  - Chủ đề nhạy cảm: giữ 5 nhóm có sẵn, thêm **pháp luật/vụ án**, **y tế/dịch bệnh**, **trẻ em**.
+  - Trọng số: giữ nguyên trong thí điểm; sau 3 tuần BTV góp ý tin nào bị xếp sai thì chỉnh. Ý nghĩa từng yếu tố:
+    - số nguồn độc lập (35): nhiều nguồn cùng đưa tin thì nhiều khả năng là tin thật và quan trọng;
+    - độ mới (20): tin vừa ra được ưu tiên;
+    - uy tín nguồn (15): nguồn chính thức xếp trên blog;
+    - độ liên quan chuyên mục (15): tin càng đúng chuyên mục điểm càng cao;
+    - tốc độ lan (15): nhiều nguồn đưa tin trong 2 giờ thì tin đang nóng.
+  - "Chủ đề nóng" và quy tắc "ít nhất 2 nguồn": để sau thí điểm.
 - **Trả lời:** ………
 
 ### E-02 · Danh sách nguồn ban đầu (cùng Legal, xem L-01)
 - **Câu hỏi:** Ban biên tập đề xuất nguồn và chuyên mục tương ứng; Legal chốt chế độ khai thác.
+- **Đề xuất:** đưa 10–20 trang mà BTV vẫn theo dõi hằng ngày, kèm chuyên mục tương ứng, theo mẫu ở L-01.
 - **Trả lời:** ………
 
 ### E-03 · Gán nhãn trong giai đoạn thí điểm
 - **Câu hỏi:** cử BTV dùng thao tác tách và gộp cụm trên Radar trong thời gian thí điểm (xem P-02), để có ít nhất 30 cặp nhãn mỗi loại.
 - **Cách dùng nhãn:** lệnh `Tinhte.Worker calibrate` dùng các cặp này để đề xuất ngưỡng gom cụm. Ngưỡng hiện tại chưa được hiệu chỉnh bằng dữ liệu thật.
+- **Đề xuất:** 2–3 BTV, mỗi người 10–15 phút/ngày rà Radar. Thấy cụm gom nhầm hai sự kiện thì **tách**; thấy hai cụm thực ra là một sự kiện thì **gộp**. Sau 3 tuần là đủ dữ liệu.
 - **Trả lời:** ………
 
 ### E-04 · Kiểm duyệt bài AI (Q-AGG-16)
@@ -319,6 +359,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
 ### F-01 · Effort WBS-140…145
 - **Câu hỏi:** ước lượng và ký effort cho các mục WBS-140…145.
 - **Lưu ý:** phần code GĐ1 đã làm trên nhánh, nhưng nhóm dự án không tự điền effort.
+- **Đề xuất:** ghi phần đã làm là effort thực tế; PM chỉ cần ước phần còn lại: review và merge, dựng staging cùng giám sát, hỗ trợ 3 tuần thí điểm, chỉnh ngưỡng sau thí điểm.
 - **Trả lời:** ………
 
 ### F-02 · Ngân sách AI (Q-AGG-10)
@@ -335,6 +376,7 @@ Câu L-04 là câu quyết định toàn bộ GĐ2. Nên hỏi Legal ngay, dù G
   - Thuộc tính `rel` cho link nguồn trên bài công khai.
   - Trang dạng "điểm tin" có đặt `noindex` không?
 - **Ghi chú:** GĐ1 chỉ dùng nội bộ, nên câu này chưa gấp.
+- **Đề xuất:** chưa cần trả lời; hỏi lại khi GĐ2 có bài công khai dẫn link nguồn.
 - **Trả lời:** ………
 
 ---
