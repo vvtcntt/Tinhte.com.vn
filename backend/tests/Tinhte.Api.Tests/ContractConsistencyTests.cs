@@ -33,7 +33,7 @@ public sealed partial class ContractConsistencyTests
     public void Feature_flag_keys_match_spec_registry()
     {
         var spec = FlagPattern().Matches(Block("x-feature-flags")).Select(m => m.Groups["key"].Value).Order().ToList();
-        Assert.Equal(17, spec.Count);
+        Assert.Equal(19, spec.Count);
         Assert.Equal(spec, FeatureFlagKeys.All.Order().ToList());
     }
 
@@ -44,7 +44,7 @@ public sealed partial class ContractConsistencyTests
             .Where(a => a.Name!.StartsWith("Tinhte.Modules.", StringComparison.Ordinal))
             .Select(Assembly.Load)
             .ToList();
-        Assert.Equal(5, moduleAssemblies.Count);
+        Assert.Equal(6, moduleAssemblies.Count);   // News, Video, Community, Ads, Identity, Aggregation (ADR-0008)
         foreach (var assembly in moduleAssemblies)
         {
             var illegal = assembly.GetReferencedAssemblies().Where(r => r.Name!.StartsWith("Tinhte.", StringComparison.Ordinal) && r.Name != "Tinhte.Platform");

@@ -41,6 +41,7 @@ tags:
 - name: PublicHome
 - name: CmsHome
 - name: StaffAuth
+- name: CmsAggregation
 x-feature-flags:
   description: Single source of truth for feature flag keys (AIR-001). x-feature-gate and x-conditional-gate values MUST be keys of this registry.
     legacyKeys lists names used in v0.2 documents/DB that must be migrated to the registry key. Turning a flag ON in production requires approval_reference,
@@ -204,6 +205,25 @@ x-feature-flags:
     legacyKeys:
     - ai.search
     description: AI search with sources.
+  - key: aggregation.radar
+    scope: P1
+    productionDefault: false
+    approvers:
+    - PO
+    legacyKeys: []
+    description: 'News radar (ADR-0008, BA-01 phase 1): source profiles, feed collection, clustering and CMS radar. Ranked P1 by the project
+      owner on 2026-11-10 (BA-01 P-01). The collector worker also stops while OFF.'
+  - key: aggregation.ai_dedup
+    scope: P2
+    productionDefault: false
+    approvers:
+    - PO
+    - Legal
+    - Security
+    legacyKeys: []
+    description: 'News radar (ADR-0008 §7, BA-01 P-02): AI check of MinHash candidate pairs, sending only titles and summaries, to decide whether
+      two items report the same event. OFF or failing falls back to MinHash clustering. No endpoints. Enable only after Legal, Security and
+      budget sign-off (BA-01 L-07, S-03, F-02).'
 x-error-catalog:
   description: 'Error codes returned in Problem.code (AIR-009). Each code maps to exactly one HTTP status. Evaluation order: 400 syntax → 401
     → 403 CSRF_INVALID → 403 FEATURE_DISABLED → 403 FORBIDDEN/ELIGIBILITY_REQUIRED/SOD_VIOLATION → 404 → 428/412 → 422 → 409 → 429 (a gateway
@@ -5515,6 +5535,1658 @@ paths:
       - PRECONDITION_REQUIRED
       - VALIDATION_FAILED
       - RATE_LIMITED
+  /admin/sources:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: List the content source catalogue
+      description: 'Access: Staff session (cmsSession) with permission content.read. ADR-0007 §1 (proposal). Sorted by name then id; disabled
+        entries included unless isEnabled=true. Source names are unique (case-insensitive).'
+      operationId: listAdminContentSources
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/CatalogEnabledFilter'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSourceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FORBIDDEN
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Add a content source
+      description: 'Access: Staff session (cmsSession) with permission taxonomy.manage. ADR-0007 §1 (proposal). Retry-safe with Idempotency-Key. Entries
+        are never deleted, only disabled.'
+      operationId: createAdminContentSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentSourceCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/sources/{sourceId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update a content source
+      description: 'Access: Staff session (cmsSession) with permission taxonomy.manage. ADR-0007 §1 (proposal). Optimistic concurrency: send If-Match
+        with the latest ETag.'
+      operationId: patchAdminContentSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentSourcePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/licenses:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: List the licence catalogue
+      description: 'Access: Staff session (cmsSession) with permission content.read. ADR-0007 §1 (proposal). Sorted by name then id; disabled
+        entries included unless isEnabled=true. A licence record does not by itself grant usage rights: Legal enters and owns it.'
+      operationId: listAdminLicenses
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/CatalogEnabledFilter'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FORBIDDEN
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Add a licence
+      description: 'Access: Staff session (cmsSession) with permission licenses.manage (MFA; granted provisionally, pending Legal — ADR-0007 Q2). ADR-0007 §1 (proposal). Retry-safe with Idempotency-Key. Entries
+        are never deleted, only disabled.'
+      operationId: createAdminLicense
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/licenses/{licenseId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update a licence
+      description: 'Access: Staff session (cmsSession) with permission licenses.manage (MFA; granted provisionally, pending Legal — ADR-0007 Q2). ADR-0007 §1 (proposal). Optimistic concurrency: send If-Match
+        with the latest ETag.'
+      operationId: patchAdminLicense
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/LicenseId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicensePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/sources:
+    get:
+      tags:
+      - CmsAggregation
+      summary: List aggregation source profiles
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side. Profiles attach collection settings to entries of the content source catalogue (ADR-0007 §1, ADR-0008 §2).'
+      operationId: listAdminAggregationSources
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/AggregationSourceStatusFilter'
+      - $ref: '#/components/parameters/Q'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSourceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+    post:
+      tags:
+      - CmsAggregation
+      summary: Create aggregation profile for a catalogued source
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. contentSourceId must exist in the content source catalogue and have no
+        profile yet (409 STATE_CONFLICT). The profile starts as proposed with usage mode M0 and collects nothing until approved. Retry-safe with
+        Idempotency-Key.'
+      operationId: createAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationSourceCreate'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/sources/{sourceId}:
+    get:
+      tags:
+      - CmsAggregation
+      summary: Aggregation source profile with feeds and approvals
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side.'
+      operationId: getAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+    patch:
+      tags:
+      - CmsAggregation
+      summary: Update aggregation source profile settings
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Usage mode and licence cannot be changed here (unknown properties are rejected);
+        use the approval operation. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: patchAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationSourcePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/sources/{sourceId}/approval:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Approve usage mode and licence of a source
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_approve (MFA). Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Records an append-only approval (who, when, mode, licence, terms evidence)
+        and enables the source. Usage modes M2 and M3 need an active licence (422 VALIDATION_FAILED) and cannot be approved by the person who proposed
+        the profile (403 SOD_VIOLATION). Optimistic concurrency: send If-Match with the latest ETag. Retry-safe with Idempotency-Key.'
+      operationId: approveAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationSourceApprovalRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - SOD_VIOLATION
+  /admin/aggregation/sources/{sourceId}/pause:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Pause collection from a source
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Reason is mandatory and kept in an append-only status history. Optimistic
+        concurrency: send If-Match with the latest ETag.'
+      operationId: pauseAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - REASON_REQUIRED
+  /admin/aggregation/sources/{sourceId}/resume:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Resume collection from a paused source
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Only an approved source can resume; a never-approved profile returns 409
+        STATE_CONFLICT. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: resumeAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/sources/{sourceId}/retire:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Retire a source (never deleted)
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Collected items stay for traceability; a retired profile cannot be resumed.
+        Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: retireAdminAggregationSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - REASON_REQUIRED
+  /admin/aggregation/sources/{sourceId}/feeds:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Add a feed to a source
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. The URL must be https and must not resolve to a private, loopback, link-local
+        or metadata address (422 UNSAFE_URL). Adding a feed sends the profile back for approval. Retry-safe with Idempotency-Key.'
+      operationId: createAdminAggregationFeed
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationFeedCreate'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationFeed'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      - FR-AGG-002
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - UNSAFE_URL
+  /admin/aggregation/feeds/{feedId}:
+    patch:
+      tags:
+      - CmsAggregation
+      summary: Update feed settings
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Changing the URL sends the profile back for approval. Feeds are disabled,
+        never deleted. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: patchAdminAggregationFeed
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/FeedId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationFeedPatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationFeed'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-001
+      - FR-AGG-002
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - UNSAFE_URL
+  /admin/aggregation/feed-tests:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Fetch and parse a feed URL once without saving
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. Applies the same network safety, size and robots rules as the collector.
+        Remote failures (timeout, HTTP error, parse error) are returned as data in the result, not as problem codes.'
+      operationId: testAdminAggregationFeed
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationFeedTestRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationFeedTestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-002
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - UNSAFE_URL
+  /admin/aggregation/category-rules:
+    get:
+      tags:
+      - CmsAggregation
+      summary: Classification rules per enabled category of a site
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side. One rule per enabled category of siteKey; a category without saved keywords returns empty lists with rowVersion 1.'
+      operationId: listAdminAggregationCategoryRules
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/AggregationSiteKeyQuery'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationCategoryRuleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-004
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/category-rules/{categoryId}:
+    patch:
+      tags:
+      - CmsAggregation
+      summary: Update keywords of a category rule
+      description: 'Access: Staff session (cmsSession) with permission aggregation.sources_manage. Feature gate `aggregation.radar` (production
+        default OFF), enforced server-side inside the write transaction. New keywords apply to items collected afterwards; existing clusters are
+        not reclassified. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: patchAdminAggregationCategoryRule
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/CategoryId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationCategoryRulePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationCategoryRule'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-004
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/items:
+    get:
+      tags:
+      - CmsAggregation
+      summary: Search collected items, including unclustered and out-of-scope ones
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side. date and window are evaluated in the newsroom time zone (returned by the stats operation). Text is plain; source HTML
+        is never returned.'
+      operationId: listAdminAggregationItems
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/AggregationSiteKeyQuery'
+      - $ref: '#/components/parameters/AggregationDate'
+      - $ref: '#/components/parameters/AggregationWindow'
+      - $ref: '#/components/parameters/SourceIdQuery'
+      - $ref: '#/components/parameters/CategoryIdQuery'
+      - $ref: '#/components/parameters/AggregationItemStatusFilter'
+      - $ref: '#/components/parameters/Q'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationItemList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-003
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/clusters:
+    get:
+      tags:
+      - CmsAggregation
+      summary: 'News radar: story clusters for a day'
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side. Ordered by score descending, then first seen time and id (stable cursor).'
+      operationId: listAdminAggregationClusters
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/AggregationSiteKeyQuery'
+      - $ref: '#/components/parameters/AggregationDate'
+      - $ref: '#/components/parameters/AggregationWindow'
+      - $ref: '#/components/parameters/CategoryIdQuery'
+      - $ref: '#/components/parameters/AggregationClusterStatusFilter'
+      - $ref: '#/components/parameters/AggregationMinScore'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/clusters/{clusterId}:
+    get:
+      tags:
+      - CmsAggregation
+      summary: Story cluster with its items and action history
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side.'
+      operationId: getAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/clusters/{clusterId}/dismiss:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Dismiss a cluster with a reason
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: dismissAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionReason'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - REASON_REQUIRED
+  /admin/aggregation/clusters/{clusterId}/watch:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Keep watching a cluster
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: watchAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/clusters/{clusterId}/reopen:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Reopen a dismissed or watched cluster
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: reopenAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/clusters/{clusterId}/claim:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Take a cluster to avoid duplicate work
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. Sets the caller as assignee; a cluster already assigned to someone else returns 409 STATE_CONFLICT.
+        Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: claimAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/clusters/{clusterId}/coverage:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Link a cluster to the article that covers it
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. The article must exist and belong to the cluster site (422 VALIDATION_FAILED); later
+        items show a new-since-covered label. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: coverAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationCoverageRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/clusters/{clusterId}/split:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Move items of a cluster into a new cluster
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. Returns the new cluster. Manual splits are kept to tune clustering thresholds. Optimistic
+        concurrency: send If-Match with the latest ETag. Retry-safe with Idempotency-Key.'
+      operationId: splitAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationSplitRequest'
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-004
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/clusters/{clusterId}/merge:
+    post:
+      tags:
+      - CmsAggregation
+      summary: Merge a cluster into another cluster
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side inside the write transaction. If-Match applies to the cluster in the path, which is closed after the merge. Returns
+        the target cluster; both clusters must belong to the same site (422 VALIDATION_FAILED). Optimistic concurrency: send If-Match with the latest
+        ETag.'
+      operationId: mergeAdminAggregationCluster
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationMergeRequest'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationClusterDetail'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-AGG-004
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/stats:
+    get:
+      tags:
+      - CmsAggregation
+      summary: Collection health and radar counters for a day
+      description: 'Access: Staff session (cmsSession) with permission aggregation.read. Feature gate `aggregation.radar` (production default OFF),
+        enforced server-side.'
+      operationId: getAdminAggregationStats
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/AggregationSiteKeyQuery'
+      - $ref: '#/components/parameters/AggregationDate'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationStats'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-AGG-002
+      - FR-AGG-005
+      x-scope: P1
+      x-feature-gate: aggregation.radar
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
 components:
   securitySchemes:
     cmsSession:
@@ -5966,6 +7638,126 @@ components:
       schema:
         type: string
         format: uuid
+    SourceId:
+      name: sourceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LicenseId:
+      name: licenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CatalogEnabledFilter:
+      name: isEnabled
+      in: query
+      required: false
+      schema:
+        type: boolean
+      description: true = only enabled entries; omitted = all.
+    FeedId:
+      name: feedId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClusterId:
+      name: clusterId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SourceIdQuery:
+      name: sourceId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Only items of this source.
+    CategoryIdQuery:
+      name: categoryId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+      description: Only this category.
+    AggregationSiteKeyQuery:
+      name: siteKey
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z][a-z0-9-]{0,30}$
+      description: Public-web site key from the Site Registry (404 NOT_FOUND otherwise; malformed or missing → 400 BAD_REQUEST).
+    AggregationDate:
+      name: date
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+      description: Newsroom-local calendar date; default today in the newsroom time zone.
+    AggregationWindow:
+      name: window
+      in: query
+      required: false
+      schema:
+        type: string
+        enum:
+        - DAY
+        - LAST_24H
+        default: DAY
+      description: DAY = the calendar day of date; LAST_24H = the 24 hours before now (date ignored).
+    AggregationSourceStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/AggregationSourceStatus'
+      description: Repeatable status filter.
+    AggregationClusterStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/AggregationClusterStatus'
+      description: Repeatable status filter; default open and watching.
+    AggregationItemStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+          - NEW
+          - CLASSIFIED
+          - CLUSTERED
+          - DUPLICATE
+          - OUT_OF_SCOPE
+      description: Repeatable status filter.
+    AggregationMinScore:
+      name: minScore
+      in: query
+      required: false
+      schema:
+        type: number
+        minimum: 0
+        maximum: 100
+      description: Lowest cluster score to return.
   schemas:
     Problem:
       type: object
@@ -6985,6 +8777,223 @@ components:
             $ref: '#/components/schemas/Topic'
       required:
       - items
+    ContentSourceKind:
+      type: string
+      enum:
+      - ORIGINAL
+      - AGENCY
+      - PARTNER
+      - PRESS_RELEASE
+      - OTHER
+      description: ORIGINAL own reporting · AGENCY news agency · PARTNER content partner · PRESS_RELEASE press release · OTHER.
+    ContentSource:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - isEnabled
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type:
+          - string
+          - 'null'
+          maxLength: 2048
+          pattern: ^https?://
+        isEnabled:
+          type: boolean
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    ContentSourceList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentSource'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    ContentSourceCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - kind
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type: string
+          maxLength: 2048
+          pattern: ^https?://
+    ContentSourcePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type:
+          - string
+          - 'null'
+          maxLength: 2048
+          pattern: ^https?://
+        isEnabled:
+          type: boolean
+    License:
+      type: object
+      required:
+      - id
+      - code
+      - name
+      - usageScope
+      - requiresAttribution
+      - isEnabled
+      - active
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9_.-]{0,59}$
+        name:
+          type: string
+          maxLength: 200
+        usageScope:
+          type: string
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+        validFrom:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        validTo:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        evidenceRef:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+          description: Reference to the agreement in the document store (no file is stored here).
+        isEnabled:
+          type: boolean
+        active:
+          type: boolean
+          readOnly: true
+          description: Enabled and within its validity window now (same rule as M2/M3 approval and, later, publishing — ADR-0007 §4).
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    LicenseList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/License'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    LicenseCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - name
+      - usageScope
+      - evidenceRef
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9_.-]{0,59}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        usageScope:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+          default: true
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        evidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+    LicensePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: The code cannot change (other records refer to it). Clearing evidenceRef is not allowed.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        usageScope:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+        validFrom:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        validTo:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        evidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+        isEnabled:
+          type: boolean
     LookupSave:
       type: object
       properties:
@@ -8593,6 +10602,1020 @@ components:
           type: string
           enum:
           - PENDING_VERIFICATION
+    AggregationUsageMode:
+      type: string
+      enum:
+      - M0
+      - M1
+      - M2
+      - M3
+      description: How Tinhte may use the content of a source (BA-01 §5). M0 detection only (internal radar); M1 link and short self-written mention;
+        M2 facts for new articles (needs licence); M3 licensed derivative use within the licence scope.
+    AggregationSourceStatus:
+      type: string
+      enum:
+      - PROPOSED
+      - ENABLED
+      - PAUSED
+      - DEGRADED
+      - RETIRED
+    AggregationFeedFormat:
+      type: string
+      enum:
+      - AUTO
+      - RSS2
+      - RSS1
+      - ATOM
+      - JSONFEED
+    AggregationFeedHealth:
+      type: string
+      enum:
+      - NEVER_FETCHED
+      - OK
+      - DEGRADED
+      - FAILING
+      - BLOCKED_BY_ROBOTS
+      - DISABLED
+    AggregationFeedFailure:
+      type: string
+      enum:
+      - TIMEOUT
+      - DNS
+      - TLS
+      - HTTP_STATUS
+      - TOO_LARGE
+      - UNSUPPORTED_CONTENT_TYPE
+      - PARSE_ERROR
+      - ROBOTS_DISALLOWED
+      - TOO_MANY_REDIRECTS
+      - RATE_LIMITED_BY_SOURCE
+      description: Collector outcome stored as data (feed health, feed test). Not a Problem.code.
+    AggregationCategoryMapping:
+      type: object
+      required:
+      - feedCategory
+      - categoryId
+      properties:
+        feedCategory:
+          type: string
+          minLength: 1
+          maxLength: 200
+        categoryId:
+          type: string
+          format: uuid
+    AggregationFeed:
+      type: object
+      required:
+      - id
+      - sourceId
+      - url
+      - format
+      - isEnabled
+      - scheduleMinutes
+      - health
+      - consecutiveFailures
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          pattern: ^https://
+          maxLength: 2048
+        format:
+          $ref: '#/components/schemas/AggregationFeedFormat'
+        isEnabled:
+          type: boolean
+        scheduleMinutes:
+          type: integer
+          minimum: 5
+          maximum: 1440
+        categoryMapping:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AggregationCategoryMapping'
+        health:
+          $ref: '#/components/schemas/AggregationFeedHealth'
+        lastFetchedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        lastSuccessAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        nextFetchAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        consecutiveFailures:
+          type: integer
+          minimum: 0
+        lastFailure:
+          anyOf:
+          - $ref: '#/components/schemas/AggregationFeedFailure'
+          - type: 'null'
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    AggregationFeedCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          pattern: ^https://
+          maxLength: 2048
+        format:
+          $ref: '#/components/schemas/AggregationFeedFormat'
+        scheduleMinutes:
+          type: integer
+          minimum: 5
+          maximum: 1440
+          default: 30
+        categoryMapping:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AggregationCategoryMapping'
+    AggregationFeedPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        url:
+          type: string
+          pattern: ^https://
+          maxLength: 2048
+        format:
+          $ref: '#/components/schemas/AggregationFeedFormat'
+        isEnabled:
+          type: boolean
+        scheduleMinutes:
+          type: integer
+          minimum: 5
+          maximum: 1440
+        categoryMapping:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AggregationCategoryMapping'
+    AggregationFeedTestRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - url
+      properties:
+        url:
+          type: string
+          pattern: ^https://
+          maxLength: 2048
+        format:
+          $ref: '#/components/schemas/AggregationFeedFormat'
+    AggregationFeedTestItem:
+      type: object
+      required:
+      - title
+      - url
+      - timeReliable
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        timeReliable:
+          type: boolean
+    AggregationFeedTestResult:
+      type: object
+      required:
+      - ok
+      - robotsAllowed
+      - itemCount
+      - sampleItems
+      - durationMs
+      properties:
+        ok:
+          type: boolean
+        httpStatus:
+          type:
+          - integer
+          - 'null'
+        detectedFormat:
+          anyOf:
+          - $ref: '#/components/schemas/AggregationFeedFormat'
+          - type: 'null'
+        feedTitle:
+          type:
+          - string
+          - 'null'
+        robotsAllowed:
+          type: boolean
+        itemCount:
+          type: integer
+          minimum: 0
+        sampleItems:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/AggregationFeedTestItem'
+        failure:
+          anyOf:
+          - $ref: '#/components/schemas/AggregationFeedFailure'
+          - type: 'null'
+        durationMs:
+          type: integer
+          minimum: 0
+    AggregationSourceApprovalRecord:
+      type: object
+      required:
+      - usageMode
+      - termsEvidenceRef
+      - approvedBy
+      - approvedAt
+      properties:
+        usageMode:
+          $ref: '#/components/schemas/AggregationUsageMode'
+        licenseId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        termsEvidenceRef:
+          type: string
+        note:
+          type:
+          - string
+          - 'null'
+        approvedBy:
+          type: string
+          format: uuid
+        approvedAt:
+          type: string
+          format: date-time
+    AggregationSourceSummary:
+      type: object
+      required:
+      - id
+      - name
+      - status
+      - usageMode
+      - trustWeight
+      - language
+      - siteKeys
+      - feedCount
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of the source in the content source catalogue (ADR-0007).
+        name:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AggregationSourceStatus'
+        usageMode:
+          $ref: '#/components/schemas/AggregationUsageMode'
+        licenseId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        trustWeight:
+          type: integer
+          minimum: 1
+          maximum: 5
+        language:
+          type: string
+          pattern: ^[a-z]{2}$
+        siteKeys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^[a-z][a-z0-9-]{0,30}$
+        feedCount:
+          type: integer
+          minimum: 0
+        itemsLast24h:
+          type: integer
+          minimum: 0
+        worstFeedHealth:
+          anyOf:
+          - $ref: '#/components/schemas/AggregationFeedHealth'
+          - type: 'null'
+        statusChangedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Time of the latest status change (status history, append-only).
+        statusChangedBySystem:
+          type: boolean
+          description: True when the collector changed the status automatically (DEGRADED after repeated failures, PAUSED after failing
+            for 24 hours — BA-01 BR-06), false when a staff member did.
+        statusReason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Reason recorded with the latest status change (required for PAUSED/RETIRED).
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    AggregationSource:
+      allOf:
+      - $ref: '#/components/schemas/AggregationSourceSummary'
+      - type: object
+        required:
+        - feeds
+        - approvals
+        properties:
+          termsEvidenceRef:
+            type:
+            - string
+            - 'null'
+          proposedBy:
+            type: string
+            format: uuid
+          approvedBy:
+            type:
+            - string
+            - 'null'
+            format: uuid
+          approvedAt:
+            type:
+            - string
+            - 'null'
+            format: date-time
+          feeds:
+            type: array
+            items:
+              $ref: '#/components/schemas/AggregationFeed'
+          approvals:
+            type: array
+            description: Most recent first; append-only history.
+            items:
+              $ref: '#/components/schemas/AggregationSourceApprovalRecord'
+    AggregationSourceList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregationSourceSummary'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    AggregationSourceCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - contentSourceId
+      - language
+      - siteKeys
+      properties:
+        contentSourceId:
+          type: string
+          format: uuid
+        trustWeight:
+          type: integer
+          minimum: 1
+          maximum: 5
+          default: 3
+        language:
+          type: string
+          pattern: ^[a-z]{2}$
+        siteKeys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^[a-z][a-z0-9-]{0,30}$
+    AggregationSourcePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        trustWeight:
+          type: integer
+          minimum: 1
+          maximum: 5
+        language:
+          type: string
+          pattern: ^[a-z]{2}$
+        siteKeys:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            pattern: ^[a-z][a-z0-9-]{0,30}$
+    AggregationSourceApprovalRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - usageMode
+      - termsEvidenceRef
+      properties:
+        usageMode:
+          $ref: '#/components/schemas/AggregationUsageMode'
+        licenseId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        termsEvidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Reference to the saved copy of the source terms/robots at approval time.
+        note:
+          type: string
+          maxLength: 2000
+      if:
+        required:
+        - usageMode
+        properties:
+          usageMode:
+            enum:
+            - M2
+            - M3
+      then:
+        required:
+        - licenseId
+        properties:
+          licenseId:
+            type: string
+            format: uuid
+    AggregationCategoryRule:
+      type: object
+      required:
+      - categoryId
+      - siteKey
+      - categoryName
+      - includeKeywords
+      - excludeKeywords
+      - entityKeywords
+      - rowVersion
+      properties:
+        categoryId:
+          type: string
+          format: uuid
+        siteKey:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{0,30}$
+        categoryName:
+          type: string
+          readOnly: true
+        includeKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        excludeKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        entityKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          description: Product, brand or company names used for clustering.
+        updatedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        updatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    AggregationCategoryRuleList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregationCategoryRule'
+    AggregationCategoryRulePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        includeKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        excludeKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+        entityKeywords:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+    AggregationItem:
+      type: object
+      required:
+      - id
+      - sourceId
+      - sourceName
+      - feedId
+      - title
+      - url
+      - firstSeenAt
+      - timeReliable
+      - status
+      - sensitive
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        sourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        feedId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        url:
+          type: string
+          format: uri
+        summary:
+          type:
+          - string
+          - 'null'
+          maxLength: 4000
+          description: Plain text from the feed, sanitised.
+        author:
+          type:
+          - string
+          - 'null'
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        firstSeenAt:
+          type: string
+          format: date-time
+        timeReliable:
+          type: boolean
+        language:
+          type:
+          - string
+          - 'null'
+        feedCategories:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+          - NEW
+          - CLASSIFIED
+          - CLUSTERED
+          - DUPLICATE
+          - OUT_OF_SCOPE
+        categoryId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        confidence:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        needsReview:
+          type: boolean
+        sensitive:
+          type: boolean
+        version:
+          type: integer
+          minimum: 1
+          description: Above 1 when the source updated the item.
+        clusterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    AggregationItemList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregationItem'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    AggregationClusterStatus:
+      type: string
+      enum:
+      - OPEN
+      - WATCHING
+      - DISMISSED
+      - COVERED
+      - CLOSED
+      description: Phase 2 (AI drafts) will add values; clients must tolerate unknown values.
+    AggregationClusterSummary:
+      type: object
+      required:
+      - id
+      - siteKey
+      - title
+      - representativeItemId
+      - score
+      - status
+      - sourceCount
+      - independentSourceCount
+      - itemCount
+      - firstSeenAt
+      - lastItemAt
+      - labels
+      - maxUsageMode
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        siteKey:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{0,30}$
+        title:
+          type: string
+        representativeItemId:
+          type: string
+          format: uuid
+        primaryCategoryId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        categoryNeedsReview:
+          type: boolean
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        status:
+          $ref: '#/components/schemas/AggregationClusterStatus'
+        sourceCount:
+          type: integer
+          minimum: 1
+        independentSourceCount:
+          type: integer
+          minimum: 1
+        itemCount:
+          type: integer
+          minimum: 1
+        firstSeenAt:
+          type: string
+          format: date-time
+        lastItemAt:
+          type: string
+          format: date-time
+        labels:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+            - SINGLE_SOURCE
+            - SENSITIVE
+            - SOURCE_UPDATED
+            - NEW_SINCE_COVERED
+        maxUsageMode:
+          $ref: '#/components/schemas/AggregationUsageMode'
+        assigneeId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        coveredArticleId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    AggregationClusterAction:
+      type: object
+      required:
+      - action
+      - actorId
+      - at
+      properties:
+        action:
+          type: string
+          enum:
+          - DISMISS
+          - WATCH
+          - REOPEN
+          - CLAIM
+          - COVER
+          - SPLIT
+          - MERGE
+        actorId:
+          type: string
+          format: uuid
+        at:
+          type: string
+          format: date-time
+        reason:
+          type:
+          - string
+          - 'null'
+        relatedClusterId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        articleId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    AggregationClusterDetail:
+      allOf:
+      - $ref: '#/components/schemas/AggregationClusterSummary'
+      - type: object
+        required:
+        - items
+        - actions
+        properties:
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/AggregationItem'
+          actions:
+            type: array
+            description: Most recent first.
+            items:
+              $ref: '#/components/schemas/AggregationClusterAction'
+    AggregationClusterList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregationClusterSummary'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    AggregationCoverageRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - articleId
+      properties:
+        articleId:
+          type: string
+          format: uuid
+    AggregationSplitRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - itemIds
+      properties:
+        itemIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        reason:
+          type: string
+          maxLength: 2000
+    AggregationMergeRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - targetClusterId
+      properties:
+        targetClusterId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+          maxLength: 2000
+    AggregationSourceHealth:
+      type: object
+      required:
+      - sourceId
+      - name
+      - status
+      - itemsToday
+      properties:
+        sourceId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/AggregationSourceStatus'
+        worstFeedHealth:
+          anyOf:
+          - $ref: '#/components/schemas/AggregationFeedHealth'
+          - type: 'null'
+        itemsToday:
+          type: integer
+          minimum: 0
+        lastSuccessAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    AggregationStats:
+      type: object
+      required:
+      - siteKey
+      - date
+      - timeZone
+      - itemsToday
+      - clustersToday
+      - openClustersToday
+      - sourcesByStatus
+      - sources
+      properties:
+        siteKey:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{0,30}$
+        date:
+          type: string
+          format: date
+        timeZone:
+          type: string
+          example: Asia/Ho_Chi_Minh
+        itemsToday:
+          type: integer
+          minimum: 0
+        clustersToday:
+          type: integer
+          minimum: 0
+        openClustersToday:
+          type: integer
+          minimum: 0
+        fetchSuccessRate24h:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        sourcesByStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregationSourceHealth'
+        workers:
+          type: array
+          description: Collector worker processes seen in the last 7 days (heartbeat), most recent first.
+          items:
+            $ref: '#/components/schemas/AggregationWorkerStatus'
+        alerts:
+          type: array
+          maxItems: 50
+          description: Collector alerts of the last 7 days for sources of the site (automatic pause/degradation), most recent first.
+          items:
+            $ref: '#/components/schemas/AggregationAlert'
+    AggregationWorkerStatus:
+      type: object
+      required:
+      - workerId
+      - startedAt
+      - lastSeenAt
+      - healthy
+      properties:
+        workerId:
+          type: string
+          maxLength: 100
+        host:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        version:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+        startedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        healthy:
+          type: boolean
+          description: Heartbeat within the last 5 minutes.
+        lastError:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+    AggregationAlert:
+      type: object
+      required:
+      - kind
+      - sourceId
+      - sourceName
+      - message
+      - createdAt
+      - delivered
+      properties:
+        kind:
+          type: string
+          enum:
+          - SOURCE_AUTO_PAUSED
+          - SOURCE_DEGRADED
+          description: Clients must tolerate unknown values.
+        sourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        message:
+          type: string
+          maxLength: 2000
+        createdAt:
+          type: string
+          format: date-time
+        delivered:
+          type: boolean
+          description: Sent to the configured external alert channel (webhook). Always false when no channel is configured.
   responses:
     BadRequest:
       description: Bad request

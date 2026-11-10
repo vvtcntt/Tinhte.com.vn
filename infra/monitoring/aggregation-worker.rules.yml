@@ -1,0 +1,82 @@
+# Luật cảnh báo cho worker Radar tin (ADR-0008, WBS-021) — DRAFT, chưa nạp lên nền tảng.
+# Nền tảng (chủ dự án chốt 10/11/2026, BA-01 T-05): Grafana Cloud. Worker gửi OTLP tới endpoint OTLP của stack Grafana Cloud
+# (OTEL_EXPORTER_OTLP_ENDPOINT + OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <instance:token>", secret, không đưa vào repo).
+# Nạp luật vào ruler Prometheus/Mimir của stack:  mimirtool rules load infra/monitoring/aggregation-worker.rules.yml
+#   (hoặc tạo "data source-managed alert rule" trên Grafana từ cùng biểu thức).
+# Kênh cảnh báo: contact point **email** của Grafana gửi cho 2 thành viên quản lý trực; notification policy khớp nhãn notify="email".
+#   Địa chỉ email cấu hình trên Grafana Cloud, không ghi trong repo. Webhook của worker (Aggregation:Alerts:WebhookUrl) là tùy chọn.
+# Định dạng Prometheus rule file. Tên metric giả định số đo OTLP của meter "Tinhte.Aggregation" được chuyển sang Prometheus theo quy tắc
+# chuẩn của OpenTelemetry Collector (dấu "." → "_", counter thêm "_total", đơn vị "s" thêm "_seconds"). Kiểm lại tên thật sau khi nối exporter.
+#   aggregation.feed.fetches             → aggregation_feed_fetches_total{outcome, failure}
+#   aggregation.items.new                → aggregation_items_new_total
+#   aggregation.alerts                   → aggregation_alerts_total{kind}
+#   aggregation.worker.last_cycle.time   → aggregation_worker_last_cycle_time_seconds   (giây Unix)
+#   aggregation.worker.radar_enabled     → aggregation_worker_radar_enabled             (0/1)
+# Nhãn service_instance_id (= worker id) có sẵn qua resource của OTLP. Ngưỡng là đề xuất, chờ vận hành + PO chỉnh.
+groups:
+  - name: tinhte-aggregation-worker
+    rules:
+      - alert: AggregationWorkerDown
+        # Cờ ON mà không bản worker nào hoàn thành vòng quét trong 10 phút (mặc định vòng 30 giây).
+        expr: |
+          max(aggregation_worker_radar_enabled) == 1
+          and (time() - max(aggregation_worker_last_cycle_time_seconds)) > 600
+        for: 5m
+        labels:
+          severity: critical
+          team: newsroom-platform
+          notify: email
+        annotations:
+          summary: Không có worker Radar tin nào chạy được trong 10 phút
+          runbook: backend/src/Tinhte.Worker/README.md#xử-lý-sự-cố
+
+      - alert: AggregationWorkerMetricsMissing
+        # Không nhận được số đo nào (worker chết hẳn hoặc exporter hỏng).
+        expr: absent(aggregation_worker_last_cycle_time_seconds)
+        for: 15m
+        labels:
+          severity: warning
+          team: newsroom-platform
+          notify: email
+        annotations:
+          summary: Không nhận được số đo của worker Radar tin trong 15 phút
+
+      - alert: AggregationFetchFailureRateHigh
+        # Hơn 20% lượt đọc feed lỗi trong 30 phút (chỉ tính khi có ít nhất 20 lượt).
+        expr: |
+          (sum(increase(aggregation_feed_fetches_total{outcome="FAILED"}[30m])) / sum(increase(aggregation_feed_fetches_total[30m]))) > 0.2
+          and sum(increase(aggregation_feed_fetches_total[30m])) >= 20
+        for: 30m
+        labels:
+          severity: warning
+          team: newsroom-platform
+          notify: email
+        annotations:
+          summary: "Tỉ lệ đọc feed lỗi {{ $value | humanizePercentage }} trong 30 phút"
+          description: Xem phân bố theo nhãn failure (DNS, TIMEOUT, HTTP_STATUS…) và màn Nguồn thu thập trên CMS.
+
+      - alert: AggregationSourceAutoPaused
+        # Một nguồn bị hệ thống tự tạm dừng (BR-06). CMS cũng hiện banner; webhook Aggregation:Alerts:WebhookUrl nếu có cấu hình.
+        expr: increase(aggregation_alerts_total{kind="SOURCE_AUTO_PAUSED"}[15m]) > 0
+        labels:
+          severity: info
+          team: newsroom
+          notify: email
+        annotations:
+          summary: Có nguồn tin bị tự tạm dừng do lỗi liên tục 24 giờ — kiểm tra trên CMS (Nguồn thu thập)
+
+      - alert: AggregationNoNewItems
+        # Cờ ON, worker vẫn quét mà 6 giờ không có mục tin mới nào (feed chết hàng loạt, robots.txt chặn, lỗi phân tích).
+        # Worker chỉ nhận tin trong ngày (BA-01 P-02) nên đêm khuya ít tin là bình thường: chỉ xét 09:00–22:00 giờ Việt Nam (02–15 UTC).
+        expr: |
+          max(aggregation_worker_radar_enabled) == 1
+          and sum(increase(aggregation_items_new_total[6h])) == 0
+          and sum(increase(aggregation_feed_fetches_total[6h])) > 0
+          and on() hour() >= 2 and on() hour() < 15
+        for: 30m
+        labels:
+          severity: warning
+          team: newsroom-platform
+          notify: email
+        annotations:
+          summary: Radar tin không nhận mục tin mới nào trong 6 giờ

@@ -64,6 +64,21 @@ related: ADR-0004, ADR-0005, WBS-023, WBS-032, WBS-124, FR-NEWS-006, FR-NEWS-003
 - Chỉ chạy khi môi trường là `Development`; ngoài đó lệnh báo lỗi và thoát mã 1.
 - Không ghi audit, không cấp quyền thật. Gỡ khi có mục 3.
 
+## Hiện thực một phần (10/11/2026)
+
+- Migration 0340 tạo `tt.content_sources` và `tt.licenses` đúng các cột ở §1 (thêm `created_at/updated_at`) và hàm `tt.license_active(id, at)`, vì ADR-0008 (Radar tin) cần danh mục nguồn và giấy phép cho chế độ M2/M3.
+- **Chưa làm**: API `/admin/sources`, `/admin/licenses`; §2 metadata quyền trên bài; §3 xác nhận quyền; §4 kiểm khi publish; khóa ngoại `media_assets.license_id`.
+
+## Hiện thực §1 (10/11/2026, vẫn PROPOSED)
+
+- Spec v0.3 thêm 6 thao tác (tag CmsTaxonomy, FR-NEWS-006, scope P0 theo FR): `GET|POST /admin/sources`, `PATCH /admin/sources/{sourceId}`, `GET|POST /admin/licenses`, `PATCH /admin/licenses/{licenseId}` + inventory + truy vết FR-NEWS-006. Không thêm mã lỗi.
+- Module News: `CatalogService`, `AdminSourcesController`, `AdminLicensesController`. Danh sách cursor (tên, id), lọc `q`/`isEnabled`; tạo có Idempotency-Key; sửa có If-Match; không xóa — chỉ tắt.
+- Quyền: xem cả hai danh mục `content.read`; sửa nguồn `taxonomy.manage` (theo §1); sửa giấy phép quyền **mới** `licenses.manage` (MFA), cấp **tạm** cho APPROVER theo chỉ đạo chủ dự án 10/11/2026 — chờ Legal chốt Q2 (thêm vào `rbac.json` + `Permissions` + test ma trận).
+- Giả định chặt hơn trong lúc chờ Q2: `evidenceRef` **bắt buộc** khi tạo giấy phép và không xóa được khi sửa; mã giấy phép không đổi; tên nguồn trùng (không phân biệt hoa thường) / mã trùng → 409.
+- CMS: menu "Nguồn & giấy phép" (`/catalog`, `/catalog/licenses`); màn Nguồn thu thập (ADR-0008) chọn nguồn/giấy phép từ danh mục thay cho nhập UUID.
+- Vẫn chưa làm: §2–§4 (metadata quyền trên bài — có thể đổi thành danh sách nguồn trên revision theo ADR-0009 §5, xác nhận quyền, cổng xuất bản), khóa ngoại `media_assets.license_id`, lịch sử thay đổi giấy phép (hiện chỉ có `row_version`/`updated_at`).
+- Có bản ghi giấy phép **không** có nghĩa là đã được phép khai thác: Legal nhập và chịu trách nhiệm (CLAUDE.md §3).
+
 ## Câu hỏi cần quyết
 
 | # | Ai | Câu hỏi |

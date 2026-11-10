@@ -1,0 +1,43 @@
+{
+  "$comment": "DRAFT — FILE MẪU, chưa được Legal/Ban biên tập ký duyệt (BA-01 BR-34, ADR-0008 §7). Ba nhóm law-and-criminal-cases, health-and-epidemics, children thêm theo chốt của chủ dự án 10/11/2026 (BA-01 E-01). Đổi bằng pull request có review của Legal hoặc Ban biên tập; không có API sửa ở GĐ1. Khóa '*' áp cho mọi site; thêm khóa theo site_key của Site Registry. Từ khóa khớp nguyên cụm từ, không phân biệt hoa thường, GIỮ dấu tiếng Việt. Mục khớp được gắn sensitive = true (không được dùng cho soạn nháp AI ở GĐ2).",
+  "version": 1,
+  "sites": {
+    "*": [
+      {
+        "topic": "politics",
+        "keywords": ["bầu cử", "đảng phái", "chính trị", "biểu tình", "election", "politics", "protest"]
+      },
+      {
+        "topic": "national-security",
+        "keywords": ["an ninh quốc gia", "khủng bố", "quân sự", "terrorism", "terrorist", "national security", "military"]
+      },
+      {
+        "topic": "religion",
+        "keywords": ["tôn giáo", "tín ngưỡng", "religion", "religious"]
+      },
+      {
+        "topic": "unverified-rumour",
+        "keywords": ["tin đồn", "chưa kiểm chứng", "chưa được xác nhận", "rumor", "rumour", "unconfirmed report"]
+      },
+      {
+        "topic": "loss-of-life",
+        "keywords": ["tử vong", "thiệt mạng", "tử nạn", "thương vong", "fatal", "fatalities", "killed", "death toll"]
+      },
+      {
+        "topic": "law-and-criminal-cases",
+        "keywords": ["vụ án", "khởi tố", "bị can", "bị cáo", "truy tố", "xét xử", "bắt giữ", "tạm giam", "điều tra hình sự", "lừa đảo chiếm đoạt",
+                     "criminal case", "indictment", "indicted", "prosecution", "criminal trial", "arrested", "lawsuit", "fraud charges"]
+      },
+      {
+        "topic": "health-and-epidemics",
+        "keywords": ["dịch bệnh", "ổ dịch", "bùng phát dịch", "ca nhiễm", "ca mắc", "dịch cúm", "dịch sởi", "ngộ độc", "vắc xin", "vaccine",
+                     "epidemic", "pandemic", "outbreak", "infection cases", "public health emergency", "food poisoning"]
+      },
+      {
+        "topic": "children",
+        "keywords": ["trẻ em", "trẻ nhỏ", "trẻ vị thành niên", "xâm hại trẻ em", "bạo hành trẻ", "bắt cóc trẻ",
+                     "children", "minors", "underage", "child abuse", "child safety"]
+      }
+    ]
+  }
+}

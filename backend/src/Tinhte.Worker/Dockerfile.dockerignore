@@ -1,0 +1,14 @@
+# Context build = gốc repo; chỉ cần backend/ (Platform, Aggregation, Worker) và config/.
+**/.git
+**/node_modules
+**/bin
+**/obj
+**/.next
+**/TestResults
+frontend
+doc
+tools
+infra
+.claude
+.env
+.env.*

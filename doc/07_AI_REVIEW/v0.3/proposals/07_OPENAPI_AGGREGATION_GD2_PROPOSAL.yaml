@@ -1,0 +1,722 @@
+openapi: 3.1.0
+info:
+  title: Tinhte.com.vn — Radar tin GĐ2 (AI drafts) — PROPOSAL
+  version: 0.3.0-proposal-gd2
+  description: |
+    ĐỀ XUẤT hợp đồng cho ADR-0009 (PROPOSED). KHÔNG thuộc spec v0.3 chính và KHÔNG được hiện thực. Chỉ gộp vào
+    07_OPENAPI_TINHTE_v0.3_DRAFT.yaml sau khi Legal trả lời BA-01 Q-AGG-01/02/04/05/13/14, TL chọn nhà cung cấp AI (Q-AGG-15)
+    và ADR-0007 §2–§4 được duyệt. Khi gộp: thêm cờ `ai.aggregation_drafts` vào x-feature-flags, 4 mã lỗi vào x-error-catalog
+    (cập nhật ErrorCatalog/FeatureFlagKeys và test), quyền `aggregation.draft` vào config/rbac/rbac.json, cập nhật inventory + truy vết.
+    Server URL là placeholder như spec chính.
+servers:
+- url: https://cms.example.invalid/api/v1
+  description: Placeholder — host suy ra từ Site Registry (ADR-0001)
+tags:
+- name: CmsAggregationDrafts
+x-proposed-feature-flags:
+- key: ai.aggregation_drafts
+  scope: P2
+  productionDefault: false
+  approvers:
+  - PO
+  - Legal
+  description: AI drafts from radar clusters (ADR-0009, BA-01 phase 2). Checked inside the convert transaction; the worker stops drafting while OFF.
+x-proposed-error-codes:
+- code: USAGE_MODE_INSUFFICIENT
+  status: 422
+  description: No M2/M3 source in the cluster for FACT_REWRITE, or a non-M3 source for LICENSED_REWRITE (BR-52).
+- code: SIMILARITY_TOO_HIGH
+  status: 422
+  description: Draft or revision too similar to a source (shared run of 12+ words outside quotes, or 8-gram overlap above threshold) — BR-44, BR-80.
+- code: GROUNDING_FAILED
+  status: 422
+  description: Claim without evidence, or number/name/date not matching the cited passage — BR-43, BR-45, BR-80.
+- code: AI_BUDGET_EXCEEDED
+  status: 429
+  description: Daily token budget or draft quota exceeded; Retry-After points to the next newsroom day — BR-49.
+x-proposed-permissions:
+- key: aggregation.draft
+  mfa: false
+  description: Request, edit and convert AI drafts (roles pending PO/BA — Q-AGG-07).
+x-proposed-changes-to-existing-operations:
+- operation: submitAdminArticle / approveAdminArticle
+  change: For articles with origin AGGREGATION, body gains `attestation` (ArticleAttestation); the checker re-runs on the current revision (422 SIMILARITY_TOO_HIGH / GROUNDING_FAILED); missing attestation → 422 VALIDATION_FAILED; requester of the AI draft counts as author for SoD (403 SOD_VIOLATION).
+- operation: getAdminArticle
+  change: Adds `aiReview` (diff vs AI draft, edit ratio, check results, sources with usage modes).
+- operation: getPublicArticle
+  change: Adds `sources` (ArticleSourceRef[]) and `aiDisclosure` (AiDisclosure); the web app does not render an AGGREGATION article missing either (BR-63).
+- operation: publishAdminArticle
+  change: Extra gate inside the publish transaction (BR-64) — at least one source, every source still within its usage mode/licence, AI label configured → otherwise 422 RIGHTS_INVALID.
+paths:
+  /admin/aggregation/clusters/{clusterId}/drafts:
+    post:
+      tags:
+      - CmsAggregationDrafts
+      summary: Request an AI draft for a cluster
+      description: 'Access: Staff session (cmsSession) with permission aggregation.draft. Feature gates `aggregation.radar` and `ai.aggregation_drafts`
+        (production default OFF). Queues a job for the worker and returns 202 with the new draft version (status QUEUED). Sensitive clusters cannot be
+        drafted (409). Retry-safe with Idempotency-Key.'
+      operationId: requestAdminAggregationDraft
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationDraftRequest'
+      responses:
+        '202':
+          description: Accepted — draft queued
+          headers:
+            Location:
+              description: URL of the draft
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationDraft'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - USAGE_MODE_INSUFFICIENT
+      - AI_BUDGET_EXCEEDED
+      - RATE_LIMITED
+    get:
+      tags:
+      - CmsAggregationDrafts
+      summary: Draft versions of a cluster (newest first)
+      description: 'Access: Staff session (cmsSession) with permission aggregation.draft. Feature gate `ai.aggregation_drafts`.'
+      operationId: listAdminAggregationDrafts
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/ClusterId'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AggregationDraftSummary'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/drafts/{draftId}:
+    get:
+      tags:
+      - CmsAggregationDrafts
+      summary: AI draft with evidence and check results
+      description: 'Access: Staff session (cmsSession) with permission aggregation.draft. Feature gate `ai.aggregation_drafts`. Source text is never
+        returned as HTML; evidence quotes are plain text.'
+      operationId: getAdminAggregationDraft
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/DraftId'
+      responses:
+        '200':
+          description: Success
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationDraft'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+  /admin/aggregation/drafts/{draftId}/convert:
+    post:
+      tags:
+      - CmsAggregationDrafts
+      summary: Create a DRAFT article from a checked AI draft
+      description: 'Access: Staff session (cmsSession) with permissions aggregation.draft and content.write_own. Feature gate `ai.aggregation_drafts`,
+        enforced inside the transaction. Only READY drafts that pass every blocking check convert; the article (origin AGGREGATION, aiAssistance
+        ASSISTED, owner = caller) then follows the normal review workflow. Optimistic concurrency with If-Match; retry-safe with Idempotency-Key.'
+      operationId: convertAdminAggregationDraft
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/DraftId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: URL of the new admin article
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationDraftConversion'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - SIMILARITY_TOO_HIGH
+      - GROUNDING_FAILED
+      - RATE_LIMITED
+  /admin/aggregation/drafts/{draftId}/discard:
+    post:
+      tags:
+      - CmsAggregationDrafts
+      summary: Discard a draft with a reason
+      description: 'Access: Staff session (cmsSession) with permission aggregation.draft. Feature gate `ai.aggregation_drafts`. Reason 5–2000 characters.'
+      operationId: discardAdminAggregationDraft
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/DraftId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 5
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Success
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregationDraft'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - REASON_REQUIRED
+      - RATE_LIMITED
+  /admin/aggregation/drafts/{draftId}/feedback:
+    post:
+      tags:
+      - CmsAggregationDrafts
+      summary: Editor feedback on draft quality (BR-72)
+      description: 'Access: Staff session (cmsSession) with permission aggregation.draft. Feature gate `ai.aggregation_drafts`. Append-only.'
+      operationId: feedbackAdminAggregationDraft
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/DraftId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AggregationDraftFeedback'
+      responses:
+        '204':
+          description: Recorded
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
+        '422':
+          $ref: '#/components/responses/Problem'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-error-codes:
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FEATURE_DISABLED
+      - FORBIDDEN
+      - NOT_FOUND
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+components:
+  securitySchemes:
+    cmsSession:
+      type: apiKey
+      in: cookie
+      name: __Host-tt_cms_session
+      description: Same as the main v0.3 contract (host-only cookie on the cms site).
+  headers:
+    ETag:
+      description: Weak ETag W/"rowVersion"
+      schema:
+        type: string
+  parameters:
+    ClusterId:
+      name: clusterId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DraftId:
+      name: draftId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    XCsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 200
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: Problem (application/problem+json) with a code from x-error-catalog (+ x-proposed-error-codes)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    TooManyRequests:
+      description: Rate limited or AI budget exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      required:
+      - title
+      - status
+      - code
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        detail:
+          type: string
+        traceId:
+          type: string
+    AggregationDraftMode:
+      type: string
+      enum:
+      - FACT_REWRITE
+      - LICENSED_REWRITE
+      description: FACT_REWRITE needs at least one M2/M3 source; LICENSED_REWRITE needs every input source to be M3 with a licence allowing derivative work (BR-52).
+    AggregationDraftStatus:
+      type: string
+      enum:
+      - QUEUED
+      - GENERATING
+      - CHECKING
+      - READY
+      - CHECK_FAILED
+      - FAILED
+      - CONVERTED
+      - DISCARDED
+      description: Clients must tolerate unknown values.
+    AggregationDraftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        mode:
+          $ref: '#/components/schemas/AggregationDraftMode'
+        length:
+          type: string
+          enum:
+          - SHORT
+          - STANDARD
+          - LONG
+          default: STANDARD
+        editorNote:
+          type: string
+          maxLength: 1000
+          description: Trusted editor instruction ("angle"), kept separate from source data; cannot disable attribution, AI label or checks (BR-53).
+        itemIds:
+          type: array
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+          description: Optional subset of cluster items to use (default all eligible M2/M3 items).
+    AggregationDraftSummary:
+      type: object
+      required:
+      - id
+      - clusterId
+      - version
+      - status
+      - mode
+      - requestedBy
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        clusterId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/AggregationDraftStatus'
+        mode:
+          $ref: '#/components/schemas/AggregationDraftMode'
+        requestedBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        convertedArticleId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    AggregationDraftClaim:
+      type: object
+      required:
+      - sentence
+      - kind
+      properties:
+        sentence:
+          type: string
+        kind:
+          type: string
+          enum:
+          - FACT
+          - CONTEXT
+          - EDITOR_VERIFIED
+          description: FACT needs evidence (red without it); CONTEXT is highlighted yellow for review (BR-43).
+        evidence:
+          type: array
+          items:
+            type: object
+            required:
+            - itemId
+            - quote
+            properties:
+              itemId:
+                type: string
+                format: uuid
+              quote:
+                type: string
+                maxLength: 1000
+    AggregationDraftCheck:
+      type: object
+      required:
+      - name
+      - passed
+      - blocking
+      properties:
+        name:
+          type: string
+          enum:
+          - SIMILARITY
+          - GROUNDING
+          - NUMBERS
+          - LINKS
+          - SOURCES_BLOCK
+          - AI_LABEL
+          - SEMANTIC_JUDGE
+        passed:
+          type: boolean
+        blocking:
+          type: boolean
+        detail:
+          type:
+          - string
+          - 'null'
+        flags:
+          type: array
+          items:
+            type: string
+            enum:
+            - NUMBER_MISMATCH
+            - INJECTION_SUSPECTED
+            - SINGLE_SOURCE
+            - UNSUPPORTED_CLAIM
+    AggregationDraft:
+      allOf:
+      - $ref: '#/components/schemas/AggregationDraftSummary'
+      - type: object
+        required:
+        - sources
+        - checks
+        - rowVersion
+        properties:
+          title:
+            type:
+            - string
+            - 'null'
+          summary:
+            type:
+            - string
+            - 'null'
+          bodyBlocks:
+            type: array
+            description: Same schema as the article editor (WBS-030).
+            items:
+              type: object
+          suggestedCategoryId:
+            type:
+            - string
+            - 'null'
+            format: uuid
+          editorNotes:
+            type: array
+            description: Uncertain points, conflicts between sources, missing information (BR-42).
+            items:
+              type: string
+          sources:
+            type: array
+            items:
+              $ref: '#/components/schemas/ArticleSourceRef'
+          claims:
+            type: array
+            items:
+              $ref: '#/components/schemas/AggregationDraftClaim'
+          checks:
+            type: array
+            items:
+              $ref: '#/components/schemas/AggregationDraftCheck'
+          usage:
+            type: object
+            properties:
+              model:
+                type: string
+              promptVersion:
+                type: string
+              tokensIn:
+                type: integer
+                minimum: 0
+              tokensOut:
+                type: integer
+                minimum: 0
+          rowVersion:
+            type: integer
+            format: int64
+            minimum: 1
+    AggregationDraftConversion:
+      type: object
+      required:
+      - articleId
+      - draftId
+      properties:
+        articleId:
+          type: string
+          format: uuid
+        draftId:
+          type: string
+          format: uuid
+    AggregationDraftFeedback:
+      type: object
+      additionalProperties: false
+      required:
+      - rating
+      properties:
+        rating:
+          type: string
+          enum:
+          - USABLE
+          - HEAVY_EDIT
+          - DISCARDED
+        reasons:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+            - WRONG_FACT
+            - TONE
+            - MISSING_POINTS
+            - TOO_SIMILAR
+            - OTHER
+        note:
+          type: string
+          maxLength: 1000
+    ArticleSourceRef:
+      type: object
+      description: Source of an article revision (BR-62) — replaces the single article-level source_id of ADR-0007 §2 (Q-AGG-09).
+      required:
+      - sourceName
+      - url
+      - role
+      properties:
+        sourceId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        sourceName:
+          type: string
+        url:
+          type: string
+          format: uri
+        author:
+          type:
+          - string
+          - 'null'
+        publishedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        role:
+          type: string
+          enum:
+          - PRIMARY
+          - SUPPORTING
+    ArticleAttestation:
+      type: object
+      description: Checklist confirmed by the editor (submit, BR-81) or the reviewer (approve, BR-82); wording owned by the editorial board (Q-AGG-16).
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+    AiDisclosure:
+      type: object
+      description: Public AI label (wording and machine-readable format pending Legal — Q-AGG-04).
+      required:
+      - level
+      - label
+      properties:
+        level:
+          type: string
+          enum:
+          - ASSISTED
+        label:
+          type: string

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Tinhte.Worker</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ADR-0008 §4: worker dùng Tinhte.Platform + phần Application/Infrastructure của module Aggregation, không chạy trong API. -->
+    <ProjectReference Include="../Tinhte.Platform/Tinhte.Platform.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Aggregation/Tinhte.Modules.Aggregation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- Site Registry (User-Agent của bot) và danh sách chủ đề nhạy cảm đi kèm bản build. -->
+    <Content Include="../../../config/sites/sites.json" Link="config/sites/sites.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../../config/aggregation/sensitive-topics.json" Link="config/aggregation/sensitive-topics.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

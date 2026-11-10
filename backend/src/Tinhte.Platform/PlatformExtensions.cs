@@ -27,13 +27,7 @@ public static class PlatformExtensions
     /// </summary>
     public static IMvcBuilder AddTinhtePlatform(this IServiceCollection services, IConfiguration configuration, IEnumerable<IModule> modules)
     {
-        // Registry tạo lười (sau khi host build) để test/override cấu hình "Sites:*" có hiệu lực.
-        services.AddSingleton(sp =>
-        {
-            var config = sp.GetRequiredService<IConfiguration>();
-            var env = sp.GetRequiredService<IHostEnvironment>();
-            return SiteRegistry.Load(ResolveRegistryPath(config, env), config["Sites:Environment"] ?? DefaultSiteEnvironment(env));
-        });
+        services.AddTinhteSiteRegistry();
         services.AddSingleton<IFeatureFlagReader, ConfigurationFeatureFlagReader>();
 
         // WBS-013: PostgreSQL (chưa cấu hình ConnectionStrings:Tinhte thì API vẫn chạy, endpoint cần DB trả 503).
@@ -75,6 +69,20 @@ public static class PlatformExtensions
         }
 
         return mvc;
+    }
+
+    /// <summary>
+    /// Site Registry (ADR-0001) cho mọi tiến trình (API, worker). Tạo lười (sau khi host build) để test/override cấu hình "Sites:*" có hiệu lực.
+    /// </summary>
+    public static IServiceCollection AddTinhteSiteRegistry(this IServiceCollection services)
+    {
+        services.AddSingleton(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var env = sp.GetRequiredService<IHostEnvironment>();
+            return SiteRegistry.Load(ResolveRegistryPath(config, env), config["Sites:Environment"] ?? DefaultSiteEnvironment(env));
+        });
+        return services;
     }
 
     /// <summary>Pipeline: lỗi chưa xử lý → forwarded headers → phân giải site → chặn Origin → header bảo mật → xác thực → CSRF → phân quyền.</summary>

@@ -50,6 +50,14 @@ public static class Permissions
     public const string UsersRead = "users.read";
     public const string UsersManage = "users.manage";
     public const string AuditRead = "audit.read";
+
+    // Radar tin GĐ1 (ADR-0008 §8) — ĐỀ XUẤT, chờ BA/PO duyệt (BA-01 Q-AGG-07). sources_approve cấp tạm cho APPROVER (A-3).
+    public const string AggregationRead = "aggregation.read";
+    public const string AggregationSourcesManage = "aggregation.sources_manage";
+    public const string AggregationSourcesApprove = "aggregation.sources_approve";
+
+    // Danh mục giấy phép (ADR-0007 §1) — ĐỀ XUẤT, cấp tạm cho APPROVER theo chỉ đạo chủ dự án 10/11/2026; chờ Legal chốt Q2.
+    public const string LicensesManage = "licenses.manage";
 }
 
 /// <summary>

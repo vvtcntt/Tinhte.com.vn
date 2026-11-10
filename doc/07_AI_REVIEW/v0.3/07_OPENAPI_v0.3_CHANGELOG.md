@@ -9,6 +9,13 @@ created_at: 2026-11-09
 
 # OpenAPI v0.3 DRAFT — Changelog
 
+> **Bổ sung 10/11/2026 (sau bảng số liệu bên dưới, chưa cập nhật lại bảng):**
+> - ADR-0008 Radar tin: 24 thao tác `/admin/aggregation/*` (tag CmsAggregation, P2, cờ `aggregation.radar`), FR-AGG-001…005 trong `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`; thêm `404 NOT_FOUND` cho 4 thao tác có `siteKey`; `AggregationSourceSummary.statusChangedAt/statusChangedBySystem/statusReason`; `AggregationStats.workers/alerts` + `AggregationWorkerStatus`, `AggregationAlert`.
+> - ADR-0007 §1: 6 thao tác danh mục nguồn/giấy phép `GET|POST /admin/sources`, `PATCH /admin/sources/{sourceId}`, `GET|POST /admin/licenses`, `PATCH /admin/licenses/{licenseId}` (tag CmsTaxonomy, FR-NEWS-006, P0).
+> - ADR-0009 (GĐ2, AI viết lại): hợp đồng **đề xuất riêng** `proposals/07_OPENAPI_AGGREGATION_GD2_PROPOSAL.yaml`, không thuộc spec này.
+> - Chủ dự án chốt 10/11/2026 (BA-01 P-01, P-02): `aggregation.radar` **P1** (x-feature-flags + `x-scope` của 24 thao tác + inventory + FR-AGG-001…005 + WBS-140…145); cờ mới `aggregation.ai_dedup` (OFF, P2, không endpoint); `AggregationFeedCreate.scheduleMinutes` mặc định 30.
+> - Không thêm mã lỗi. Contract tĩnh 34/34.
+
 ## 1. Trạng thái và cách dùng
 
 - File `07_OPENAPI_TINHTE_v0.3_DRAFT.yaml` là **bản nháp đề xuất**: áp các đề xuất `AIR-xxx` trong `../07_AI_TECH_REVIEW_PROPOSALS.md` lên hợp đồng v0.2.
@@ -262,3 +269,29 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - Gỡ (`content.takedown`, MFA, If-Match tùy chọn): xóa publish pointer trong transaction; 409 khi không có bản công khai. Thu hồi playback grant/CDN/feed: WBS-039/128 + outbox WBS-020.
 - Chưa hiện thực: `postAdminVideosVideoidSchedule` (cần bộ lập lịch + job kiểm lại lúc chạy — WBS-025/020). Route chưa có → 404.
 - Kiểm lại: 34/34 test tĩnh PASS.
+
+## 15. Bổ sung — Radar tin / module Aggregation GĐ1 (BA-01, ADR-0008, 2026-11-09)
+
+- **Đề xuất, chưa hiện thực.** Nghiệp vụ: `doc/ba/BA-01_TONG_HOP_TIN_RSS_AI_v0.1_DRAFT.md`. Kiến trúc: `doc/adr/ADR-0008-news-aggregation-radar.md`.
+- **Thêm 24 thao tác / 22 path** dưới `/admin/aggregation/*`, tag `CmsAggregation`:
+  - hồ sơ nguồn: list, tạo, chi tiết (ETag), sửa, duyệt chế độ khai thác, tạm dừng/tiếp tục/ngừng;
+  - feed: thêm, sửa; thử đọc feed (`feed-tests`, không lưu);
+  - luật phân loại theo chuyên mục: list, sửa;
+  - mục tin: tìm kiếm;
+  - cụm sự kiện: list (Radar), chi tiết (ETag), bỏ qua / theo dõi / mở lại / nhận việc / đánh dấu đã đưa tin / tách / gộp;
+  - thống kê.
+- Mọi thao tác: `x-scope: P2` (**tạm**, chờ PO xếp hạng — BA-01 Q-AGG-06), `x-feature-gate: aggregation.radar`, chỉ `cmsSession`, `x-requirements` FR-AGG-001…005.
+- **Registry cờ: thêm `aggregation.radar`** (P2, production OFF, người duyệt PO, không có `legacyKeys`, không có `publicConfigField`). Registry thành 18 khóa. `FeatureFlagKeys` (C#) và test khớp spec cập nhật theo. Hàng trong `tt.feature_gates` sẽ thêm bằng migration khi hiện thực.
+- **34 schema mới** `Aggregation*`, **12 tham số mới**.
+  - `AggregationSourceApprovalRequest`: M2/M3 bắt buộc `licenseId` (if/then).
+  - `AggregationSourcePatch`/`…Create`/`AggregationFeed*` có `additionalProperties: false`: không đổi được `usageMode` ngoài thao tác duyệt.
+  - URL feed bắt buộc `^https://`.
+- **Không thêm mã lỗi.** Lỗi khi tải feed là dữ liệu (`AggregationFeedFailure`), không phải `Problem.code`.
+- **Không đổi thao tác cũ** (chỉ chèn thêm; diff không có dòng xóa).
+- Truy vết:
+  - FR-AGG-001…005 ở file mới `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv` (cùng cột với FR84 v0.3), không nằm trong bộ 84 FR gốc;
+  - WBS-140…145 thêm vào `trace/07_WBS_EXTENDED_v0.3_DRAFT.csv` với `PROPOSED_PENDING_PM_SIGNOFF`, **không có effort**.
+- Test tĩnh:
+  - đọc thêm file addendum (biến `TT_FR_ADDENDUM_FILE`, mặc định cạnh file FR84); T22 vẫn kiểm đúng 84 FR gốc và không trùng FR;
+  - T30 thêm 9 trường hợp cho quy tắc duyệt chế độ khai thác, PATCH không đổi chế độ, feed https.
+- Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`); backend 192 PASS / 64 SKIP (test DB, chưa đặt `TT_TEST_PG`).

@@ -39,6 +39,8 @@ SPEC_FILE = Path(os.environ.get("TT_SPEC_FILE", SPEC_V02))
 INVENTORY = Path(os.environ.get("TT_INVENTORY_FILE", DOC / "07_API_ENDPOINT_INVENTORY_v0.2.csv"))
 FR84 = Path(os.environ.get("TT_FR84_FILE", DOC / "07_FR84_TRACEABILITY_v0.2.csv"))
 WBS = Path(os.environ.get("TT_WBS_FILE", DOC / "07_WBS_EXTENDED_135_v0.2.csv"))
+# FR ngoài bộ 84 FR gốc (BA-01 …): cùng cột với FR84 v0.3, đặt cạnh file FR84. Không có thì bỏ qua (v0.2).
+FR_ADDENDUM = Path(os.environ.get("TT_FR_ADDENDUM_FILE", FR84.parent / "07_FR_ADDENDUM_v0.3_DRAFT.csv"))
 SQL = DOC / "07_DB_ADS_LITE_REFERENCE_v0.2.sql"
 PARALLEL = DOC / "07_PARALLEL_WORKSTREAM_RELEASE_GATES_v0.2.md"
 
@@ -380,6 +382,19 @@ class SchemaBehaviour(unittest.TestCase):
             ("ModerationActionRequest", {"action": "LOCK", "reason": "spam lặp"}, True),
             ("Problem", {"type": "about:blank", "title": "x", "status": 403, "code": "COMMENT_DISABLED", "traceId": "t"}, False),
         ]
+        if "AggregationSourceApprovalRequest" in COMP["schemas"]:  # ADR-0008: chế độ khai thác chỉ đổi qua duyệt
+            lic = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+            cases += [
+                ("AggregationSourceApprovalRequest", {"usageMode": "M0", "termsEvidenceRef": "dms://tos-1"}, True),
+                ("AggregationSourceApprovalRequest", {"usageMode": "M2", "termsEvidenceRef": "dms://tos-1"}, False),
+                ("AggregationSourceApprovalRequest", {"usageMode": "M3", "termsEvidenceRef": "dms://tos-1", "licenseId": None}, False),
+                ("AggregationSourceApprovalRequest", {"usageMode": "M2", "termsEvidenceRef": "dms://tos-1", "licenseId": lic}, True),
+                ("AggregationSourceApprovalRequest", {"usageMode": "M1"}, False),
+                ("AggregationSourcePatch", {"usageMode": "M3"}, False),
+                ("AggregationSourcePatch", {"trustWeight": 4}, True),
+                ("AggregationFeedCreate", {"url": "http://example.test/rss"}, False),
+                ("AggregationFeedCreate", {"url": "https://example.test/rss"}, True),
+            ]
         wrong = [(name, json.dumps(inst, ensure_ascii=False)[:80], "kỳ vọng hợp lệ" if exp else "kỳ vọng bị chặn")
                  for name, inst, exp in cases if self.check(name, inst) != exp]
         self.assertEqual(wrong, [], "Quy tắc schema sai:" + fmt(wrong))
@@ -387,7 +402,8 @@ class SchemaBehaviour(unittest.TestCase):
 
 class Traceability(unittest.TestCase):
     INV = read_csv(INVENTORY)
-    FRS = read_csv(FR84)
+    FR84_ROWS = read_csv(FR84)
+    FRS = FR84_ROWS + (read_csv(FR_ADDENDUM) if FR_ADDENDUM.exists() else [])
     W = {r["WBS"]: r for r in read_csv(WBS)}
 
     def test_T21_inventory_matches_spec(self):
@@ -412,7 +428,9 @@ class Traceability(unittest.TestCase):
             for api in filter(None, (a.strip() for a in r[self.API_COL].split(";"))):
                 if api not in spec_ops:
                     bad.append((r["Requirement ID"], api))
-        self.assertEqual(len(self.FRS), 84)
+        self.assertEqual(len(self.FR84_ROWS), 84, "bộ FR gốc phải đúng 84; FR mới đặt trong file addendum")
+        dup = sorted({r["Requirement ID"] for r in self.FRS if [x["Requirement ID"] for x in self.FRS].count(r["Requirement ID"]) > 1})
+        self.assertEqual(dup, [], "FR trùng giữa FR84 và addendum")
         self.assertEqual(bad, [], fmt(bad))
 
     def test_T23_child_scope_compatible_with_parent(self):

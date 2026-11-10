@@ -15,17 +15,27 @@
     "moderation.act": { "label": "Xử lý kiểm duyệt", "mfa": true },
     "users.read": { "label": "Xem tài khoản", "mfa": false },
     "users.manage": { "label": "Đình chỉ tài khoản, cấp/thu hồi vai trò", "mfa": true },
-    "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true }
+    "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true },
+    "aggregation.read": { "label": "Xem Radar tin, nguồn thu thập và mục tin (ADR-0008, chờ BA/PO duyệt)", "mfa": false },
+    "aggregation.sources_manage": { "label": "Đề xuất/sửa nguồn thu thập, feed, luật chuyên mục; tạm dừng/tiếp tục/ngừng nguồn (ADR-0008, chờ BA/PO duyệt)", "mfa": false },
+    "aggregation.sources_approve": { "label": "Duyệt chế độ khai thác và giấy phép của nguồn thu thập (ADR-0008; cấp tạm cho APPROVER, chờ PO + Legal — A-3)", "mfa": true },
+    "licenses.manage": { "label": "Tạo/sửa giấy phép sử dụng nội dung (ADR-0007 §1; cấp tạm cho APPROVER, chờ Legal — Q2)", "mfa": true }
   },
   "roles": {
     "AUTHOR": { "label": "Tác giả", "permissions": ["content.read", "content.write_own", "media.upload"] },
     "EDITOR": {
       "label": "Biên tập viên",
-      "permissions": ["content.read", "content.write_own", "content.write_any", "content.review", "media.upload", "taxonomy.manage"]
+      "permissions": [
+        "content.read", "content.write_own", "content.write_any", "content.review", "media.upload", "taxonomy.manage",
+        "aggregation.read", "aggregation.sources_manage"
+      ]
     },
     "APPROVER": {
       "label": "Người duyệt xuất bản",
-      "permissions": ["content.read", "content.review", "content.approve", "content.publish", "content.takedown"]
+      "permissions": [
+        "content.read", "content.review", "content.approve", "content.publish", "content.takedown",
+        "aggregation.read", "aggregation.sources_approve", "licenses.manage"
+      ]
     },
     "MODERATOR": { "label": "Kiểm duyệt viên", "permissions": ["moderation.act"] },
     "ADMIN": { "label": "Quản trị tài khoản", "permissions": ["users.read", "users.manage", "audit.read"] }

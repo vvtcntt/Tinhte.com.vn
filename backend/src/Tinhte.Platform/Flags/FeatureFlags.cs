@@ -23,11 +23,23 @@ public static class FeatureFlagKeys
     public const string AiAssistance = "ai.assistance";
     public const string AiSearch = "ai.search";
 
+    /// <summary>
+    /// Radar tin: thu thập RSS + gom cụm (ADR-0008, BA-01 GĐ1). Dòng tt.feature_gates do migration 0341 thêm (OFF); 0346 đổi P2 → P1 (BA-01 P-01).
+    /// Module Aggregation đọc cờ thẳng từ tt.feature_gates (ghi: tt.flag_enabled_for_write trong transaction), không qua reader cấu hình.
+    /// </summary>
+    public const string AggregationRadar = "aggregation.radar";
+
+    /// <summary>
+    /// Radar tin: AI xác định tin trùng chủ đề trên cặp ứng viên MinHash (ADR-0008 §7, BA-01 P-02). Dòng do migration 0346 thêm (OFF, P2).
+    /// Tắt hoặc AI lỗi ⇒ gom cụm như cũ. Chỉ bật sau L-07, S-03, F-02. Điểm nối: <see cref="Tinhte.Platform.Ai.ISameEventJudge"/>.
+    /// </summary>
+    public const string AggregationAiDedup = "aggregation.ai_dedup";
+
     public static readonly IReadOnlyList<string> All =
     [
         CommunityVideoComments, CommunityArticleComments, CommunityMember, CommunityModeration, CommunityUgc, CommunityAppeals,
         MemberBookmarks, AdsSponsoredPublication, AdsDisplaySlots, AdsShortsInstream, AdsCampaignAdvanced, DiscoverySeries,
-        DiscoverySearchSuggestions, CmsRelatedSuggestions, AnalyticsOperations, AiAssistance, AiSearch,
+        DiscoverySearchSuggestions, CmsRelatedSuggestions, AnalyticsOperations, AiAssistance, AiSearch, AggregationRadar, AggregationAiDedup,
     ];
 
     /// <summary>Mặc định production: mọi cờ OFF trừ community.moderation (công cụ staff).</summary>

@@ -23,6 +23,7 @@ public sealed class NewsModule : IModule
         services.AddSingleton<PublicArticleService>();
         services.AddSingleton<HomeService>();
         services.AddSingleton<HomeCurationService>();
+        services.AddSingleton<CatalogService>();
 
         // bodyBlocks là JSON tự do (JsonElement): service tự kiểm, MVC không duyệt đệ quy vào cây JSON.
         services.Configure<MvcOptions>(o => o.ModelMetadataDetailsProviders.Add(new SuppressChildValidationMetadataProvider(typeof(JsonElement))));

@@ -135,7 +135,7 @@ const SLOT = (over = '') => `INSERT INTO tt.ad_placements (code, label, status, 
 
 async function behaviour(sc, db) {
   // Registry cờ (0300)
-  await expectValue(sc, db, 'F1 17 khóa registry + 1 khóa ngoài registry được giữ', `SELECT count(*)::int FROM tt.feature_gates`, 18);
+  await expectValue(sc, db, 'F1 19 khóa registry (17 của 0300 + aggregation.radar của 0341 + aggregation.ai_dedup của 0346) + 1 khóa ngoài registry được giữ', `SELECT count(*)::int FROM tt.feature_gates`, 20);
   await expectValue(sc, db, 'F1b khóa cũ đã đổi tên hết', `SELECT count(*)::int FROM tt.feature_gates WHERE key IN ('community.comments','member.bookmark')`, 0);
   await expectValue(sc, db, 'F1c chỉ community.moderation ON, mọi cờ public OFF', `SELECT string_agg(key, ',' ORDER BY key) FROM tt.feature_gates WHERE enabled`, 'community.moderation');
   await expectError(sc, db, 'F2 bật cờ không có hồ sơ duyệt bị chặn', `UPDATE tt.feature_gates SET enabled = true WHERE key = 'ads.sponsored_publication'`, /ck_feature_gates_enabled_requires_approval/);
@@ -360,6 +360,137 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'H5 vị trí ngoài 1..10 bị chặn', `${LAYOUT}
     INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b1')}', 11);`, /home_featured_articles_position_check/);
   await expectError(sc, db, 'H6 lịch sử tin nổi bật chỉ thêm', `${LAYOUT} UPDATE tt.home_layouts SET updated_by = '${U1}'; DELETE FROM tt.home_featured_history`, /APPEND_ONLY/);
+
+  // Danh mục nguồn/giấy phép (0340, ADR-0007 §1) + Radar tin GĐ1 (0341, ADR-0008)
+  const SRC = id('5c1');
+  const LIC = id('11c1');
+  const AGG = `INSERT INTO tt.content_sources (id, name, kind, url) VALUES ('${SRC}', 'Báo Công nghệ', 'AGENCY', 'https://bao-cong-nghe.example');
+    INSERT INTO tt.licenses (id, code, name, usage_scope, evidence_ref) VALUES ('${LIC}', 'LIC-01', 'Thỏa thuận trích dẫn', 'Dùng dữ kiện, ghi nguồn', 'dms://lic-01');
+    SET LOCAL tt.actor_id = '${U2}';
+    INSERT INTO tt.agg_source_profiles (content_source_id, language, site_keys, proposed_by) VALUES ('${SRC}', 'vi', ARRAY['www'], '${U2}');`;
+  const AGG_APPROVE = (mode, by = U1, lic = null) => `SET LOCAL tt.actor_id = '${by}';
+    INSERT INTO tt.agg_source_approvals (content_source_id, usage_mode, license_id, terms_evidence_ref, approved_by)
+      VALUES ('${SRC}', '${mode}', ${lic ? `'${lic}'` : 'NULL'}, 'dms://terms-1', '${by}');
+    UPDATE tt.agg_source_profiles SET usage_mode = '${mode}', license_id = ${lic ? `'${lic}'` : 'NULL'}, terms_evidence_ref = 'dms://terms-1',
+      approved_by = '${by}', approved_at = now(), status = 'ENABLED' WHERE content_source_id = '${SRC}';`;
+  const FEED = (url = 'https://bao-cong-nghe.example/rss') => `INSERT INTO tt.agg_feeds (id, content_source_id, url) VALUES ('${id('fe1')}', '${SRC}', '${url}');`;
+  const ITEM = (guid, hash) => `INSERT INTO tt.agg_items (content_source_id, feed_id, guid, url, url_hash, title, content_hash)
+    VALUES ('${SRC}', '${id('fe1')}', ${guid ? `'${guid}'` : 'NULL'}, 'https://bao-cong-nghe.example/a', repeat('${hash}', 64), 'Tin mới', repeat('c', 64));`;
+  await expectValue(sc, db, 'AG1 cờ Radar trong registry: aggregation.radar OFF/P1 (0346, P-01), aggregation.ai_dedup OFF/P2; mặc định production OFF',
+    `SELECT string_agg(key || '=' || enabled || '/' || scope || '/' || production_default, ',' ORDER BY key) FROM tt.feature_gates WHERE key LIKE 'aggregation.%'`,
+    'aggregation.ai_dedup=false/P2/false,aggregation.radar=false/P1/false');
+  await expectOk(sc, db, 'AG2 duyệt M1 → ENABLED; lịch sử trạng thái ghi PROPOSED rồi ENABLED, người thao tác từ tt.actor_id', `${AGG} ${AGG_APPROVE('M1')}
+    DO $$ BEGIN IF (SELECT string_agg(coalesce(from_status, '-') || '>' || to_status || '@' || actor_id, ',' ORDER BY id) FROM tt.agg_source_status_history)
+      <> '->PROPOSED@${U2},PROPOSED>ENABLED@${U1}' THEN RAISE EXCEPTION 'history'; END IF; END $$;`);
+  await expectError(sc, db, 'AG3 tạo hồ sơ đã bật sẵn bị chặn (chỉ PROPOSED/M0)', `${AGG}
+    INSERT INTO tt.content_sources (id, name) VALUES ('${id('5c2')}', 'Nguồn 2');
+    INSERT INTO tt.agg_source_profiles (content_source_id, language, site_keys, proposed_by, status) VALUES ('${id('5c2')}', 'en', ARRAY['www'], '${U2}', 'ENABLED');`, /STATE_CONFLICT.*starts PROPOSED/);
+  await expectError(sc, db, 'AG4 đổi chế độ khai thác không qua bản ghi duyệt → STATE_CONFLICT', `${AGG}
+    UPDATE tt.agg_source_profiles SET usage_mode = 'M1' WHERE content_source_id = '${SRC}';`, /STATE_CONFLICT.*approval operation/);
+  await expectError(sc, db, 'AG5 ENABLED mà chưa có người duyệt bị chặn', `${AGG} UPDATE tt.agg_source_profiles SET status = 'ENABLED'`, /ck_agg_source_profiles_enabled_requires_approval/);
+  await expectError(sc, db, 'AG6 duyệt M2 thiếu giấy phép bị chặn', `${AGG} ${AGG_APPROVE('M2')}`, /VALIDATION_FAILED.*licence none/);
+  await expectError(sc, db, 'AG7 người đề xuất tự duyệt M2 → SOD_VIOLATION', `${AGG} ${AGG_APPROVE('M2', U2, LIC)}`, /SOD_VIOLATION/);
+  await expectError(sc, db, 'AG8 duyệt M3 với giấy phép hết hạn → VALIDATION_FAILED', `${AGG}
+    UPDATE tt.licenses SET valid_from = now() - interval '60 days', valid_to = now() - interval '1 day' WHERE id = '${LIC}'; ${AGG_APPROVE('M3', U1, LIC)}`, /VALIDATION_FAILED.*licence/);
+  await expectOk(sc, db, 'AG9 duyệt M2 hợp lệ (giấy phép còn hạn, người duyệt khác người đề xuất)', `${AGG} ${AGG_APPROVE('M2', U1, LIC)}`);
+  await expectError(sc, db, 'AG10 tạm dừng thiếu lý do → REASON_REQUIRED', `${AGG} ${AGG_APPROVE('M1')} UPDATE tt.agg_source_profiles SET status = 'PAUSED'`, /REASON_REQUIRED/);
+  await expectOk(sc, db, 'AG11 tạm dừng có lý do → lịch sử lưu lý do; gửi lại duyệt chỉ xóa người duyệt', `${AGG} ${AGG_APPROVE('M1')}
+    SET LOCAL tt.reason = 'Nguồn đổi điều khoản'; UPDATE tt.agg_source_profiles SET status = 'PAUSED';
+    UPDATE tt.agg_source_profiles SET approved_by = NULL, approved_at = NULL;
+    DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM tt.agg_source_status_history WHERE to_status = 'PAUSED' AND reason = 'Nguồn đổi điều khoản')
+      OR (SELECT usage_mode FROM tt.agg_source_profiles) <> 'M1' THEN RAISE EXCEPTION 'pause'; END IF; END $$;`);
+  await expectError(sc, db, 'AG12 hồ sơ RETIRED không đổi được nữa', `${AGG} SET LOCAL tt.reason = 'Nguồn ngừng hoạt động';
+    UPDATE tt.agg_source_profiles SET status = 'RETIRED'; UPDATE tt.agg_source_profiles SET trust_weight = 4;`, /STATE_CONFLICT.*retired/);
+  await expectError(sc, db, 'AG13 không xóa hồ sơ (chỉ RETIRED)', `${AGG} DELETE FROM tt.agg_source_profiles`, /APPEND_ONLY/);
+  await expectError(sc, db, 'AG14 lịch sử duyệt chỉ thêm', `${AGG} ${AGG_APPROVE('M1')} UPDATE tt.agg_source_approvals SET note = 'sửa'`, /APPEND_ONLY/);
+  await expectError(sc, db, 'AG15 hồ sơ không gắn site cms', `${SYNC} ${AGG} UPDATE tt.agg_source_profiles SET site_keys = ARRAY['www', 'cms']`, /VALIDATION_FAILED.*siteKeys cms/);
+  await expectError(sc, db, 'AG16 feed phải https', `${AGG} ${FEED('http://bao-cong-nghe.example/rss')}`, /ck_agg_feeds_url/);
+  await expectError(sc, db, 'AG17 hai feed trùng URL bị chặn', `${AGG} ${FEED()} INSERT INTO tt.agg_feeds (content_source_id, url) VALUES ('${SRC}', 'https://bao-cong-nghe.example/rss')`, /uq_agg_feeds_url/);
+  await expectError(sc, db, 'AG18 feed không xóa được (chỉ tắt)', `${AGG} ${FEED()} DELETE FROM tt.agg_feeds`, /APPEND_ONLY/);
+  await expectError(sc, db, 'AG19 khử trùng mục tin theo (nguồn, guid)', `${AGG} ${FEED()} ${ITEM('g-1', 'a')} ${ITEM('g-1', 'b')}`, /ux_agg_items_source_guid/);
+  await expectError(sc, db, 'AG20 khử trùng mục tin theo (nguồn, url_hash)', `${AGG} ${FEED()} ${ITEM(null, 'a')} ${ITEM(null, 'a')}`, /ux_agg_items_source_url_hash/);
+  await expectError(sc, db, 'AG21 mục tin không đổi feed/nguồn', `${AGG} ${FEED()} ${ITEM('g-1', 'a')}
+    INSERT INTO tt.agg_feeds (id, content_source_id, url) VALUES ('${id('fe2')}', '${SRC}', 'https://bao-cong-nghe.example/rss2');
+    UPDATE tt.agg_items SET feed_id = '${id('fe2')}'`, /STATE_CONFLICT.*cannot move/);
+  await expectError(sc, db, 'AG22 bỏ qua cụm thiếu lý do → REASON_REQUIRED', `INSERT INTO tt.agg_clusters (id, site_key, title) VALUES ('${id('c1a')}', 'www', 'Sự kiện');
+    INSERT INTO tt.agg_cluster_actions (cluster_id, action, actor_id, reason) VALUES ('${id('c1a')}', 'DISMISS', '${U1}', 'ok')`, /REASON_REQUIRED/);
+  await expectError(sc, db, 'AG23 cụm COVERED phải có bài', `INSERT INTO tt.agg_clusters (site_key, title, status) VALUES ('www', 'Sự kiện', 'COVERED')`, /ck_agg_clusters_covered/);
+  await expectError(sc, db, 'AG24 down 0341 từ chối khi đã có lịch sử nguồn', `${AGG} ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))}`, /Refusing to roll back 0341/);
+  await expectError(sc, db, 'AG25 down 0340 từ chối khi đã có giấy phép', `INSERT INTO tt.licenses (code, name, usage_scope) VALUES ('LIC-X', 'X', 'Y');
+    ${['0346_aggregation_owner_decisions', '0345_aggregation_calibration', '0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
+      .map((m) => read(path.join(MIG_DIR, `${m}.down.sql`))).join(' ')}`, /Refusing to roll back 0340/);
+  // Bộ thu thập (0342): row_version của feed chỉ đổi khi CMS sửa; failing_since; down tạo lại trigger cũ.
+  const FEED_RV = `SELECT row_version FROM tt.agg_feeds WHERE id = '${id('fe1')}'`;
+  await expectOk(sc, db, 'AG26 worker cập nhật lease/ETag/sức khỏe/failing_since không đổi row_version; CMS đổi lịch thì tăng', `${AGG} ${FEED()}
+    UPDATE tt.agg_feeds SET lease_until = now() + interval '2 minutes', health = 'DEGRADED', consecutive_failures = 1, last_failure = 'TIMEOUT',
+      failing_since = now(), etag = 'W/"x"', next_fetch_at = now() + interval '30 minutes';
+    DO $$ BEGIN IF (${FEED_RV}) <> 1 THEN RAISE EXCEPTION 'worker bumped row_version'; END IF; END $$;
+    UPDATE tt.agg_feeds SET schedule_minutes = 30;
+    DO $$ BEGIN IF (${FEED_RV}) <> 2 THEN RAISE EXCEPTION 'cms did not bump row_version'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG27 down 0342 tạo lại trigger tăng row_version ở mọi UPDATE', `${AGG} ${FEED()}
+    ${read(path.join(MIG_DIR, '0342_aggregation_collector.down.sql'))}
+    UPDATE tt.agg_feeds SET lease_until = now();
+    DO $$ BEGIN IF (${FEED_RV}) <> 2 OR to_regclass('tt.ix_agg_items_site_recent') IS NOT NULL
+      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_feeds' AND column_name = 'failing_since')
+      THEN RAISE EXCEPTION 'down 0342'; END IF; END $$;`);
+  // Gom cụm (0343): row_version của cụm chỉ đổi theo thao tác CMS; down tạo lại trigger cũ.
+  const CL = `INSERT INTO tt.agg_clusters (id, site_key, title) VALUES ('${id('c1b')}', 'www', 'Sự kiện');`;
+  const CL_RV = `SELECT row_version FROM tt.agg_clusters WHERE id = '${id('c1b')}'`;
+  await expectOk(sc, db, 'AG28 worker cập nhật điểm/bộ đếm/nhãn cụm không đổi row_version; đổi trạng thái thì tăng; mục có chữ ký MinHash', `${CL}
+    UPDATE tt.agg_clusters SET score = 42.5, item_count = 3, feed_count = 2, source_count = 2, labels = ARRAY['SENSITIVE']::varchar(20)[], last_item_at = now();
+    DO $$ BEGIN IF (${CL_RV}) <> 1 THEN RAISE EXCEPTION 'worker bumped cluster row_version'; END IF; END $$;
+    UPDATE tt.agg_clusters SET status = 'WATCHING';
+    DO $$ BEGIN IF (${CL_RV}) <> 2 THEN RAISE EXCEPTION 'cms did not bump cluster row_version'; END IF; END $$;
+    ${AGG} ${FEED()} INSERT INTO tt.agg_items (content_source_id, feed_id, url, url_hash, title, content_hash, minhash, minhash_bands, cluster_id, status)
+      VALUES ('${SRC}', '${id('fe1')}', 'https://bao-cong-nghe.example/a', repeat('a', 64), 'Tin', repeat('c', 64), ARRAY[1,2], ARRAY[3,4]::bigint[], '${id('c1b')}', 'CLUSTERED');
+    DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM tt.agg_items WHERE minhash_bands && ARRAY[4]::bigint[]) THEN RAISE EXCEPTION 'bands'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG29 down 0343 tạo lại trigger tăng row_version cụm ở mọi UPDATE', `${CL}
+    ${read(path.join(MIG_DIR, '0343_aggregation_clustering.down.sql'))}
+    UPDATE tt.agg_clusters SET score = 1;
+    DO $$ BEGIN IF (${CL_RV}) <> 2 OR to_regclass('tt.ix_agg_items_minhash_bands') IS NOT NULL
+      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_clusters' AND column_name = 'covered_at')
+      THEN RAISE EXCEPTION 'down 0343'; END IF; END $$;`);
+  // Vận hành (0344): cảnh báo nguồn (outbox) + nhịp tim worker.
+  await expectError(sc, db, 'AG30 loại cảnh báo ngoài danh sách bị chặn', `${AGG} INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'OTHER', 'x')`, /ck_agg_alerts_kind/);
+  await expectOk(sc, db, 'AG31 cảnh báo tự tạm dừng + nhịp tim worker ghi được; đánh dấu đã gửi', `${AGG}
+    INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'SOURCE_AUTO_PAUSED', 'Nguồn tự tạm dừng');
+    UPDATE tt.agg_alerts SET delivered_at = now(), attempts = 1;
+    INSERT INTO tt.agg_worker_heartbeats (worker_id, host, started_at) VALUES ('w-1', 'host-a', now())
+      ON CONFLICT (worker_id) DO UPDATE SET last_seen_at = now();`);
+  await expectError(sc, db, 'AG32 down 0344 từ chối khi còn cảnh báo chưa gửi', `${AGG}
+    INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'SOURCE_DEGRADED', 'Nguồn suy giảm');
+    ${read(path.join(MIG_DIR, '0344_aggregation_operations.down.sql'))}`, /Refusing to roll back 0344/);
+  // Hiệu chỉnh gom cụm (0345): lần tách/gộp lưu mục bị chuyển và phía bên kia; lịch sử vẫn chỉ thêm.
+  await expectOk(sc, db, 'AG33 tách cụm ghi item_ids/other_item_ids; dòng thao tác vẫn không sửa được', `${CL}
+    INSERT INTO tt.agg_clusters (id, site_key, title) VALUES ('${id('c1c')}', 'www', 'Sự kiện tách');
+    INSERT INTO tt.agg_cluster_actions (cluster_id, action, actor_id, related_cluster_id, item_ids, other_item_ids)
+      VALUES ('${id('c1b')}', 'SPLIT', '${U1}', '${id('c1c')}', ARRAY['${id('a01')}'::uuid], ARRAY['${id('a02')}'::uuid, '${id('a03')}'::uuid]);
+    DO $$ BEGIN
+      IF (SELECT cardinality(other_item_ids) FROM tt.agg_cluster_actions WHERE cluster_id = '${id('c1b')}') <> 2 THEN RAISE EXCEPTION 'ids'; END IF;
+      BEGIN
+        UPDATE tt.agg_cluster_actions SET item_ids = NULL;
+        RAISE EXCEPTION 'append-only not enforced';
+      EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM = 'append-only not enforced' THEN RAISE; END IF;
+      END;
+    END $$;`);
+
+  // Kết quả chốt 10/11/2026 (0346): chu kỳ mặc định 30 phút; chuyên mục phụ của mục tin luôn chứa chuyên mục chính; down trả P2, gỡ cờ AI.
+  await expectOk(sc, db, 'AG34 feed mới mặc định 30 phút; mục tin chưa phân loại có category_ids rỗng', `${AGG} ${FEED()} ${ITEM(null, 'a')}
+    DO $$ BEGIN
+      IF (SELECT schedule_minutes FROM tt.agg_feeds) <> 30 THEN RAISE EXCEPTION 'schedule'; END IF;
+      IF (SELECT cardinality(category_ids) FROM tt.agg_items) <> 0 THEN RAISE EXCEPTION 'ids'; END IF;
+    END $$;`);
+  await expectOk(sc, db, 'AG35 đổi chuyên mục chính ⇒ category_ids tự có chuyên mục đó (đứng đầu)', `${AGG} ${FEED()} ${ITEM(null, 'a')}
+    UPDATE tt.agg_items SET category_id = '${id('ca1')}', category_ids = '{}';
+    DO $$ BEGIN IF (SELECT category_ids FROM tt.agg_items) <> ARRAY['${id('ca1')}'::uuid] THEN RAISE EXCEPTION 'ids'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG36 down 0346 trả aggregation.radar về P2, gỡ aggregation.ai_dedup và category_ids', `${read(path.join(MIG_DIR, '0346_aggregation_owner_decisions.down.sql'))}
+    DO $$ BEGIN
+      IF (SELECT string_agg(key || '/' || scope, ',') FROM tt.feature_gates WHERE key LIKE 'aggregation.%') <> 'aggregation.radar/P2' THEN RAISE EXCEPTION 'flags'; END IF;
+      IF tt_migration.has_column('agg_items', 'category_ids') THEN RAISE EXCEPTION 'column'; END IF;
+    END $$;`);
+  await expectError(sc, db, 'AG37 down 0346 từ chối khi aggregation.ai_dedup đang bật', `${APPROVE('aggregation.ai_dedup')}
+    ${read(path.join(MIG_DIR, '0346_aggregation_owner_decisions.down.sql'))}`, /Refusing to roll back 0346/);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
