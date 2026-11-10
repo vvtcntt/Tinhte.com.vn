@@ -38,7 +38,10 @@ public sealed record AggregationSourceApprovalRecord(
     Guid ApprovedBy,
     DateTimeOffset ApprovedAt);
 
-/// <summary>AggregationSourceSummary: <c>id</c> = id nguồn trong danh mục tt.content_sources (ADR-0007).</summary>
+/// <summary>
+/// AggregationSourceSummary: <c>id</c> = id nguồn trong danh mục tt.content_sources (ADR-0007). <c>statusChangedBySystem</c> = lần đổi trạng thái
+/// gần nhất do worker (BR-06: tự DEGRADED/PAUSED), lấy từ lịch sử trạng thái chỉ thêm.
+/// </summary>
 public sealed record AggregationSourceSummary(
     Guid Id,
     string Name,
@@ -51,7 +54,10 @@ public sealed record AggregationSourceSummary(
     int FeedCount,
     int ItemsLast24h,
     string? WorstFeedHealth,
-    long RowVersion);
+    long RowVersion,
+    DateTimeOffset? StatusChangedAt = null,
+    bool StatusChangedBySystem = false,
+    string? StatusReason = null);
 
 /// <summary>AggregationSource = AggregationSourceSummary + hồ sơ duyệt, feeds, lịch sử duyệt (mới nhất trước).</summary>
 public sealed record AggregationSource(
@@ -67,6 +73,9 @@ public sealed record AggregationSource(
     int ItemsLast24h,
     string? WorstFeedHealth,
     long RowVersion,
+    DateTimeOffset? StatusChangedAt,
+    bool StatusChangedBySystem,
+    string? StatusReason,
     string? TermsEvidenceRef,
     Guid ProposedBy,
     Guid? ApprovedBy,
@@ -77,7 +86,8 @@ public sealed record AggregationSource(
     public static AggregationSource From(AggregationSourceSummary s, SourceApprovalState a, IReadOnlyList<AggregationFeed> feeds,
         IReadOnlyList<AggregationSourceApprovalRecord> approvals) =>
         new(s.Id, s.Name, s.Status, s.UsageMode, s.LicenseId, s.TrustWeight, s.Language, s.SiteKeys, s.FeedCount, s.ItemsLast24h, s.WorstFeedHealth,
-            s.RowVersion, a.TermsEvidenceRef, a.ProposedBy, a.ApprovedBy, a.ApprovedAt, feeds, approvals);
+            s.RowVersion, s.StatusChangedAt, s.StatusChangedBySystem, s.StatusReason, a.TermsEvidenceRef, a.ProposedBy, a.ApprovedBy, a.ApprovedAt, feeds,
+            approvals);
 }
 
 /// <summary>Phần hồ sơ duyệt của một nguồn (đọc cùng summary).</summary>
@@ -296,4 +306,13 @@ public sealed record AggregationStats(
     int OpenClustersToday,
     double? FetchSuccessRate24h,
     IReadOnlyDictionary<string, int> SourcesByStatus,
-    IReadOnlyList<AggregationSourceHealth> Sources);
+    IReadOnlyList<AggregationSourceHealth> Sources,
+    IReadOnlyList<AggregationWorkerStatus> Workers,
+    IReadOnlyList<AggregationAlert> Alerts);
+
+/// <summary>AggregationWorkerStatus — nhịp tim của một tiến trình worker; healthy = có nhịp tim trong 5 phút.</summary>
+public sealed record AggregationWorkerStatus(string WorkerId, string? Host, string? Version, DateTimeOffset StartedAt, DateTimeOffset LastSeenAt, bool Healthy,
+    string? LastError);
+
+/// <summary>AggregationAlert — cảnh báo nguồn do worker tạo (outbox tt.agg_alerts).</summary>
+public sealed record AggregationAlert(string Kind, Guid SourceId, string SourceName, string Message, DateTimeOffset CreatedAt, bool Delivered);

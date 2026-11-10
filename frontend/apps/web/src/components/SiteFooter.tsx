@@ -16,6 +16,7 @@ export function SiteFooter({ site }: { site: SiteDefinition }) {
             <li><Link href={routes.page('dieu-khoan')}>Điều khoản sử dụng</Link></li>
             <li><Link href={routes.page('quyen-rieng-tu')}>Chính sách quyền riêng tư</Link></li>
             <li><Link href={routes.page('lien-he')}>Liên hệ</Link></li>
+            <li><Link href={routes.bot()}>Bot thu thập tin</Link></li>
           </ul>
         </nav>
         <p className="site-footer__copy">

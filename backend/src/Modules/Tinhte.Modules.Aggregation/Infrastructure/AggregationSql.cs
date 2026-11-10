@@ -27,9 +27,12 @@ internal static class AggregationSql
                                  WHEN 'DEGRADED' THEN 3 WHEN 'NEVER_FETCHED' THEN 2 ELSE 1 END DESC) FILTER (WHERE f.is_enabled))[1]
                             ELSE 'DISABLED' END
                   FROM tt.agg_feeds f WHERE f.content_source_id = p.content_source_id),
-               p.row_version, p.terms_evidence_ref, p.proposed_by, p.approved_by, p.approved_at
+               p.row_version, p.terms_evidence_ref, p.proposed_by, p.approved_by, p.approved_at,
+               h.created_at, COALESCE(h.actor_id IS NULL, false), h.reason
           FROM tt.agg_source_profiles p
           JOIN tt.content_sources cs ON cs.id = p.content_source_id
+          LEFT JOIN LATERAL (SELECT sh.created_at, sh.actor_id, sh.reason FROM tt.agg_source_status_history sh
+                              WHERE sh.content_source_id = p.content_source_id ORDER BY sh.id DESC LIMIT 1) h ON true
         """;
 
     /// <summary>Thứ tự cột khớp <see cref="ReadFeed"/>.</summary>
@@ -52,7 +55,10 @@ internal static class AggregationSql
             FeedCount: r.GetInt32(8),
             ItemsLast24h: r.GetInt32(9),
             WorstFeedHealth: NullableText(r, 10),
-            RowVersion: r.GetInt64(11)),
+            RowVersion: r.GetInt64(11),
+            StatusChangedAt: NullableTime(r, 16),
+            StatusChangedBySystem: r.GetBoolean(17),
+            StatusReason: NullableText(r, 18)),
         new SourceApprovalState(NullableText(r, 12), r.GetGuid(13), NullableGuid(r, 14), NullableTime(r, 15)));
 
     /// <summary>

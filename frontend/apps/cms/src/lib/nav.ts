@@ -15,6 +15,8 @@ export const SECTIONS: Section[] = [
   { href: '/articles', label: 'Bài viết', permission: 'content.read', wbs: 'WBS-030, WBS-031', summary: 'Soạn, lưu nháp, xem trước và hàng đợi duyệt bài.' },
   { href: '/review', label: 'Duyệt bài', permission: 'content.read', wbs: 'WBS-031', summary: 'Hàng đợi duyệt, trả bài và xuất bản theo vai trò.' },
   { href: '/videos', label: 'Video', permission: 'content.read', wbs: 'WBS-046', summary: 'Tải lên, theo dõi xử lý, thư viện media.' },
+  { href: '/radar', label: 'Radar tin', permission: 'aggregation.read', wbs: 'WBS-144', summary: 'Tin mới hôm nay từ các nguồn, gom theo sự kiện, chấm điểm.' },
+  { href: '/aggregation', label: 'Nguồn thu thập', permission: 'aggregation.read', wbs: 'WBS-144', summary: 'Nguồn RSS, feed, duyệt chế độ khai thác, luật chuyên mục.' },
   { href: '/taxonomy', label: 'Chuyên mục & tag', permission: 'taxonomy.manage', wbs: 'WBS-032', summary: 'Chuyên mục, tag, nguồn và thông tin bản quyền.' },
   { href: '/moderation', label: 'Kiểm duyệt', permission: 'moderation.act', wbs: 'WBS-065', summary: 'Hàng đợi báo cáo và quyết định kiểm duyệt.' },
   { href: '/users', label: 'Tài khoản', permission: 'users.read', wbs: 'WBS-115', summary: 'Tài khoản staff, đình chỉ, cấp/thu hồi vai trò.' },

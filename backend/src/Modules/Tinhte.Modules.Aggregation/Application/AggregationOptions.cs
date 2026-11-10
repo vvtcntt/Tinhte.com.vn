@@ -13,6 +13,7 @@ namespace Tinhte.Modules.Aggregation.Application;
 ///         <c>Classification:Sites:{siteKey}:AutoAssign|Review</c> — BR-31;</item>
 ///   <item><c>Clustering:Similarity</c> (0.5), <c>Clustering:SimilarityWithEntity</c> (0.25), <c>Clustering:WindowHours</c> (48) — BR-21;</item>
 ///   <item><c>Scoring:Sources|Trust|Relevance|Velocity|Freshness</c> (35/15/15/15/20) — BR-32; <c>Worker:MaintenanceMinutes</c> (5);</item>
+///   <item><c>FetchLogRetentionDays</c> (30), <c>Alerts:WebhookUrl</c> (https, tùy chọn — kênh gửi cảnh báo nguồn);</item>
 ///   <item><c>FeedTests:PerMinute</c> (10) — số lần thử feed mỗi phút cho một người (429 RATE_LIMITED);</item>
 ///   <item><c>SensitiveTopicsPath</c> (config/aggregation/sensitive-topics.json), <c>BotSiteKey</c>, <c>BotInfoPath</c>.</item>
 /// </list>
@@ -30,6 +31,9 @@ public sealed class AggregationOptions
     public int FeedTestsPerMinute { get; init; } = 10;
 
     public TimeSpan MaintenanceInterval { get; init; } = TimeSpan.FromMinutes(5);
+
+    /// <summary>Số ngày giữ agg_fetch_log (ADR-0008 §9: 30 ngày), worker dọn theo lô.</summary>
+    public int FetchLogRetentionDays { get; init; } = 30;
 
     public ClusteringOptions Clustering { get; init; } = ClusteringOptions.Default;
 
@@ -56,6 +60,7 @@ public sealed class AggregationOptions
             LeaseDuration = TimeSpan.FromSeconds(Int(section, "Worker:LeaseSeconds", 120, 30, 3600)),
             FeedTestsPerMinute = Int(section, "FeedTests:PerMinute", 10, 1, 1000),
             MaintenanceInterval = TimeSpan.FromMinutes(Int(section, "Worker:MaintenanceMinutes", 5, 1, 1440)),
+            FetchLogRetentionDays = Int(section, "FetchLogRetentionDays", 30, 1, 365),
             Clustering = new ClusteringOptions(
                 Fraction(section, "Clustering:Similarity", ClusteringOptions.Default.Similarity),
                 Fraction(section, "Clustering:SimilarityWithEntity", ClusteringOptions.Default.SimilarityWithEntity),

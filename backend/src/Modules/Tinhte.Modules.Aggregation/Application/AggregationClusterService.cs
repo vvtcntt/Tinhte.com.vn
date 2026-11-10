@@ -294,7 +294,40 @@ public sealed class AggregationClusterService(ITinhteDatabase database, Aggregat
         }
 
         var health = sources.Select(s => perSource.TryGetValue(s.SourceId, out var x) ? s with { ItemsToday = x.Items, LastSuccessAt = x.LastSuccess } : s).ToList();
-        return new AggregationStats(siteKey, day, clock.Id, itemsToday, clustersToday, openToday, successRate, byStatus, health);
+
+        // Giám sát worker (nhịp tim 7 ngày) + cảnh báo nguồn của site (7 ngày, mới trước) — NFR-AGG-06, BR-06.
+        var workers = new List<AggregationWorkerStatus>();
+        await using (var command = AggregationSql.Command(connection, null, """
+            SELECT worker_id, host, version, started_at, last_seen_at, last_seen_at >= now() - interval '5 minutes', last_error
+              FROM tt.agg_worker_heartbeats WHERE last_seen_at >= now() - interval '7 days' ORDER BY last_seen_at DESC LIMIT 50
+            """))
+        await using (var r = await command.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                workers.Add(new AggregationWorkerStatus(r.GetString(0), AggregationSql.NullableText(r, 1), AggregationSql.NullableText(r, 2),
+                    r.GetFieldValue<DateTimeOffset>(3), r.GetFieldValue<DateTimeOffset>(4), r.GetBoolean(5), AggregationSql.NullableText(r, 6)));
+            }
+        }
+
+        var alerts = new List<AggregationAlert>();
+        await using (var command = AggregationSql.Command(connection, null, """
+            SELECT a.kind, a.content_source_id, cs.name, a.message, a.created_at, a.delivered_at IS NOT NULL
+              FROM tt.agg_alerts a
+              JOIN tt.agg_source_profiles p ON p.content_source_id = a.content_source_id
+              JOIN tt.content_sources cs ON cs.id = a.content_source_id
+             WHERE @site = ANY(p.site_keys) AND a.created_at >= now() - interval '7 days'
+             ORDER BY a.created_at DESC, a.id DESC LIMIT 50
+            """).WithText("site", siteKey))
+        await using (var r = await command.ExecuteReaderAsync(ct))
+        {
+            while (await r.ReadAsync(ct))
+            {
+                alerts.Add(new AggregationAlert(r.GetString(0), r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetFieldValue<DateTimeOffset>(4), r.GetBoolean(5)));
+            }
+        }
+
+        return new AggregationStats(siteKey, day, clock.Id, itemsToday, clustersToday, openToday, successRate, byStatus, health, workers, alerts);
     }
 
     // ---------------------------------------------------------------- nội bộ

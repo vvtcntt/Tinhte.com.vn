@@ -10380,6 +10380,22 @@ components:
           anyOf:
           - $ref: '#/components/schemas/AggregationFeedHealth'
           - type: 'null'
+        statusChangedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Time of the latest status change (status history, append-only).
+        statusChangedBySystem:
+          type: boolean
+          description: True when the collector changed the status automatically (DEGRADED after repeated failures, PAUSED after failing
+            for 24 hours — BA-01 BR-06), false when a staff member did.
+        statusReason:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+          description: Reason recorded with the latest status change (required for PAUSED/RETIRED).
         rowVersion:
           type: integer
           format: int64
@@ -10982,6 +10998,82 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AggregationSourceHealth'
+        workers:
+          type: array
+          description: Collector worker processes seen in the last 7 days (heartbeat), most recent first.
+          items:
+            $ref: '#/components/schemas/AggregationWorkerStatus'
+        alerts:
+          type: array
+          maxItems: 50
+          description: Collector alerts of the last 7 days for sources of the site (automatic pause/degradation), most recent first.
+          items:
+            $ref: '#/components/schemas/AggregationAlert'
+    AggregationWorkerStatus:
+      type: object
+      required:
+      - workerId
+      - startedAt
+      - lastSeenAt
+      - healthy
+      properties:
+        workerId:
+          type: string
+          maxLength: 100
+        host:
+          type:
+          - string
+          - 'null'
+          maxLength: 200
+        version:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+        startedAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+        healthy:
+          type: boolean
+          description: Heartbeat within the last 5 minutes.
+        lastError:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+    AggregationAlert:
+      type: object
+      required:
+      - kind
+      - sourceId
+      - sourceName
+      - message
+      - createdAt
+      - delivered
+      properties:
+        kind:
+          type: string
+          enum:
+          - SOURCE_AUTO_PAUSED
+          - SOURCE_DEGRADED
+          description: Clients must tolerate unknown values.
+        sourceId:
+          type: string
+          format: uuid
+        sourceName:
+          type: string
+        message:
+          type: string
+          maxLength: 2000
+        createdAt:
+          type: string
+          format: date-time
+        delivered:
+          type: boolean
+          description: Sent to the configured external alert channel (webhook). Always false when no channel is configured.
   responses:
     BadRequest:
       description: Bad request

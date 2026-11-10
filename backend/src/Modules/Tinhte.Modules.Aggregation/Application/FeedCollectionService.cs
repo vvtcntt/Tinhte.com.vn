@@ -152,10 +152,15 @@ public sealed partial class FeedCollectionService(
         }
 
         if (fetch.Unsafe) LogUnsafeTarget(logger, lease.FeedId, fetch.Detail);
+        CollectorMetrics.Fetches.Add(1, new KeyValuePair<string, object?>("outcome", outcome), new KeyValuePair<string, object?>("failure", failure ?? "none"));
         var attempt = new Attempt(started, outcome, failure, fetch.HttpStatus, fetch.BytesRead, fetch.ETag, fetch.LastModified, fetch.RetryAfter, parsed);
         try
         {
-            return await RecordAsync(lease, attempt, ct);
+            var result = await RecordAsync(lease, attempt, ct);
+            CollectorMetrics.ItemsNew.Add(result.ItemsNew);
+            CollectorMetrics.ItemsUpdated.Add(result.ItemsUpdated);
+            CollectorMetrics.FetchDuration.Record((time.GetUtcNow() - started).TotalMilliseconds);
+            return result;
         }
         catch (Exception e) when (e is NpgsqlException or InvalidOperationException or JsonException)
         {
@@ -298,7 +303,11 @@ public sealed partial class FeedCollectionService(
         {
             await using var degrade = AggregationSql.Command(connection, tx,
                 "UPDATE tt.agg_source_profiles SET status = 'DEGRADED' WHERE content_source_id = @source AND status = 'ENABLED'").WithUuid("source", lease.SourceId);
-            await degrade.ExecuteNonQueryAsync(ct);
+            if (await degrade.ExecuteNonQueryAsync(ct) > 0)
+            {
+                await CollectorOperations.RaiseAsync(connection, tx, lease.SourceId, "SOURCE_DEGRADED",
+                    $"Feed {lease.Url} lỗi {failures} lần liên tiếp (gần nhất {failure}); nguồn chuyển DEGRADED.", ct);
+            }
         }
 
         await using (var check = AggregationSql.Command(connection, tx, """
@@ -315,7 +324,14 @@ public sealed partial class FeedCollectionService(
         await using var pause = AggregationSql.Command(connection, tx,
             "UPDATE tt.agg_source_profiles SET status = 'PAUSED' WHERE content_source_id = @source AND status IN ('ENABLED', 'DEGRADED')")
             .WithUuid("source", lease.SourceId);
-        if (await pause.ExecuteNonQueryAsync(ct) > 0) LogSourcePaused(logger, lease.SourceId, failure);
+        if (await pause.ExecuteNonQueryAsync(ct) > 0)
+        {
+            // Cảnh báo ghi cùng transaction với việc tạm dừng (outbox): không mất nếu kênh ngoài lỗi; CMS đọc qua thống kê.
+            await CollectorOperations.RaiseAsync(connection, tx, lease.SourceId, "SOURCE_AUTO_PAUSED",
+                $"Mọi feed đang bật của nguồn lỗi liên tục ≥ {FetchSchedule.AutoPauseAfter.TotalHours:0} giờ (gần nhất {failure}); nguồn đã tự tạm dừng. "
+                + "Kiểm tra feed rồi tiếp tục (resume) trên CMS.", ct);
+            LogSourcePaused(logger, lease.SourceId, failure);
+        }
     }
 
     // ---------------------------------------------------------------- mục tin

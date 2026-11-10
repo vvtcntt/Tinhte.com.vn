@@ -46,12 +46,17 @@ public sealed class AggregationModule : IModule
             sp.GetRequiredService<IFeedHostResolver>(), sp.GetRequiredService<BotUserAgent>(), sp.GetRequiredService<TimeProvider>()));
     }
 
-    /// <summary>Phần chỉ worker cần: danh sách chủ đề nhạy cảm (config/aggregation/sensitive-topics.json) + dịch vụ thu thập.</summary>
+    /// <summary>
+    /// Phần chỉ worker cần: danh sách chủ đề nhạy cảm (config/aggregation/sensitive-topics.json), dịch vụ thu thập, việc vận hành
+    /// (dọn nhật ký, gửi cảnh báo qua <c>Aggregation:Alerts:WebhookUrl</c>, nhịp tim).
+    /// </summary>
     public static void AddCollectorWorker(IServiceCollection services, IConfiguration configuration)
     {
         AddCollector(services, configuration);
         services.TryAddSingleton(sp => SensitiveTopics.Load(ContentPaths.Resolve(sp.GetRequiredService<AggregationOptions>().SensitiveTopicsPath,
             sp.GetRequiredService<IHostEnvironment>())));
         services.TryAddSingleton<FeedCollectionService>();
+        services.TryAddSingleton(sp => WebhookAlertSink.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+        services.TryAddSingleton<CollectorOperations>();
     }
 }

@@ -3,6 +3,8 @@
 #   edge     : Caddy mô phỏng CDN đa subdomain; Caddyfile SINH TỪ config/sites/sites.json
 #              (node tools/sites/generate-caddyfile.mjs) — ADR-0001 D10.
 # App chạy trên máy: API `dotnet run` (5080), web `npm run dev -w @tinhte/web` (3000), cms (3001).
+#   worker   : (profile "worker", tùy chọn) worker thu thập Radar tin — `docker compose --profile worker up -d worker`.
+#              Chạy migration trước (Tinhte.DbMigrator). Cờ aggregation.radar OFF thì worker chạy nhưng không thu thập.
 # Truy cập qua edge: http://www.tinhte.localhost:8080 , http://cms.tinhte.localhost:8080 (trình duyệt tự trỏ *.localhost về 127.0.0.1).
 services:
   postgres:
@@ -28,6 +30,21 @@ services:
       - ./infra/local/Caddyfile:/etc/caddy/Caddyfile:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  worker:
+    profiles: ["worker"]
+    build:
+      context: .
+      dockerfile: backend/src/Tinhte.Worker/Dockerfile
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      Sites__Environment: local
+      ConnectionStrings__Tinhte: Host=postgres;Port=5432;Username=tinhte;Password=${TT_LOCAL_PG_PASSWORD:-change-me-local-only};Database=tinhte
+      Aggregation__Worker__PollSeconds: "30"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   pgdata: {}

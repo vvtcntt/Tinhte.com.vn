@@ -28,6 +28,7 @@ PASS [A] UP 0340_content_sources_licenses.up.sql
 PASS [A] UP 0341_aggregation_radar.up.sql
 PASS [A] UP 0342_aggregation_collector.up.sql
 PASS [A] UP 0343_aggregation_clustering.up.sql
+PASS [A] UP 0344_aggregation_operations.up.sql
 PASS [A] UP 0311_privacy_requests.LEGAL_PENDING.up.sql
 PASS [A] UP lần 2 (idempotent) 0299_migration_support.up.sql
 PASS [A] UP lần 2 (idempotent) 0300_feature_gate_registry.up.sql
@@ -59,6 +60,7 @@ PASS [A] UP lần 2 (idempotent) 0340_content_sources_licenses.up.sql
 PASS [A] UP lần 2 (idempotent) 0341_aggregation_radar.up.sql
 PASS [A] UP lần 2 (idempotent) 0342_aggregation_collector.up.sql
 PASS [A] UP lần 2 (idempotent) 0343_aggregation_clustering.up.sql
+PASS [A] UP lần 2 (idempotent) 0344_aggregation_operations.up.sql
 PASS [A] UP lần 2 (idempotent) 0311_privacy_requests.LEGAL_PENDING.up.sql
 PASS [A] Chạy up lần 2 không đổi schema
 PASS [A] F1 18 khóa registry (17 của 0300 + aggregation.radar của 0341) + 1 khóa ngoài registry được giữ
@@ -68,25 +70,25 @@ PASS [A] F2 bật cờ không có hồ sơ duyệt bị chặn — new row for r
 PASS [A] F3 bật cờ có hồ sơ duyệt → audit có người thao tác + version tăng
 PASS [A] F4 xóa nhật ký cờ bị chặn — APPEND_ONLY | DELETE on tt.feature_gate_changes is not allowed: rows are append-only evidence
 PASS [A] F5 TRUNCATE nhật ký cờ bị chặn — APPEND_ONLY | TRUNCATE on tt.feature_gate_changes is not allowed: rows are append-only evidence
-PASS [A] R1 revision SPONSORED thiếu sponsorship bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_complete" | Failing row contains (5341eea6-ac6a-4b10-b148-d4f518fdbd5
-PASS [A] R2 validTo ≤ validFrom bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_window" | Failing row contains (22445728-6405-47fd-945b-41ab7e2eb520,
+PASS [A] R1 revision SPONSORED thiếu sponsorship bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_complete" | Failing row contains (d11b2d90-120d-4e50-98b2-d02cfcbc5e5
+PASS [A] R2 validTo ≤ validFrom bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_window" | Failing row contains (4dbe630d-da55-4472-a9b2-bbca7c03e557,
 PASS [A] R3 approved_by thiếu approved_at bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_sponsorship_approval_pair" | Failing row contains (00000000-0000-0000-0000-000000
 PASS [A] R4 content_kind ngoài enum bị chặn — new row for relation "video_revisions" violates check constraint "ck_video_revisions_content_kind" | Failing row contains (00000000-0000-0000-0000-0000000000d2, 00000000-
 PASS [A] P1 publish tài trợ khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | ads.sponsored_publication is OFF: sponsored revisions cannot be published
 PASS [A] P2 cờ ON, tài trợ chưa duyệt → SPONSORSHIP_LABEL_REQUIRED — SPONSORSHIP_LABEL_REQUIRED | Sponsorship of revision 00000000-0000-0000-0000-0000000000f2 is not approved
-PASS [A] P3 cờ ON, tài trợ hết hạn → SPONSORSHIP_EXPIRED — SPONSORSHIP_EXPIRED | Sponsorship window [2026-09-11 11:35:55.803+07, 2026-11-09 11:35:55.803+07) does not include now
+PASS [A] P3 cờ ON, tài trợ hết hạn → SPONSORSHIP_EXPIRED — SPONSORSHIP_EXPIRED | Sponsorship window [2026-09-11 11:53:41.838+07, 2026-11-09 11:53:41.838+07) does not include now
 PASS [A] P4 cờ ON, đã duyệt, còn hạn → publish được
 PASS [A] P5 bài EDITORIAL publish được khi cờ tài trợ OFF
 PASS [A] P6 revision của bài khác → STATE_CONFLICT — STATE_CONFLICT | Revision 00000000-0000-0000-0000-0000000000f5 does not belong to articles 00000000-0000-0000-0000-0000000000b1
 PASS [A] P7 video tài trợ khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | ads.sponsored_publication is OFF: sponsored revisions cannot be published
 PASS [A] C1 ghi bình luận khi cờ OFF → FEATURE_DISABLED — FEATURE_DISABLED | community.video_comments is OFF: write to tt.comments rejected
 PASS [A] C2 ghi bình luận khi cờ ON (có duyệt)
-PASS [A] A1 targetUrl javascript: bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_target_https" | Failing row contains (80e3a3fa-7557-4838-b543-f2ca0fd17535, slot_a, Quảng
-PASS [A] A2 ACTIVE chưa duyệt bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_approval" | Failing row contains (7396793e-a497-4b4c-867c-42c950c3ee86, slot_a, Quảng cáo
-PASS [A] A3 APPROVED thiếu alt/media bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_serving_complete" | Failing row contains (c52e4418-5ab1-4fae-902c-cc08c3efc8c8, slot_a, Q
-PASS [A] A4 code sai định dạng bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_code_format" | Failing row contains (ec1c2957-0725-4487-8032-6f0cfa339001, Bad Code, Quản
-PASS [A] A5 thiếu kích thước bị chặn (chống CLS) — new row for relation "ad_placements" violates check constraint "ck_ad_placements_dimensions" | Failing row contains (1d7ffc8e-87f1-47bf-b6ac-f3052f5363a5, slot_a, Quảng c
-PASS [A] A6 status ngoài enum bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_status" | Failing row contains (1e5529cd-982a-4b0e-a4d3-2a9a8f958c05, slot_a, Quảng cáo, 
+PASS [A] A1 targetUrl javascript: bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_target_https" | Failing row contains (19c5d4a6-68bf-49c3-a356-079be4fbf429, slot_a, Quảng
+PASS [A] A2 ACTIVE chưa duyệt bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_approval" | Failing row contains (59ddcf0d-6f23-49a9-aafc-d1d637d52a93, slot_a, Quảng cáo
+PASS [A] A3 APPROVED thiếu alt/media bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_serving_complete" | Failing row contains (78dba157-97c7-4a20-9b34-5955db3c170f, slot_a, Q
+PASS [A] A4 code sai định dạng bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_code_format" | Failing row contains (bc9240bc-4fa6-4a37-93b3-61b6e20b9b0c, Bad Code, Quản
+PASS [A] A5 thiếu kích thước bị chặn (chống CLS) — new row for relation "ad_placements" violates check constraint "ck_ad_placements_dimensions" | Failing row contains (41313c35-53bb-46cd-a7b5-a3a245272222, slot_a, Quảng c
+PASS [A] A6 status ngoài enum bị chặn — new row for relation "ad_placements" violates check constraint "ck_ad_placements_status" | Failing row contains (9685885c-6477-439e-acd9-5ae89c72d34f, slot_a, Quảng cáo, 
 PASS [A] A7 slot ACTIVE đầy đủ hợp lệ; UPDATE tăng row_version
 PASS [A] T1 ghi nhận yêu cầu takedown
 PASS [A] T2 ACTIONED khi chưa có action → STATE_CONFLICT (kiểm hoãn) — STATE_CONFLICT | Takedown 00000000-0000-0000-0000-0000000007d1 cannot be ACTIONED without a linked action
@@ -98,7 +100,7 @@ PASS [A] T7 TRUNCATE bằng chứng bị chặn — APPEND_ONLY | TRUNCATE on tt
 PASS [A] T8 RECEIVED → CLOSED bị chặn — STATE_CONFLICT | Takedown 00000000-0000-0000-0000-0000000007d1: transition RECEIVED → CLOSED is not allowed
 PASS [A] T9 bước lan truyền DONE thiếu completed_at bị chặn — new row for relation "takedown_propagation" violates check constraint "ck_takedown_propagation_done_at" | Failing row contains (00000000-0000-0000-0000-0000000007d1, CDN_
 PASS [A] T10 down 0303 từ chối khi đã có yêu cầu takedown — Refusing to roll back 0303: tt.takedown_requests contains rows (legal evidence). Export the data and obtain approval before rolling back.
-PASS [A] T11 action thiếu lý do bị chặn — new row for relation "takedown_actions" violates check constraint "takedown_actions_reason_check" | Failing row contains (5f626cbe-d0a5-447f-b15c-9432ba5cddea, 00000000-0
+PASS [A] T11 action thiếu lý do bị chặn — new row for relation "takedown_actions" violates check constraint "takedown_actions_reason_check" | Failing row contains (5da99da2-6e94-4384-bd1c-e204d5553da2, 00000000-0
 PASS [A] M1 priority ngoài enum bị chặn — new row for relation "moderation_cases" violates check constraint "ck_moderation_cases_priority" | Failing row contains (00000000-0000-0000-0000-0000000000c1, COMMENT, 00
 PASS [A] M2 sửa lịch sử kiểm duyệt bị chặn — APPEND_ONLY | UPDATE on tt.moderation_case_history is not allowed: rows are append-only evidence
 PASS [A] M3 HIDE thiếu lý do bị chặn — new row for relation "moderation_case_history" violates check constraint "ck_moderation_case_history_reason" | Failing row contains (2, 00000000-0000-0000-0000-0000000000
@@ -122,7 +124,7 @@ PASS [A] N3 public revision không sửa được nội dung (kể cả status D
 PASS [A] N4 revision đã đóng băng vẫn đổi được trạng thái + thông tin xuất bản
 PASS [A] N5 revision đã rời DRAFT không quay lại DRAFT — STATE_CONFLICT | Revision 1 of article 00000000-0000-0000-0000-0000000000b2 cannot return to DRAFT
 PASS [A] N6 revision không xóa được (lịch sử sửa bài) — APPEND_ONLY | DELETE on tt.article_revisions is not allowed: rows are append-only evidence
-PASS [A] N7 status revision ngoài vòng đời bị chặn (CHECK khi INSERT; UPDATE còn bị trigger 0324 chặn trước) — new row for relation "article_revisions" violates check constraint "ck_article_revisions_status" | Failing row contains (40623ea6-777f-4cb7-81f7-c675b0d7553b, 00000000-00
+PASS [A] N7 status revision ngoài vòng đời bị chặn (CHECK khi INSERT; UPDATE còn bị trigger 0324 chặn trước) — new row for relation "article_revisions" violates check constraint "ck_article_revisions_status" | Failing row contains (d9a30c45-c2fb-4a16-a766-d1eb8afa9cba, 00000000-00
 PASS [A] N8 slug sai định dạng bị chặn — new row for relation "articles" violates check constraint "ck_articles_slug_format" | Failing row contains (00000000-0000-0000-0000-0000000000b2, Bai Mot, DRAFT, null, nu
 PASS [A] N9 body revision phải là mảng block — new row for relation "article_revisions" violates check constraint "ck_article_revisions_body_array" | Failing row contains (00000000-0000-0000-0000-0000000000f5, 0000000
 PASS [A] N10 published_by thiếu published_at bị chặn — new row for relation "article_revisions" violates check constraint "ck_article_revisions_published_pair" | Failing row contains (00000000-0000-0000-0000-0000000000f5, 000
@@ -132,7 +134,7 @@ PASS [A] W3 gửi duyệt → yêu cầu sửa có lý do; ghi người duyệt
 PASS [A] W4 lý do duyệt đã ghi không sửa được — STATE_CONFLICT | Review record of revision 1 of article 00000000-0000-0000-0000-0000000000b2 is immutable
 PASS [A] W5 bị từ chối thì không duyệt lại được (sửa → revision mới) — STATE_CONFLICT | Revision 1 of article 00000000-0000-0000-0000-0000000000b2 cannot go from REJECTED to APPROVED
 PASS [A] W6 người gửi chỉ có cả hai cột hoặc không — new row for relation "article_revisions" violates check constraint "ck_article_revisions_submitted_pair" | Failing row contains (00000000-0000-0000-0000-0000000000f5, 000
-PASS [A] MV1 status media ngoài enum MediaStatus bị chặn — new row for relation "media_assets" violates check constraint "ck_media_assets_status" | Failing row contains (00000000-0000-0000-0000-0000000000e1, DONE, 2026-11-10 11:3
+PASS [A] MV1 status media ngoài enum MediaStatus bị chặn — new row for relation "media_assets" violates check constraint "ck_media_assets_status" | Failing row contains (00000000-0000-0000-0000-0000000000e1, DONE, 2026-11-10 11:5
 PASS [A] MV2 checksum không phải sha256 hex thường bị chặn — new row for relation "media_assets" violates check constraint "ck_media_assets_checksum_format" | Failing row contains (00000000-0000-0000-0000-0000000000e1, UPLOADING, 2
 PASS [A] MV3 upload token thiếu hạn bị chặn — new row for relation "media_assets" violates check constraint "ck_media_assets_upload_token" | Failing row contains (00000000-0000-0000-0000-0000000000e1, UPLOADING, 2026
 PASS [A] MV4 upload token chỉ tồn tại khi UPLOADING — new row for relation "media_assets" violates check constraint "ck_media_assets_upload_token" | Failing row contains (00000000-0000-0000-0000-0000000000e2, UPLOADED, 2026-
@@ -195,16 +197,20 @@ PASS [A] AG17 hai feed trùng URL bị chặn — duplicate key value violates u
 PASS [A] AG18 feed không xóa được (chỉ tắt) — APPEND_ONLY | DELETE on tt.agg_feeds is not allowed: rows are append-only evidence
 PASS [A] AG19 khử trùng mục tin theo (nguồn, guid) — duplicate key value violates unique constraint "ux_agg_items_source_guid" | Key (content_source_id, guid)=(00000000-0000-0000-0000-0000000005c1, g-1) already exists. | ux
 PASS [A] AG20 khử trùng mục tin theo (nguồn, url_hash) — duplicate key value violates unique constraint "ux_agg_items_source_url_hash" | Key (content_source_id, url_hash)=(00000000-0000-0000-0000-0000000005c1, aaaaaaaaaaaaaaaaa
-PASS [A] AG21 mục tin không đổi feed/nguồn — STATE_CONFLICT | tt.agg_items b9ebd486-f8b0-4423-9154-ea1ea615701c cannot move to another source or feed
+PASS [A] AG21 mục tin không đổi feed/nguồn — STATE_CONFLICT | tt.agg_items 9621ac59-e7ab-4193-b274-08645ca23428 cannot move to another source or feed
 PASS [A] AG22 bỏ qua cụm thiếu lý do → REASON_REQUIRED — REASON_REQUIRED | Dismissing cluster 00000000-0000-0000-0000-000000000c1a requires a reason of at least 5 characters
-PASS [A] AG23 cụm COVERED phải có bài — new row for relation "agg_clusters" violates check constraint "ck_agg_clusters_covered" | Failing row contains (50737b2c-dc35-447e-a516-b365e84bbc41, www, Sự kiện, null, 
+PASS [A] AG23 cụm COVERED phải có bài — new row for relation "agg_clusters" violates check constraint "ck_agg_clusters_covered" | Failing row contains (c53a5d12-7964-4e8f-8268-09bdfd1c4832, www, Sự kiện, null, 
 PASS [A] AG24 down 0341 từ chối khi đã có lịch sử nguồn — Refusing to roll back 0341: tt.agg_source_status_history contains rows (source pause/resume/retire audit trail). Export the data and obtain approval before rolling back.
 PASS [A] AG25 down 0340 từ chối khi đã có giấy phép — Refusing to roll back 0340: tt.licenses contains rows (licence records and contract evidence references). Export the data and obtain approval before rolling back.
 PASS [A] AG26 worker cập nhật lease/ETag/sức khỏe/failing_since không đổi row_version; CMS đổi lịch thì tăng
 PASS [A] AG27 down 0342 tạo lại trigger tăng row_version ở mọi UPDATE
 PASS [A] AG28 worker cập nhật điểm/bộ đếm/nhãn cụm không đổi row_version; đổi trạng thái thì tăng; mục có chữ ký MinHash
 PASS [A] AG29 down 0343 tạo lại trigger tăng row_version cụm ở mọi UPDATE
-PASS [A] O1 privacy request VERIFIED thiếu verified_at bị chặn — new row for relation "privacy_requests" violates check constraint "ck_privacy_requests_verified_at" | Failing row contains (1fff510c-f6cc-4c2d-936c-2fc0ec2b4781, ACCESS, 
+PASS [A] AG30 loại cảnh báo ngoài danh sách bị chặn — new row for relation "agg_alerts" violates check constraint "ck_agg_alerts_kind" | Failing row contains (1, 00000000-0000-0000-0000-0000000005c1, OTHER, x, 2026-11-10 11:
+PASS [A] AG31 cảnh báo tự tạm dừng + nhịp tim worker ghi được; đánh dấu đã gửi
+PASS [A] AG32 down 0344 từ chối khi còn cảnh báo chưa gửi — Refusing to roll back 0344: tt.agg_alerts has undelivered alerts. Deliver or export them first.
+PASS [A] O1 privacy request VERIFIED thiếu verified_at bị chặn — new row for relation "privacy_requests" violates check constraint "ck_privacy_requests_verified_at" | Failing row contains (2ded7d96-3b9a-417a-a972-7f832dcb3d2e, ACCESS, 
+PASS [A] DOWN 0344_aggregation_operations.down.sql
 PASS [A] DOWN 0343_aggregation_clustering.down.sql
 PASS [A] DOWN 0342_aggregation_collector.down.sql
 PASS [A] DOWN 0341_aggregation_radar.down.sql
@@ -267,6 +273,7 @@ PASS [A] UP lại sau down 0340_content_sources_licenses.up.sql
 PASS [A] UP lại sau down 0341_aggregation_radar.up.sql
 PASS [A] UP lại sau down 0342_aggregation_collector.up.sql
 PASS [A] UP lại sau down 0343_aggregation_clustering.up.sql
+PASS [A] UP lại sau down 0344_aggregation_operations.up.sql
 PASS [B] SQL addendum v0.2 chạy được trên stub (lần đầu được chạy thử)
 PASS [B] UP 0299_migration_support.up.sql
 PASS [B] UP 0300_feature_gate_registry.up.sql
@@ -297,11 +304,13 @@ PASS [B] UP 0340_content_sources_licenses.up.sql
 PASS [B] UP 0341_aggregation_radar.up.sql
 PASS [B] UP 0342_aggregation_collector.up.sql
 PASS [B] UP 0343_aggregation_clustering.up.sql
+PASS [B] UP 0344_aggregation_operations.up.sql
 PASS [B] Khóa v0.2 đổi sang registry, giữ trạng thái OFF
 PASS [B] Báo cáo vi phạm NOT VALID chỉ ra đúng dòng v0.2 thiếu kích thước — ad_placements.ck_ad_placements_dimensions=1
 PASS [B] 0310 phải DỪNG khi dữ liệu cũ thiếu kích thước slot — 0310_validate_constraints.up.sql: VALIDATE failed for tt.ad_placements.ck_ad_placements_dimensions: existing rows violate it — backfill/map data, then rerun 0310 (check c
 PASS [B] UP sau backfill 0310_validate_constraints.up.sql
 PASS [B] Mọi ràng buộc v0.3 đã VALIDATED
+PASS [B] DOWN 0344_aggregation_operations.down.sql
 PASS [B] DOWN 0343_aggregation_clustering.down.sql
 PASS [B] DOWN 0342_aggregation_collector.down.sql
 PASS [B] DOWN 0341_aggregation_radar.down.sql
@@ -335,4 +344,4 @@ PASS [B] DOWN 0299_migration_support.down.sql
 PASS [B] Sau down, schema + khóa cờ trở về đúng trạng thái v0.2
 PASS [C] 0304 dừng khi thiếu tt.moderation_cases — 0304_moderation_cases.up.sql: Precondition failed: table tt.moderation_cases is required (schema 04). Reconcile 04_DATABASE_SCHEMA_REFERENCE_v0.1.sql first.
 
-TỔNG: 336/336 PASS
+TỔNG: 345/345 PASS

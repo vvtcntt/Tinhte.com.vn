@@ -1,0 +1,56 @@
+/* Radar tin + Quản lý nguồn (WBS-144). Chỉ dùng token màu của globals.css. */
+
+.small { font-size: 13px; }
+.title-row.spread { justify-content: space-between; align-items: flex-start; }
+.title-row.spread > div { min-width: 0; }
+.row-start { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.inline-form > input, .inline-form > select { min-height: 36px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.narrow-input { width: 90px; }
+.ok-text { color: var(--ok-text); }
+.check.inline { align-items: center; min-height: 36px; font-size: 14px; }
+.inline-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; border: 0; padding: 0; margin: 0; }
+.inline-checks legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+
+/* Điểm ưu tiên cụm */
+.score { display: inline-grid; place-items: center; min-width: 40px; height: 40px; border-radius: 10px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.score-high { background: var(--accent); color: var(--accent-text); }
+.score-mid { background: var(--warn-bg); color: var(--warn-text); }
+.score-low { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+
+/* Thống kê nhanh */
+.stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 2px; }
+.stat strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+
+/* Danh sách cụm */
+.cluster-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cluster-card { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; box-shadow: var(--shadow); }
+.cluster-body { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.cluster-title { font-weight: 600; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.cluster-title:hover { text-decoration: underline; }
+.cluster-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.cluster-body p { margin: 0; }
+.cluster-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+@media (max-width: 640px) {
+  .cluster-card { flex-wrap: wrap; }
+  .cluster-actions { flex-direction: row; width: 100%; }
+}
+
+/* Dòng thời gian mục tin + lịch sử */
+.timeline, .history { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.timeline-item { display: flex; gap: 10px; align-items: flex-start; border-left: 2px solid var(--border); padding-left: 12px; }
+.timeline-item p { margin: 0 0 4px; }
+.timeline-item .badge { margin-left: 6px; }
+.timeline-title { font-weight: 600; overflow-wrap: anywhere; }
+.history li { font-size: 14px; overflow-wrap: anywhere; }
+
+/* Feed */
+.feed-row { border-top: 1px solid var(--border); padding-top: 12px; display: grid; gap: 8px; }
+.feed-row p { margin: 4px 0 0; }
+.feed-url { overflow-wrap: anywhere; }
+.feed-test { flex-basis: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+.feed-test ul { margin: 6px 0 0; padding-left: 18px; }
+.add-feed { border-top: 1px solid var(--border); padding-top: 12px; }
+.add-feed h3 { margin: 0; font-size: 15px; }

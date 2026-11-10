@@ -10,6 +10,8 @@ export const routes = {
   video: (videoId: string) => `/shorts/${encodeURIComponent(videoId)}`,
   search: () => '/search',
   page: (slug: 'gioi-thieu' | 'dieu-khoan' | 'quyen-rieng-tu' | 'lien-he') => `/${slug}`,
+  /** Trang giới thiệu bot thu thập tin — khớp Aggregation:BotInfoPath của worker (User-Agent TinhteNewsBot). */
+  bot: () => '/bot',
 };
 
 /** Chỉ cho phép URL http(s) tuyệt đối (ảnh, creative). Chặn javascript:, data: … */

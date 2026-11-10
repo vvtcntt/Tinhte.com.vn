@@ -416,7 +416,8 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'AG23 cụm COVERED phải có bài', `INSERT INTO tt.agg_clusters (site_key, title, status) VALUES ('www', 'Sự kiện', 'COVERED')`, /ck_agg_clusters_covered/);
   await expectError(sc, db, 'AG24 down 0341 từ chối khi đã có lịch sử nguồn', `${AGG} ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))}`, /Refusing to roll back 0341/);
   await expectError(sc, db, 'AG25 down 0340 từ chối khi đã có giấy phép', `INSERT INTO tt.licenses (code, name, usage_scope) VALUES ('LIC-X', 'X', 'Y');
-    ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))} ${read(path.join(MIG_DIR, '0340_content_sources_licenses.down.sql'))}`, /Refusing to roll back 0340/);
+    ${['0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
+      .map((m) => read(path.join(MIG_DIR, `${m}.down.sql`))).join(' ')}`, /Refusing to roll back 0340/);
   // Bộ thu thập (0342): row_version của feed chỉ đổi khi CMS sửa; failing_since; down tạo lại trigger cũ.
   const FEED_RV = `SELECT row_version FROM tt.agg_feeds WHERE id = '${id('fe1')}'`;
   await expectOk(sc, db, 'AG26 worker cập nhật lease/ETag/sức khỏe/failing_since không đổi row_version; CMS đổi lịch thì tăng', `${AGG} ${FEED()}
@@ -448,6 +449,16 @@ async function behaviour(sc, db) {
     DO $$ BEGIN IF (${CL_RV}) <> 2 OR to_regclass('tt.ix_agg_items_minhash_bands') IS NOT NULL
       OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_clusters' AND column_name = 'covered_at')
       THEN RAISE EXCEPTION 'down 0343'; END IF; END $$;`);
+  // Vận hành (0344): cảnh báo nguồn (outbox) + nhịp tim worker.
+  await expectError(sc, db, 'AG30 loại cảnh báo ngoài danh sách bị chặn', `${AGG} INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'OTHER', 'x')`, /ck_agg_alerts_kind/);
+  await expectOk(sc, db, 'AG31 cảnh báo tự tạm dừng + nhịp tim worker ghi được; đánh dấu đã gửi', `${AGG}
+    INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'SOURCE_AUTO_PAUSED', 'Nguồn tự tạm dừng');
+    UPDATE tt.agg_alerts SET delivered_at = now(), attempts = 1;
+    INSERT INTO tt.agg_worker_heartbeats (worker_id, host, started_at) VALUES ('w-1', 'host-a', now())
+      ON CONFLICT (worker_id) DO UPDATE SET last_seen_at = now();`);
+  await expectError(sc, db, 'AG32 down 0344 từ chối khi còn cảnh báo chưa gửi', `${AGG}
+    INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'SOURCE_DEGRADED', 'Nguồn suy giảm');
+    ${read(path.join(MIG_DIR, '0344_aggregation_operations.down.sql'))}`, /Refusing to roll back 0344/);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
