@@ -784,6 +784,12 @@ CMS (BTV bấm "Soạn nháp") ─► API ─► outbox ─► Drafter ─► Ch
 | **GĐ3 — Vận hành thật** | Bật cờ có `approval_reference` | Release gate G3 + Legal | KPI mục 1.2 đo được 4 tuần |
 | **GĐ4 — Mở rộng** (tùy chọn) | <ul><li>Gợi ý cập nhật bài.</li><li>Theo dõi đính chính sâu hơn.</li><li>Nguồn không có RSS (news sitemap, API đối tác).</li><li>Tự động soạn nháp cho cụm điểm cao: **vẫn không tự xuất bản**.</li></ul> | PO duyệt | — |
 
+**GĐ1 đã có ADR và hợp đồng (09/11/2026):**
+- `doc/adr/ADR-0008-news-aggregation-radar.md`.
+- Spec v0.3: 24 thao tác `/admin/aggregation/*`, cờ `aggregation.radar`.
+- FR-AGG-001…005 ở `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`.
+- WBS-140…145 trong `trace/07_WBS_EXTENDED_v0.3_DRAFT.csv`. Các dòng này thay cho AGG-BE-1/2/3, AGG-DATA-1, AGG-FE-1 và phần GĐ1 của AGG-QA-1 bên dưới.
+
 **Đề xuất mục WBS** (`PROPOSED_PENDING_PM_SIGNOFF`, kích cỡ tương đối, **không** phải dự toán):
 
 | WBS đề xuất | Việc | Cỡ | Phụ thuộc |

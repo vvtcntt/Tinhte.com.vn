@@ -189,3 +189,16 @@ Chạy lại kiểm tra:
 cd doc/07_AI_REVIEW/contract-tests
 TT_SPEC_FILE=../v0.3/07_OPENAPI_TINHTE_v0.3_DRAFT.yaml TT_INVENTORY_FILE=../v0.3/07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv TT_FR84_FILE=../v0.3/trace/07_FR84_TRACEABILITY_v0.3_DRAFT.csv TT_WBS_FILE=../v0.3/trace/07_WBS_EXTENDED_v0.3_DRAFT.csv python -m unittest -v test_static_contract.py
 ```
+
+## 9. Bổ sung — FR ngoài bộ 84 FR gốc (BA-01, ADR-0008, 2026-11-09)
+
+- File mới `07_FR_ADDENDUM_v0.3_DRAFT.csv`:
+  - cùng cột với FR84 v0.3;
+  - chứa FR-AGG-001…005 (Radar tin, GĐ1);
+  - `Release package = P2` **tạm**, chờ PO (BA-01 Q-AGG-06); `Status = PROPOSED_BA01`.
+- FR-AGG-006…009 (AI viết lại, kiểm duyệt) chưa vào addendum vì chưa có API trong spec; T31 đòi mỗi FR có ít nhất một API.
+- WBS đề xuất WBS-140…145:
+  - nhóm `G-AGG Proposed (pending PM)`, scope P2, `PROPOSED_PENDING_PM_SIGNOFF`;
+  - **không điền effort**: PM/Finance ước lượng và ký;
+  - FR của addendum chỉ ghi các WBS này ở cột `Proposed WBS (pending PM)`, chưa ghi ở `WBS IDs` baseline.
+- Test tĩnh đọc FR84 + addendum (T21–T33); T22 vẫn kiểm đúng 84 FR gốc.

@@ -9,5 +9,6 @@
 | [ADR-0005](ADR-0005-news-revisions-publish-pointer.md) | Bài viết theo revision + publish pointer; truy cập DB bằng Npgsql thuần | PROPOSED (Sprint 0) |
 | [ADR-0006](ADR-0006-media-upload-storage-adapter.md) | Tải media lên qua upload intent + adapter kho lưu trữ; bản dev lưu cục bộ và giả lập xử lý; §6 duyệt/xuất bản/gỡ video + media theo revision (WBS-040) | PROPOSED (Sprint 0) |
 | [ADR-0007](ADR-0007-content-sources-licenses-rights.md) | Nguồn, giấy phép và xác nhận quyền nội dung của bài viết | PROPOSED — đề xuất, chưa hiện thực |
+| [ADR-0008](ADR-0008-news-aggregation-radar.md) | Module Aggregation: thu thập RSS và Radar tin (GĐ1, chưa có AI viết) — BA-01 | PROPOSED — đề xuất, chưa hiện thực |
 
 Quy ước: mỗi quyết định kiến trúc một file `ADR-NNNN-<slug>.md`, gồm các phần Bối cảnh, Quyết định, Hệ quả và Phương án đã loại. ADR đã ACCEPTED không sửa nội dung; muốn đổi thì viết ADR mới thay thế.
