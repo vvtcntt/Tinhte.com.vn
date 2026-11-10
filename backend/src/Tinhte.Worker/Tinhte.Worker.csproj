@@ -7,6 +7,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- ADR-0008 §4: worker dùng Tinhte.Platform + phần Application/Infrastructure của module Aggregation, không chạy trong API. -->
     <ProjectReference Include="../Tinhte.Platform/Tinhte.Platform.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Aggregation/Tinhte.Modules.Aggregation.csproj" />

@@ -8,6 +8,7 @@
 .inline-form > input, .inline-form > select { min-height: 36px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
 .narrow-input { width: 90px; }
 .ok-text { color: var(--ok-text); }
+.break { overflow-wrap: anywhere; }
 .check.inline { align-items: center; min-height: 36px; font-size: 14px; }
 .inline-checks { display: flex; flex-wrap: wrap; gap: 4px 12px; border: 0; padding: 0; margin: 0; }
 .inline-checks legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }

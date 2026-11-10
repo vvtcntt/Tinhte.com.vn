@@ -58,5 +58,6 @@ public sealed class AggregationModule : IModule
         services.TryAddSingleton<FeedCollectionService>();
         services.TryAddSingleton(sp => WebhookAlertSink.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
         services.TryAddSingleton<CollectorOperations>();
+        services.TryAddSingleton<ClusterCalibrationService>();
     }
 }

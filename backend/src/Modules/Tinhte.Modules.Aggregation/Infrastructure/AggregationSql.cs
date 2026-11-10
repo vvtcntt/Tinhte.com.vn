@@ -187,6 +187,9 @@ internal static class AggregationSql
     public static NpgsqlCommand WithSmallInt(this NpgsqlCommand command, string name, int? value) =>
         command.With(name, NpgsqlDbType.Smallint, value is { } v ? (short)Math.Clamp(v, short.MinValue, short.MaxValue) : null);
 
+    public static NpgsqlCommand WithNullableUuidArray(this NpgsqlCommand command, string name, IReadOnlyList<Guid>? value) =>
+        command.With(name, NpgsqlDbType.Array | NpgsqlDbType.Uuid, value?.ToArray());
+
     public static NpgsqlCommand WithIntArray(this NpgsqlCommand command, string name, IReadOnlyList<int>? value) =>
         command.With(name, NpgsqlDbType.Array | NpgsqlDbType.Integer, value?.ToArray());
 

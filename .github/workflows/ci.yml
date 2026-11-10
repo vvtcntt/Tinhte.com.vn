@@ -110,3 +110,34 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm test
+
+  worker-image:
+    name: Worker image (build + scan)
+    # Image worker Radar tin (ADR-0008 §4): build từ gốc repo, khởi động được, không có lỗ hổng CRITICAL/HIGH đã có bản vá; kiểm cú pháp luật cảnh báo.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/src/Tinhte.Worker/Dockerfile
+          tags: tinhte-worker:ci
+          load: true
+          push: false
+      - name: Smoke — thiếu chuỗi kết nối thì thoát mã 1 với thông báo rõ
+        run: |
+          set +e
+          out=$(docker run --rm tinhte-worker:ci 2>&1); code=$?
+          echo "$out"
+          test "$code" -eq 1 && echo "$out" | grep -q "ConnectionStrings:Tinhte is not configured"
+      - name: Scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: tinhte-worker:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Check alert rules (promtool)
+        run: docker run --rm -v "$PWD/infra/monitoring:/rules:ro" --entrypoint promtool prom/prometheus:v2.55.1 check rules /rules/aggregation-worker.rules.yml

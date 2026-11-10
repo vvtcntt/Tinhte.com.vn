@@ -99,6 +99,7 @@ public sealed partial class FeedCollectorWorker(
             LogHeartbeatFailed(logger, e);
         }
 
+        if (error is null) CollectorMetrics.RecordCycle(DateTimeOffset.UtcNow, enabled, leased ?? 0);
         if (error is null && !string.IsNullOrWhiteSpace(livenessFile))
         {
             try

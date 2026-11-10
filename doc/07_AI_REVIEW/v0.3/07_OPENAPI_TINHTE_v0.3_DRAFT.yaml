@@ -5524,6 +5524,306 @@ paths:
       - PRECONDITION_REQUIRED
       - VALIDATION_FAILED
       - RATE_LIMITED
+  /admin/sources:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: List the content source catalogue
+      description: 'Access: Staff session (cmsSession) with permission content.read. ADR-0007 §1 (proposal). Sorted by name then id; disabled
+        entries included unless isEnabled=true. Source names are unique (case-insensitive).'
+      operationId: listAdminContentSources
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/CatalogEnabledFilter'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSourceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FORBIDDEN
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Add a content source
+      description: 'Access: Staff session (cmsSession) with permission taxonomy.manage. ADR-0007 §1 (proposal). Retry-safe with Idempotency-Key. Entries
+        are never deleted, only disabled.'
+      operationId: createAdminContentSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentSourceCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/sources/{sourceId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update a content source
+      description: 'Access: Staff session (cmsSession) with permission taxonomy.manage. ADR-0007 §1 (proposal). Optimistic concurrency: send If-Match
+        with the latest ETag.'
+      operationId: patchAdminContentSource
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SourceId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentSourcePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentSource'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/licenses:
+    get:
+      tags:
+      - CmsTaxonomy
+      summary: List the licence catalogue
+      description: 'Access: Staff session (cmsSession) with permission content.read. ADR-0007 §1 (proposal). Sorted by name then id; disabled
+        entries included unless isEnabled=true. A licence record does not by itself grant usage rights: Legal enters and owns it.'
+      operationId: listAdminLicenses
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Q'
+      - $ref: '#/components/parameters/CatalogEnabledFilter'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - INVALID_CURSOR
+      - UNAUTHENTICATED
+      - FORBIDDEN
+    post:
+      tags:
+      - CmsTaxonomy
+      summary: Add a licence
+      description: 'Access: Staff session (cmsSession) with permission licenses.manage (MFA; granted provisionally, pending Legal — ADR-0007 Q2). ADR-0007 §1 (proposal). Retry-safe with Idempotency-Key. Entries
+        are never deleted, only disabled.'
+      operationId: createAdminLicense
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/licenses/{licenseId}:
+    patch:
+      tags:
+      - CmsTaxonomy
+      summary: Update a licence
+      description: 'Access: Staff session (cmsSession) with permission licenses.manage (MFA; granted provisionally, pending Legal — ADR-0007 Q2). ADR-0007 §1 (proposal). Optimistic concurrency: send If-Match
+        with the latest ETag.'
+      operationId: patchAdminLicense
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/LicenseId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicensePatch'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-NEWS-006
+      x-scope: P0
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
   /admin/aggregation/sources:
     get:
       tags:
@@ -7334,6 +7634,20 @@ components:
       schema:
         type: string
         format: uuid
+    LicenseId:
+      name: licenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CatalogEnabledFilter:
+      name: isEnabled
+      in: query
+      required: false
+      schema:
+        type: boolean
+      description: true = only enabled entries; omitted = all.
     FeedId:
       name: feedId
       in: path
@@ -8452,6 +8766,223 @@ components:
             $ref: '#/components/schemas/Topic'
       required:
       - items
+    ContentSourceKind:
+      type: string
+      enum:
+      - ORIGINAL
+      - AGENCY
+      - PARTNER
+      - PRESS_RELEASE
+      - OTHER
+      description: ORIGINAL own reporting · AGENCY news agency · PARTNER content partner · PRESS_RELEASE press release · OTHER.
+    ContentSource:
+      type: object
+      required:
+      - id
+      - name
+      - kind
+      - isEnabled
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type:
+          - string
+          - 'null'
+          maxLength: 2048
+          pattern: ^https?://
+        isEnabled:
+          type: boolean
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    ContentSourceList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentSource'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    ContentSourceCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - kind
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type: string
+          maxLength: 2048
+          pattern: ^https?://
+    ContentSourcePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        kind:
+          $ref: '#/components/schemas/ContentSourceKind'
+        url:
+          type:
+          - string
+          - 'null'
+          maxLength: 2048
+          pattern: ^https?://
+        isEnabled:
+          type: boolean
+    License:
+      type: object
+      required:
+      - id
+      - code
+      - name
+      - usageScope
+      - requiresAttribution
+      - isEnabled
+      - active
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9_.-]{0,59}$
+        name:
+          type: string
+          maxLength: 200
+        usageScope:
+          type: string
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+        validFrom:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        validTo:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        evidenceRef:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+          description: Reference to the agreement in the document store (no file is stored here).
+        isEnabled:
+          type: boolean
+        active:
+          type: boolean
+          readOnly: true
+          description: Enabled and within its validity window now (same rule as M2/M3 approval and, later, publishing — ADR-0007 §4).
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    LicenseList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/License'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+    LicenseCreate:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - name
+      - usageScope
+      - evidenceRef
+      properties:
+        code:
+          type: string
+          pattern: ^[A-Z0-9][A-Z0-9_.-]{0,59}$
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        usageScope:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+          default: true
+        validFrom:
+          type: string
+          format: date-time
+        validTo:
+          type: string
+          format: date-time
+        evidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+    LicensePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: The code cannot change (other records refer to it). Clearing evidenceRef is not allowed.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        usageScope:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        requiresAttribution:
+          type: boolean
+        validFrom:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        validTo:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        evidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 500
+        isEnabled:
+          type: boolean
     LookupSave:
       type: object
       properties:

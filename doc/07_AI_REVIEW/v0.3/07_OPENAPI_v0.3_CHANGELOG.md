@@ -9,6 +9,12 @@ created_at: 2026-11-09
 
 # OpenAPI v0.3 DRAFT — Changelog
 
+> **Bổ sung 10/11/2026 (sau bảng số liệu bên dưới, chưa cập nhật lại bảng):**
+> - ADR-0008 Radar tin: 24 thao tác `/admin/aggregation/*` (tag CmsAggregation, P2, cờ `aggregation.radar`), FR-AGG-001…005 trong `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`; thêm `404 NOT_FOUND` cho 4 thao tác có `siteKey`; `AggregationSourceSummary.statusChangedAt/statusChangedBySystem/statusReason`; `AggregationStats.workers/alerts` + `AggregationWorkerStatus`, `AggregationAlert`.
+> - ADR-0007 §1: 6 thao tác danh mục nguồn/giấy phép `GET|POST /admin/sources`, `PATCH /admin/sources/{sourceId}`, `GET|POST /admin/licenses`, `PATCH /admin/licenses/{licenseId}` (tag CmsTaxonomy, FR-NEWS-006, P0).
+> - ADR-0009 (GĐ2, AI viết lại): hợp đồng **đề xuất riêng** `proposals/07_OPENAPI_AGGREGATION_GD2_PROPOSAL.yaml`, không thuộc spec này.
+> - Không thêm mã lỗi, không thêm cờ ngoài `aggregation.radar`. Contract tĩnh 34/34.
+
 ## 1. Trạng thái và cách dùng
 
 - File `07_OPENAPI_TINHTE_v0.3_DRAFT.yaml` là **bản nháp đề xuất**: áp các đề xuất `AIR-xxx` trong `../07_AI_TECH_REVIEW_PROPOSALS.md` lên hợp đồng v0.2.

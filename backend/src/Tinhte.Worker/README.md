@@ -1,6 +1,6 @@
 # Tinhte.Worker — worker thu thập Radar tin (ADR-0008 §3–§4)
 
-> DRAFT — ADR-0008 vẫn PROPOSED (A-1 chờ TL, A-4 chờ Security). Image chưa được build thử trên máy dựng (không có Docker) và CI chưa build image.
+> DRAFT — ADR-0008 vẫn PROPOSED (A-1 chờ TL, A-4 chờ Security). Image chưa được build thử trên máy dựng (không có Docker); job CI `worker-image` (build + chạy thử + quét Trivy) đã thêm nhưng chưa chạy trên GitHub Actions.
 
 Tiến trình riêng (generic host), **không** chạy trong API. Mỗi vòng quét:
 
@@ -26,6 +26,7 @@ docker build -f backend/src/Tinhte.Worker/Dockerfile -t tinhte-worker .
 | `Sites__Environment` | khuyến nghị | `production` / `staging` / `local` — dùng để dựng User-Agent `TinhteNewsBot/x.y (+<origin site public-web>/bot)` |
 | `Aggregation__Alerts__WebhookUrl` | không | https; incoming webhook kiểu Slack/Teams/Google Chat. Secret. Không có ⇒ cảnh báo chỉ hiện trên CMS |
 | `Aggregation__Worker__LivenessFile` | không | Image đặt sẵn `/tmp/tinhte-worker.alive` cho `HEALTHCHECK` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` (hoặc `Telemetry__Otlp__Endpoint`) | không | Bật xuất số đo OTLP (gRPC 4317 mặc định; dùng thêm biến chuẩn `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_HEADERS` nếu cần) |
 | `Aggregation__Worker__Parallelism` / `PollSeconds` / `LeaseSeconds` / `MaintenanceMinutes` | không | 8 / 30 / 120 / 5 |
 | `Aggregation__NewsroomTimeZone`, `Aggregation__Clustering__*`, `Aggregation__Scoring__*`, `Aggregation__Classification__*` | không | Xem `appsettings.json`, ADR-0008 mục tiến độ |
 
@@ -43,7 +44,7 @@ docker build -f backend/src/Tinhte.Worker/Dockerfile -t tinhte-worker .
 | Liveness container | `HEALTHCHECK` (tệp được chạm trong 3 phút, chỉ khi vòng quét không lỗi hạ tầng) | Container unhealthy |
 | Sức khỏe nguồn | CMS → Nguồn thu thập; `stats.fetchSuccessRate24h`, `stats.sources[].worstFeedHealth` | Tỉ lệ thành công 24 giờ < 80% |
 | Cảnh báo nguồn | `tt.agg_alerts` (tự DEGRADED / tự PAUSED theo BR-06); CMS hiện banner; webhook nếu cấu hình | Cảnh báo chưa gửi được sau 10 lần thử (`attempts = 10`, `delivered_at IS NULL`) |
-| Số đo | Meter `Tinhte.Aggregation`: `aggregation.feed.fetches` (outcome, failure), `aggregation.items.new/updated`, `aggregation.feed.fetch.duration` (ms), `aggregation.alerts`, `aggregation.fetch_log.purged` | Đọc tạm bằng `dotnet-counters monitor -n Tinhte.Worker --counters Tinhte.Aggregation`; exporter (OpenTelemetry/Prometheus) chờ WBS-021 chọn nền tảng |
+| Số đo | Meter `Tinhte.Aggregation`: `aggregation.feed.fetches` (outcome, failure), `aggregation.items.new/updated`, `aggregation.feed.fetch.duration` (ms), `aggregation.alerts`, `aggregation.fetch_log.purged`, gauge `aggregation.worker.last_cycle.time`, `aggregation.worker.radar_enabled`, `aggregation.worker.leased`; cộng số đo runtime và HttpClient | Xuất qua **OTLP** khi đặt `OTEL_EXPORTER_OTLP_ENDPOINT` (vd `http://otel-collector:4317`) hoặc `Telemetry__Otlp__Endpoint`; không đặt thì không gửi gì ra ngoài (vẫn đọc được bằng `dotnet-counters monitor -n Tinhte.Worker --counters Tinhte.Aggregation`). Luật cảnh báo mẫu: `infra/monitoring/aggregation-worker.rules.yml` |
 | Log | stdout (JSON tùy nền tảng); mức `Warning`: đích không an toàn, nguồn tự PAUSED, gửi cảnh báo lỗi | — |
 
 Truy vấn nhanh khi trực:
@@ -53,6 +54,14 @@ SELECT worker_id, last_seen_at, radar_enabled, last_cycle_feeds, last_error FROM
 SELECT kind, content_source_id, message, created_at, attempts, last_error FROM tt.agg_alerts WHERE delivered_at IS NULL ORDER BY created_at;
 SELECT outcome, failure, count(*) FROM tt.agg_fetch_log WHERE started_at > now() - interval '1 hour' GROUP BY 1, 2;
 ```
+
+## Hiệu chỉnh ngưỡng gom cụm
+
+```bash
+dotnet Tinhte.Worker.dll calibrate --days 90      # trong container: docker run --rm -e ConnectionStrings__Tinhte=... tinhte-worker calibrate
+```
+
+Chỉ đọc. Lấy cặp có nhãn từ các lần BTV tách/gộp cụm (migration 0345), chấm lưới ngưỡng `Aggregation:Clustering:Similarity` / `SimilarityWithEntity` và in đề xuất khi đủ ≥ 30 cặp mỗi loại. Đổi ngưỡng qua pull request (BA/TL duyệt), không sửa tay trên môi trường.
 
 ## Xử lý sự cố
 

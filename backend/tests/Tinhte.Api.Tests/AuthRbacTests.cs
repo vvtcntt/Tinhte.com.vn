@@ -97,6 +97,11 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     [InlineData("APPROVER", false, Permissions.AggregationSourcesApprove, AccessDecision.MfaRequired)]
     [InlineData("APPROVER", true, Permissions.AggregationSourcesApprove, AccessDecision.Allowed)]
     [InlineData("APPROVER", true, Permissions.AggregationSourcesManage, AccessDecision.MissingPermission)]
+    // Giấy phép (ADR-0007 §1, DRAFT): chỉ APPROVER (tạm, chờ Legal Q2), cần MFA; biên tập viên quản lý nguồn qua taxonomy.manage.
+    [InlineData("APPROVER", false, Permissions.LicensesManage, AccessDecision.MfaRequired)]
+    [InlineData("APPROVER", true, Permissions.LicensesManage, AccessDecision.Allowed)]
+    [InlineData("EDITOR", true, Permissions.LicensesManage, AccessDecision.MissingPermission)]
+    [InlineData("EDITOR", false, Permissions.TaxonomyManage, AccessDecision.Allowed)]
     public void Matrix_decisions(string role, bool mfa, string permission, AccessDecision expected) =>
         Assert.Equal(expected, PermissionMatrix.Evaluate([role], mfa, permission));
 

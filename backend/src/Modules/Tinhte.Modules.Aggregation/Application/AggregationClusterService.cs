@@ -193,7 +193,8 @@ public sealed class AggregationClusterService(ITinhteDatabase database, Aggregat
             }
 
             await MoveItemsAsync(connection, tx, itemIds, created, ct);
-            await ActionAsync(connection, tx, clusterId, "SPLIT", actorId, reason, created, null, ct);
+            // Dữ liệu hiệu chỉnh (0345, BR-23): mục bị tách × mục ở lại = cặp "khác sự kiện" theo quyết định của BTV.
+            await ActionAsync(connection, tx, clusterId, "SPLIT", actorId, reason, created, null, ct, itemIds, members.Except(itemIds).ToList());
             await ActionAsync(connection, tx, created, "SPLIT", actorId, reason, clusterId, null, ct);
             var now = time.GetUtcNow();
             await ClusterStore.RecomputeAsync(connection, tx, clusterId, options.Scoring, now, ct);
@@ -230,9 +231,17 @@ public sealed class AggregationClusterService(ITinhteDatabase database, Aggregat
                 while (await r.ReadAsync(ct)) moved.Add(r.GetGuid(0));
             }
 
+            var targetItems = new List<Guid>();
+            await using (var command = AggregationSql.Command(connection, tx, "SELECT id FROM tt.agg_items WHERE cluster_id = @id").WithUuid("id", targetId))
+            await using (var r = await command.ExecuteReaderAsync(ct))
+            {
+                while (await r.ReadAsync(ct)) targetItems.Add(r.GetGuid(0));
+            }
+
             await MoveItemsAsync(connection, tx, moved, targetId, ct);
             await SetStatusAsync(connection, tx, clusterId, "CLOSED", ct);
-            await ActionAsync(connection, tx, clusterId, "MERGE", actorId, reason, targetId, null, ct);
+            // Dữ liệu hiệu chỉnh (0345): mục của cụm nguồn × mục của cụm đích = cặp "cùng sự kiện" theo quyết định của BTV.
+            await ActionAsync(connection, tx, clusterId, "MERGE", actorId, reason, targetId, null, ct, moved, targetItems);
             await ActionAsync(connection, tx, targetId, "MERGE", actorId, reason, clusterId, null, ct);
             await ClusterStore.RecomputeAsync(connection, tx, targetId, options.Scoring, time.GetUtcNow(), ct);
             return targetId;
@@ -381,13 +390,13 @@ public sealed class AggregationClusterService(ITinhteDatabase database, Aggregat
     }
 
     private static async Task ActionAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid clusterId, string action, Guid actorId, string? reason,
-        Guid? relatedClusterId, Guid? articleId, CancellationToken ct)
+        Guid? relatedClusterId, Guid? articleId, CancellationToken ct, IReadOnlyList<Guid>? itemIds = null, IReadOnlyList<Guid>? otherItemIds = null)
     {
         await using var insert = AggregationSql.Command(connection, tx, """
-            INSERT INTO tt.agg_cluster_actions (cluster_id, action, actor_id, reason, related_cluster_id, article_id)
-            VALUES (@cluster, @action, @actor, @reason, @related, @article)
+            INSERT INTO tt.agg_cluster_actions (cluster_id, action, actor_id, reason, related_cluster_id, article_id, item_ids, other_item_ids)
+            VALUES (@cluster, @action, @actor, @reason, @related, @article, @items, @others)
             """).WithUuid("cluster", clusterId).WithText("action", action).WithUuid("actor", actorId).WithText("reason", reason)
-            .WithUuid("related", relatedClusterId).WithUuid("article", articleId);
+            .WithUuid("related", relatedClusterId).WithUuid("article", articleId).WithNullableUuidArray("items", itemIds).WithNullableUuidArray("others", otherItemIds);
         await insert.ExecuteNonQueryAsync(ct);
     }
 

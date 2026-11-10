@@ -86,6 +86,27 @@ public static class CollectorMetrics
     public static readonly Histogram<double> FetchDuration = Meter.CreateHistogram<double>("aggregation.feed.fetch.duration", "ms", "Fetch + store time per feed");
     public static readonly Counter<long> Alerts = Meter.CreateCounter<long>("aggregation.alerts", description: "Source alerts raised by kind");
     public static readonly Counter<long> FetchLogPurged = Meter.CreateCounter<long>("aggregation.fetch_log.purged", description: "Fetch log rows deleted by retention");
+
+    private static long _lastCycleUnix;
+    private static int _radarEnabled;
+    private static int _lastLeased;
+
+    /// <summary>Thời điểm vòng quét gần nhất không lỗi hạ tầng (giây Unix) — luật cảnh báo "worker không chạy" dựa vào đây.</summary>
+    public static readonly ObservableGauge<long> LastCycle = Meter.CreateObservableGauge("aggregation.worker.last_cycle.time",
+        () => Interlocked.Read(ref _lastCycleUnix), "s", "Unix time of the last successful collection cycle");
+
+    public static readonly ObservableGauge<int> RadarEnabled = Meter.CreateObservableGauge("aggregation.worker.radar_enabled",
+        () => Volatile.Read(ref _radarEnabled), description: "1 when the aggregation.radar flag is ON");
+
+    public static readonly ObservableGauge<int> LastLeased = Meter.CreateObservableGauge("aggregation.worker.leased",
+        () => Volatile.Read(ref _lastLeased), description: "Feeds leased in the last cycle");
+
+    public static void RecordCycle(DateTimeOffset at, bool radarEnabled, int leased)
+    {
+        Interlocked.Exchange(ref _lastCycleUnix, at.ToUnixTimeSeconds());
+        Volatile.Write(ref _radarEnabled, radarEnabled ? 1 : 0);
+        Volatile.Write(ref _lastLeased, leased);
+    }
 }
 
 /// <summary>

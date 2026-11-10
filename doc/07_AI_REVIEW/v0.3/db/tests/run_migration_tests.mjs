@@ -416,7 +416,7 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'AG23 cụm COVERED phải có bài', `INSERT INTO tt.agg_clusters (site_key, title, status) VALUES ('www', 'Sự kiện', 'COVERED')`, /ck_agg_clusters_covered/);
   await expectError(sc, db, 'AG24 down 0341 từ chối khi đã có lịch sử nguồn', `${AGG} ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))}`, /Refusing to roll back 0341/);
   await expectError(sc, db, 'AG25 down 0340 từ chối khi đã có giấy phép', `INSERT INTO tt.licenses (code, name, usage_scope) VALUES ('LIC-X', 'X', 'Y');
-    ${['0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
+    ${['0345_aggregation_calibration', '0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
       .map((m) => read(path.join(MIG_DIR, `${m}.down.sql`))).join(' ')}`, /Refusing to roll back 0340/);
   // Bộ thu thập (0342): row_version của feed chỉ đổi khi CMS sửa; failing_since; down tạo lại trigger cũ.
   const FEED_RV = `SELECT row_version FROM tt.agg_feeds WHERE id = '${id('fe1')}'`;
@@ -459,6 +459,20 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'AG32 down 0344 từ chối khi còn cảnh báo chưa gửi', `${AGG}
     INSERT INTO tt.agg_alerts (content_source_id, kind, message) VALUES ('${SRC}', 'SOURCE_DEGRADED', 'Nguồn suy giảm');
     ${read(path.join(MIG_DIR, '0344_aggregation_operations.down.sql'))}`, /Refusing to roll back 0344/);
+  // Hiệu chỉnh gom cụm (0345): lần tách/gộp lưu mục bị chuyển và phía bên kia; lịch sử vẫn chỉ thêm.
+  await expectOk(sc, db, 'AG33 tách cụm ghi item_ids/other_item_ids; dòng thao tác vẫn không sửa được', `${CL}
+    INSERT INTO tt.agg_clusters (id, site_key, title) VALUES ('${id('c1c')}', 'www', 'Sự kiện tách');
+    INSERT INTO tt.agg_cluster_actions (cluster_id, action, actor_id, related_cluster_id, item_ids, other_item_ids)
+      VALUES ('${id('c1b')}', 'SPLIT', '${U1}', '${id('c1c')}', ARRAY['${id('a01')}'::uuid], ARRAY['${id('a02')}'::uuid, '${id('a03')}'::uuid]);
+    DO $$ BEGIN
+      IF (SELECT cardinality(other_item_ids) FROM tt.agg_cluster_actions WHERE cluster_id = '${id('c1b')}') <> 2 THEN RAISE EXCEPTION 'ids'; END IF;
+      BEGIN
+        UPDATE tt.agg_cluster_actions SET item_ids = NULL;
+        RAISE EXCEPTION 'append-only not enforced';
+      EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM = 'append-only not enforced' THEN RAISE; END IF;
+      END;
+    END $$;`);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);

@@ -30,6 +30,7 @@ import {
   type UsageMode,
 } from '../lib/aggregation';
 import { access, permissionLabel } from '../lib/rbac';
+import { ContentSourcePicker, LicensePicker } from './Catalog';
 import { RequirePermission } from './CmsApp';
 import { Banner, SiteSelect, aggErrorText, contentSites, isConflict, newIdempotencyKey, useSiteCategories } from './aggregationCommon';
 import { useStaff } from './session';
@@ -194,7 +195,7 @@ function CreateSource({ onCreated }: { onCreated: () => void }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isUuid(contentSourceId)) return setMessage({ kind: 'error', text: 'Nhập mã nguồn (UUID) trong danh mục nguồn.' });
+    if (!isUuid(contentSourceId)) return setMessage({ kind: 'error', text: 'Chọn nguồn trong danh mục.' });
     if (!/^[a-z]{2}$/.test(language)) return setMessage({ kind: 'error', text: 'Ngôn ngữ là mã ISO 639-1 hai chữ thường (vi, en…).' });
     if (siteKeys.length === 0) return setMessage({ kind: 'error', text: 'Chọn ít nhất một site.' });
     setBusy(true);
@@ -219,9 +220,9 @@ function CreateSource({ onCreated }: { onCreated: () => void }) {
   return (
     <form className="card stack-sm" onSubmit={submit}>
       <h2>Thêm hồ sơ thu thập</h2>
-      <p className="muted small">Nguồn phải có sẵn trong danh mục nguồn (chưa có màn danh mục nguồn — ADR-0007; nhờ quản trị tạo và gửi mã).</p>
+      <p className="muted small">Chọn nguồn có sẵn trong danh mục "Nguồn & giấy phép" (thêm nguồn mới ở đó nếu chưa có).</p>
+      <ContentSourcePicker value={contentSourceId} onChange={setContentSourceId} />
       <div className="grid-2">
-        <label className="field"><span>Mã nguồn trong danh mục</span><input value={contentSourceId} onChange={(e) => setContentSourceId(e.target.value)} placeholder="UUID" required /></label>
         <label className="field"><span>Ngôn ngữ</span><input value={language} onChange={(e) => setLanguage(e.target.value)} maxLength={2} /></label>
         <label className="field"><span>Uy tín (1–5)</span><input type="number" min={1} max={5} value={trust} onChange={(e) => setTrust(Number(e.target.value))} /></label>
         <fieldset className="checks">
@@ -494,7 +495,7 @@ function ApprovalForm({ source, etag, onSaved, onConflict }: EditorProps) {
             {(Object.keys(USAGE_MODE_LABEL) as UsageMode[]).map((m) => <option key={m} value={m}>{USAGE_MODE_LABEL[m]}</option>)}
           </select>
         </label>
-        <label className="field"><span>Mã giấy phép (bắt buộc M2/M3)</span><input value={licenseId} onChange={(e) => setLicenseId(e.target.value)} placeholder="UUID" /></label>
+        <LicensePicker value={licenseId} onChange={setLicenseId} />
         <label className="field"><span>Bằng chứng điều khoản (đường dẫn DMS…)</span><input value={terms} maxLength={500} onChange={(e) => setTerms(e.target.value)} required /></label>
         <label className="field"><span>Ghi chú</span><input value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} /></label>
       </div>
