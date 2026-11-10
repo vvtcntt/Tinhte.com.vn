@@ -30,8 +30,11 @@ public sealed class VideoPatch
 
     public PatchField<string> ChangeReason { get; private init; }
 
-    /// <summary>Có đổi nội dung revision. Media cũng là nội dung của revision (WBS-040, migration 0334).</summary>
-    public bool TouchesRevision => Title.IsSet || Summary.IsSet || MediaId.IsSet || ContentKind.IsSet || Sponsorship.IsSet || ChangeReason.IsSet;
+    /// <summary>Thay thân của working revision (BodyBlock[], cùng quy tắc với bài viết — Tinhte.Platform.Content.BodyBlocks).</summary>
+    public PatchField<JsonElement> BodyBlocks { get; private init; }
+
+    /// <summary>Có đổi nội dung revision. Media (0334) và thân (0355) cũng là nội dung của revision.</summary>
+    public bool TouchesRevision => Title.IsSet || Summary.IsSet || MediaId.IsSet || ContentKind.IsSet || Sponsorship.IsSet || ChangeReason.IsSet || BodyBlocks.IsSet;
 
     public static VideoPatch Parse(JsonElement body)
     {
@@ -50,6 +53,7 @@ public sealed class VideoPatch
         var contentKind = PatchField<string>.Unset;
         var sponsorship = PatchField<VideoSponsorshipInput?>.Unset;
         var changeReason = PatchField<string>.Unset;
+        var bodyBlocks = PatchField<JsonElement>.Unset;
 
         foreach (var p in body.EnumerateObject())
         {
@@ -83,6 +87,10 @@ public sealed class VideoPatch
                     if (v.ValueKind == JsonValueKind.String && v.GetString()!.Length <= 500) changeReason = PatchField<string>.Of(v.GetString()!);
                     else Fail("changeReason", "Must be a string of at most 500 characters.");
                     break;
+                case "bodyBlocks":
+                    if (Tinhte.Platform.Content.BodyBlocks.Validate(v, "bodyBlocks") is { } blocksError) Fail(blocksError.Path, blocksError.Message);
+                    else bodyBlocks = PatchField<JsonElement>.Of(v.Clone());
+                    break;
                 case "rightsSource":
                     // Có trong hợp đồng nhưng taxonomy nguồn/giấy phép thuộc WBS-023: từ chối rõ ràng thay vì bỏ qua im lặng.
                     Fail(p.Name, "Not supported yet: source/license taxonomy is delivered by WBS-023.");
@@ -99,6 +107,7 @@ public sealed class VideoPatch
         return new VideoPatch
         {
             Title = title, Summary = summary, MediaId = mediaId, ContentKind = contentKind, Sponsorship = sponsorship, ChangeReason = changeReason,
+            BodyBlocks = bodyBlocks,
         };
     }
 

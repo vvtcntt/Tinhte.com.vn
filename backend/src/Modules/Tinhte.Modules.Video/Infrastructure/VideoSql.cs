@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using Tinhte.Modules.Video.Application;
@@ -15,7 +16,8 @@ internal static class VideoSql
                w.sponsorship_approved_by, w.sponsorship_approved_at,
                v.working_revision_id, v.public_revision_id, v.owner_id, v.assignee_id, v.rights_status, v.rights_expires_at,
                v.scheduled_at, v.updated_at, v.row_version, w.media_id, w.summary, v.created_at,
-               w.status, w.submitted_by, w.submitted_at, w.reviewed_by, w.reviewed_at, w.review_note, v.unpublished_at, v.unpublish_reason
+               w.status, w.submitted_by, w.submitted_at, w.reviewed_by, w.reviewed_at, w.review_note, v.unpublished_at, v.unpublish_reason,
+               w.body::text
           FROM tt.videos v
           LEFT JOIN tt.video_revisions w ON w.id = COALESCE(v.working_revision_id, v.public_revision_id)
         """;
@@ -54,8 +56,16 @@ internal static class VideoSql
             ReviewedAt: NullableTime(r, 27),
             ReviewNote: NullableText(r, 28),
             UnpublishedAt: NullableTime(r, 29),
-            UnpublishReason: NullableText(r, 30)),
+            UnpublishReason: NullableText(r, 30),
+            BodyBlocks: ParseBody(NullableText(r, 31))),
         Time(r, 22));
+
+    /// <summary>Thân video (cột body của 0355); chưa có revision/NULL → mảng rỗng.</summary>
+    public static JsonElement ParseBody(string? json)
+    {
+        using var doc = JsonDocument.Parse(json ?? "[]");
+        return doc.RootElement.Clone();
+    }
 
     public static string? NullableText(DbDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
 
@@ -112,6 +122,12 @@ internal static class VideoSql
     public static NpgsqlCommand WithText(this NpgsqlCommand command, string name, string? value)
     {
         command.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value });
+        return command;
+    }
+
+    public static NpgsqlCommand WithJson(this NpgsqlCommand command, string name, JsonElement value)
+    {
+        command.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Jsonb) { Value = value.GetRawText() });
         return command;
     }
 

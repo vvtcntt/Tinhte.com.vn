@@ -79,7 +79,10 @@ public static partial class MetadataPrompts
         builder.Append(label).Append(": ").Append(text);
     }
 
-    /// <summary>Chữ trong bodyBlocks: mọi chuỗi ở thuộc tính text/caption/content/title/items, theo thứ tự xuất hiện; bỏ URL, id, kiểu khối.</summary>
+    /// <summary>
+    /// Chữ trong bodyBlocks (bài và video): mọi chuỗi ở thuộc tính text/caption/content/title/items, theo thứ tự xuất hiện (kể cả mục
+    /// danh sách và ô bảng dạng {text}); bỏ URL, id, kiểu khối và runs (trùng với text).
+    /// </summary>
     internal static string BodyText(string? bodyJson)
     {
         if (string.IsNullOrWhiteSpace(bodyJson)) return "";
@@ -109,7 +112,12 @@ public static partial class MetadataPrompts
                 foreach (var item in element.EnumerateArray()) Collect(item, property, parts);
                 break;
             case JsonValueKind.Object:
-                foreach (var p in element.EnumerateObject()) Collect(p.Value, p.Name, parts);
+                // runs[] lặp lại đúng chữ của text (BodyBlock: text = nối runs[].text) → bỏ qua để không gửi chữ hai lần.
+                foreach (var p in element.EnumerateObject())
+                {
+                    if (!p.NameEquals("runs")) Collect(p.Value, p.Name, parts);
+                }
+
                 break;
         }
     }

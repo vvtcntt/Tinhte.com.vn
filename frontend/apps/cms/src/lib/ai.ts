@@ -74,3 +74,44 @@ export function aiErrorText(error: unknown): string {
 export function tagsToText(tags: readonly string[]): string {
   return tags.join(', ');
 }
+
+// ---------------------------------------------------------------- AI viết lại đoạn đã chọn (postAdminAiRewrite, CHANGELOG v0.3 mục 22)
+// Cùng cờ ai.assistance + quyền ai.assist. Kết quả chỉ là ĐỀ XUẤT: người biên tập so sánh rồi chọn thay/chèn/bỏ, sau đó tự Lưu.
+
+export type AiRewriteMode = 'IMPROVE' | 'SHORTEN' | 'EXPAND' | 'FIX_SPELLING' | 'NEUTRAL_TONE';
+
+export const AI_REWRITE_PATH = '/admin/ai/rewrite';
+export const AI_REWRITE_MAX = 6000;
+export const AI_REWRITE_NOTE_MAX = 300;
+
+export const AI_REWRITE_MODES: readonly { value: AiRewriteMode; label: string }[] = [
+  { value: 'IMPROVE', label: 'Viết lại cho rõ ý' },
+  { value: 'SHORTEN', label: 'Rút gọn' },
+  { value: 'EXPAND', label: 'Viết dài hơn' },
+  { value: 'FIX_SPELLING', label: 'Sửa chính tả, dấu câu' },
+  { value: 'NEUTRAL_TONE', label: 'Giọng tin tức trung lập' },
+];
+
+/** Lỗi phát hiện trước khi gọi (server vẫn kiểm). */
+export function rewriteInputError(text: string, note: string): string | null {
+  if (!text.trim()) return 'Chọn một đoạn chữ trong nội dung trước.';
+  if (text.length > AI_REWRITE_MAX) return `Đoạn chọn quá dài (${text.length} ký tự, tối đa ${AI_REWRITE_MAX}). Chọn ngắn hơn.`;
+  if (note.length > AI_REWRITE_NOTE_MAX) return `Ghi chú tối đa ${AI_REWRITE_NOTE_MAX} ký tự.`;
+  return null;
+}
+
+export async function requestRewrite(
+  input: { contentId: string; text: string; mode: AiRewriteMode; note?: string },
+  fetcher: Fetcher = apiFetch,
+  newKey: () => string = () => crypto.randomUUID(),
+): Promise<string> {
+  const note = input.note?.trim() || null;
+  const response = await fetcher<{ text?: unknown }>(AI_REWRITE_PATH, {
+    method: 'POST',
+    body: { contentId: input.contentId, text: input.text, mode: input.mode, note },
+    idempotencyKey: newKey(),
+  });
+  const text = typeof response.data?.text === 'string' ? response.data.text.replace(/\r\n/g, '\n').trim() : '';
+  if (!text) throw new ApiError({ title: 'AI không trả về nội dung', status: 503, code: 'DEPENDENCY_UNAVAILABLE' });
+  return text;
+}

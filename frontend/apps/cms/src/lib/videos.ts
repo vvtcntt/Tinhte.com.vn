@@ -31,6 +31,8 @@ export interface AdminVideo {
   rowVersion: number;
   mediaId: string | null;
   summary?: string | null;
+  /** Thân (mô tả dài) của cùng revision với summary — BodyBlock[], DRAFT CHANGELOG v0.3 mục 22. API cũ chưa trả → coi là []. */
+  bodyBlocks?: unknown[];
   // WBS-040 (CHANGELOG mục 13): trạng thái working revision, hồ sơ duyệt, lần gỡ gần nhất.
   revisionStatus?: string | null;
   submittedBy?: string | null;
@@ -146,6 +148,14 @@ export function canAttachToVideo(media: MediaStatus, now: Date = new Date()): bo
   if (media.mediaType !== 'VIDEO' || MEDIA_FAILED.has(media.status) || RIGHTS_BLOCKED.has(media.rightsStatus)) return false;
   return !media.rightsExpiresAt || new Date(media.rightsExpiresAt).getTime() > now.getTime();
 }
+
+/** Ảnh chèn được vào thân bài/video (FR-CMS-009, khớp kiểm tra BodyBlock image ở API): IMAGE, đã READY, quyền chưa bị chặn/hết hạn. */
+export function canInsertImage(media: MediaStatus, now: Date = new Date()): boolean {
+  if (media.mediaType !== 'IMAGE' || media.status !== 'READY' || RIGHTS_BLOCKED.has(media.rightsStatus)) return false;
+  return !media.rightsExpiresAt || new Date(media.rightsExpiresAt).getTime() > now.getTime();
+}
+
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 
 /** Lịch hỏi trạng thái: nhanh lúc đầu, giãn dần tới 10 giây (không dồn request khi xử lý lâu). */
 export function pollDelayMs(attempt: number): number {
@@ -353,6 +363,8 @@ export interface VideoDraft {
   title: string;
   summary: string;
   contentKind: string;
+  /** JSON của bodyBlocks (blocksKey) — so sánh như chuỗi. */
+  body: string;
   sponsorship: { sponsorName: string; sponsorReference: string; evidenceRef: string; validFrom: string; validTo: string };
   changeReason: string;
 }
@@ -372,6 +384,7 @@ export function draftFromVideo(video: AdminVideo): VideoDraft {
     title: video.title,
     summary: video.summary ?? '',
     contentKind: video.contentKind,
+    body: JSON.stringify(video.bodyBlocks ?? []),
     sponsorship: {
       sponsorName: s?.sponsorName ?? '',
       sponsorReference: s?.sponsorReference ?? '',
@@ -393,6 +406,7 @@ export function videoPatchBody(video: AdminVideo, draft: VideoDraft): Record<str
   if (draft.title.trim() !== video.title) body.title = draft.title.trim();
   if ((draft.summary.trim() || null) !== (video.summary ?? null)) body.summary = draft.summary.trim() || null;
   if (draft.contentKind !== video.contentKind) body.contentKind = draft.contentKind;
+  if (draft.body !== original.body) body.bodyBlocks = JSON.parse(draft.body);
   if (draft.contentKind === 'SPONSORED') {
     const s = draft.sponsorship;
     const changed = (Object.keys(s) as (keyof VideoDraft['sponsorship'])[]).some((k) => s[k] !== original.sponsorship[k]);

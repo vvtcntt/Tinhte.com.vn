@@ -14,7 +14,7 @@ namespace Tinhte.Modules.Ai.Controllers;
 /// </summary>
 [Route(ApiRoutes.Prefix + "/admin/ai")]
 [Tags("AiOptional")]
-public sealed class AdminAiController(MetadataSuggestionService suggestions, AiAuditService audit) : TinhteControllerBase
+public sealed class AdminAiController(MetadataSuggestionService suggestions, RewriteService rewrites, AiAuditService audit) : TinhteControllerBase
 {
     /// <summary>postAdminAiMetadataSuggestions: gợi ý tag (TAG) hoặc tóm tắt (SUMMARY) cho bài/video; không ghi vào nội dung.</summary>
     [HttpPost("metadata-suggestions", Name = "postAdminAiMetadataSuggestions")]
@@ -24,6 +24,22 @@ public sealed class AdminAiController(MetadataSuggestionService suggestions, AiA
     {
         var actor = User.RequirePermission(Permissions.AiAssist);
         var result = await suggestions.SuggestAsync(actor, request,
+            retryAfter => Response.Headers.RetryAfter = Math.Max(1, (long)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture),
+            cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// postAdminAiRewrite: viết lại đoạn văn đã chọn (IMPROVE | SHORTEN | EXPAND | FIX_SPELLING | NEUTRAL_TONE); không ghi vào nội dung,
+    /// người biên tập tự quyết định thay/chèn/bỏ. Cùng cờ, hạn mức, nhật ký (ai.rewrite) với gợi ý metadata.
+    /// </summary>
+    [HttpPost("rewrite", Name = "postAdminAiRewrite")]
+    [RequirePermission(Permissions.AiAssist)]
+    [Idempotent]
+    public async Task<ActionResult<AiRewrite>> Rewrite(AiRewriteRequest request, CancellationToken cancellationToken)
+    {
+        var actor = User.RequirePermission(Permissions.AiAssist);
+        var result = await rewrites.RewriteAsync(actor, request,
             retryAfter => Response.Headers.RetryAfter = Math.Max(1, (long)Math.Ceiling(retryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture),
             cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);

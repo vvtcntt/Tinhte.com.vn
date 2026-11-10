@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Tinhte.Modules.Video.Domain;
 
@@ -35,7 +36,8 @@ public sealed record CreateVideoRequest(
     VideoSponsorshipInput? Sponsorship);
 
 /// <summary>
-/// AdminVideo (+ summary, CHANGELOG mục 12; + revisionStatus, hồ sơ duyệt, lần gỡ gần nhất — mục 13).
+/// AdminVideo (+ summary, CHANGELOG mục 12; + revisionStatus, hồ sơ duyệt, lần gỡ gần nhất — mục 13; + bodyBlocks — mục 22).
+/// <c>bodyBlocks</c> = thân của cùng revision với <c>summary</c> (mảng rỗng khi chưa có); danh sách (getAdminVideos) không kèm, giống bài viết.
 /// <c>mediaId</c> = media của working revision (bản đang soạn/duyệt); media đang phát công khai là media của public revision.
 /// </summary>
 public sealed record AdminVideo(
@@ -62,7 +64,8 @@ public sealed record AdminVideo(
     DateTimeOffset? ReviewedAt,
     string? ReviewNote,
     DateTimeOffset? UnpublishedAt,
-    string? UnpublishReason);
+    string? UnpublishReason,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonElement? BodyBlocks);
 
 /// <summary>ApproveRequest: duyệt đúng revision đang chờ (tránh duyệt nhầm bản đã bị thay trong lúc xem).</summary>
 public sealed record VideoApproveRequest([Required] Guid? RevisionId, [StringLength(1000)] string? Note);

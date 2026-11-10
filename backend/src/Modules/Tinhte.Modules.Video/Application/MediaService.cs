@@ -162,6 +162,21 @@ public sealed class MediaService(ITinhteDatabase database, IMediaStorage storage
         return await r.ReadAsync(ct) ? VideoSql.ReadMedia(r) : throw NotFound();
     }
 
+    /// <summary>
+    /// getAdminMediaContent: chỉ ảnh (IMAGE) đã READY, tạo qua upload intent; mọi trường hợp khác 404 để trình soạn thảo hiện ô thay thế.
+    /// Quyền RESTRICTED/EXPIRED/REVOKED vẫn xem được ở đây (biên tập viên cần thấy ảnh nào phải thay). Trả key object + MIME đã lưu.
+    /// </summary>
+    public async Task<(string StorageKey, string ContentType)> GetViewableImageAsync(Guid mediaId, CancellationToken ct)
+    {
+        await using var connection = await database.OpenConnectionAsync(ct);
+        await using var command = VideoSql.Command(connection, null, """
+            SELECT storage_key, content_type FROM tt.media_assets
+             WHERE id = @id AND media_type = 'IMAGE' AND status = 'READY' AND storage_key IS NOT NULL AND content_type LIKE 'image/%'
+            """).WithUuid("id", mediaId);
+        await using var r = await command.ExecuteReaderAsync(ct);
+        return await r.ReadAsync(ct) ? (r.GetString(0), r.GetString(1)) : throw NotFound();
+    }
+
     public async Task<IReadOnlyList<MediaStatus>> ListAsync(MediaFilter filter, MediaPosition? after, int limitPlusOne, CancellationToken ct)
     {
         await SweepExpiredUploadsAsync(ct);

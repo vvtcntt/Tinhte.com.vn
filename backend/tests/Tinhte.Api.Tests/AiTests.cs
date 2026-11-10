@@ -184,8 +184,14 @@ public sealed class AiUnitTests(WebApplicationFactory<Program> factory) : IClass
     [Fact]
     public void Audit_actions_match_the_migration_check()
     {
-        var check = File.ReadAllText(RepoPaths.File("doc", "07_AI_REVIEW", "v0.3", "db", "migrations", "0353_ai_requests.up.sql"));
-        Assert.Contains($"'{AiTasks.AuditAction(AiTasks.Tag)}', '{AiTasks.AuditAction(AiTasks.Summary)}'", check, StringComparison.Ordinal);
+        // Migration MỚI NHẤT định nghĩa ck_ai_requests_action (0354 nới thêm ai.rewrite; dạng tt_migration.add_constraint nhân đôi dấu nháy).
+        var latest = Directory.GetFiles(RepoPaths.File("doc", "07_AI_REVIEW", "v0.3", "db", "migrations"), "*.up.sql")
+            .Order(StringComparer.Ordinal)
+            .Last(f => File.ReadAllText(f) is var sql && sql.Contains("ck_ai_requests_action", StringComparison.Ordinal)
+                && sql.Contains("CHECK (action IN", StringComparison.Ordinal));
+        Assert.EndsWith("0354_ai_rewrite_action.up.sql", latest, StringComparison.Ordinal);
+        var check = File.ReadAllText(latest).Replace("''", "'", StringComparison.Ordinal);
+        Assert.Contains($"'{AiTasks.AuditAction(AiTasks.Tag)}', '{AiTasks.AuditAction(AiTasks.Summary)}', '{AiRewriteModes.AuditAction}'", check, StringComparison.Ordinal);
     }
 
     // ---------------------------------------------------------------- bề mặt API

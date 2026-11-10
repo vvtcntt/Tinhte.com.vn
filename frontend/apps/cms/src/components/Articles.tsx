@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ApiError, apiFetch } from '../lib/api';
 import {
   ARTICLE_STATUSES,
-  blocksToText,
   canEditArticle,
   canSubmit,
   isPendingReview,
@@ -19,11 +18,13 @@ import {
   textToBlocks,
   type AdminArticle,
   type ArticleRevision,
-  type Block,
   type Category,
 } from '../lib/articles';
+import { blocksKey, blocksProblems, blocksWarnings, parseBlocksKey, type BodyBlock } from '../lib/bodyBlocks';
 import { access } from '../lib/rbac';
 import { AiSuggest } from './AiSuggest';
+import { BodyView } from './editor/BodyView';
+import { RichEditor } from './editor/RichEditor';
 import { RequirePermission } from './CmsApp';
 import { useStaff } from './session';
 
@@ -45,7 +46,11 @@ const BACKUP_PREFIX = 'tt-cms:article-draft:';
 function readBackup(articleId: string): { draft: Draft; savedAt: string } | null {
   try {
     const raw = window.localStorage.getItem(BACKUP_PREFIX + articleId);
-    return raw ? (JSON.parse(raw) as { draft: Draft; savedAt: string }) : null;
+    if (!raw) return null;
+    const backup = JSON.parse(raw) as { draft: Draft; savedAt: string };
+    // Bản sao lưu của trình soạn tạm (văn bản "## / >") → đổi sang bodyBlocks.
+    if (parseBlocksKey(backup.draft.body) === null) backup.draft.body = blocksKey(textToBlocks(backup.draft.body));
+    return backup;
   } catch {
     return null;
   }
@@ -323,6 +328,7 @@ interface Draft {
   slug: string;
   summary: string;
   categoryId: string;
+  /** JSON của bodyBlocks (blocksKey) — so sánh/sao lưu như chuỗi. */
   body: string;
 }
 
@@ -353,8 +359,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       setArticle(art);
       setEtag(a.etag);
       setRevision(r);
-      const body = blocksToText((r?.bodyBlocks ?? []) as Block[]);
-      const loaded: Draft = { title: r?.title ?? art.title, slug: art.slug, summary: r?.summary ?? '', categoryId: r?.categoryId ?? '', body: body.text };
+      const loaded: Draft = { title: r?.title ?? art.title, slug: art.slug, summary: r?.summary ?? '', categoryId: r?.categoryId ?? '', body: blocksKey(r?.bodyBlocks ?? []) };
       setDraft(loaded);
       const backup = readBackup(articleId);
       setRestorable(backup && !sameDraft(backup.draft, loaded) ? backup : null);
@@ -367,7 +372,6 @@ function ArticleEditor({ articleId }: { articleId: string }) {
 
   useEffect(() => void load(), [load]);
 
-  const bodySupported = useMemo(() => blocksToText((revision?.bodyBlocks ?? []) as Block[]).supported, [revision]);
   const original = useMemo<Draft | null>(() => {
     if (!article) return null;
     return {
@@ -375,7 +379,7 @@ function ArticleEditor({ articleId }: { articleId: string }) {
       slug: article.slug,
       summary: revision?.summary ?? '',
       categoryId: revision?.categoryId ?? '',
-      body: blocksToText((revision?.bodyBlocks ?? []) as Block[]).text,
+      body: blocksKey(revision?.bodyBlocks ?? []),
     };
   }, [article, revision]);
   const dirty = !!draft && !!original && !sameDraft(draft, original);
@@ -425,7 +429,10 @@ function ArticleEditor({ articleId }: { articleId: string }) {
   const can = (p: 'content.write_own' | 'content.write_any') => access(staff, p) === 'allowed';
   const permitted = canEditArticle(can, staff.userId, article);
   const editableState = EDITABLE_STATUSES.has(article.status);
-  const editable = permitted && editableState && bodySupported;
+  const editable = permitted && editableState;
+  const bodyBlocks = (parseBlocksKey(draft.body) ?? []) as BodyBlock[];
+  const bodyProblems = blocksProblems(bodyBlocks);
+  const bodyWarnings = blocksWarnings(bodyBlocks);
   const set = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 
   const save = async (e: FormEvent) => {
@@ -435,7 +442,13 @@ function ArticleEditor({ articleId }: { articleId: string }) {
     if (draft.slug !== original.slug) body.slug = draft.slug;
     if (draft.summary !== original.summary) body.summary = draft.summary.trim() ? draft.summary : null;
     if (draft.categoryId !== original.categoryId && draft.categoryId) body.categoryId = draft.categoryId;
-    if (draft.body !== original.body) body.bodyBlocks = textToBlocks(draft.body);
+    if (draft.body !== original.body) {
+      if (bodyProblems.length) {
+        setMessage({ kind: 'error', text: bodyProblems.join(' ') });
+        return;
+      }
+      body.bodyBlocks = bodyBlocks;
+    }
     if (changeReason.trim()) body.changeReason = changeReason.trim();
     if (Object.keys(body).length === 0) return;
     setBusy(true);
@@ -505,12 +518,6 @@ function ArticleEditor({ articleId }: { articleId: string }) {
           {article.assigneeId === staff.userId && <span className="small">Bạn là người phụ trách tiếp theo: sửa bài rồi gửi duyệt lại.</span>}
         </div>
       )}
-      {!bodySupported && (
-        <div className="banner warn" role="status">
-          Nội dung có loại khối mà trình soạn tạm chưa hỗ trợ (ảnh, nhúng…). Chỉ xem được; trình soạn đầy đủ làm theo thiết kế UX-CMS-02.
-        </div>
-      )}
-
       <div className="editor-layout">
         <form ref={formRef} className="card stack-sm" onSubmit={save}>
           <label className="field">
@@ -549,17 +556,19 @@ function ArticleEditor({ articleId }: { articleId: string }) {
               </button>
             </span>
             {preview ? (
-              <BlocksPreview blocks={textToBlocks(draft.body)} />
+              <BodyView blocks={bodyBlocks} />
             ) : (
-              <textarea
-                className="body-editor"
+              <RichEditor
                 value={draft.body}
-                onChange={(e) => set({ body: e.target.value })}
-                rows={16}
+                onChange={(body) => set({ body })}
                 disabled={!editable || busy}
-                placeholder={'Viết nội dung. Cách đoạn bằng một dòng trống.\n## Tiêu đề mục\n> Trích dẫn'}
+                placeholder="Viết nội dung bài… (dán/kéo thả ảnh, Ctrl+K chèn liên kết, Ctrl+F tìm)"
+                contentId={article.id}
+                canUpload={access(staff, 'media.upload') === 'allowed'}
+                canUseAi={access(staff, 'ai.assist') === 'allowed'}
               />
             )}
+            {editable && bodyWarnings.map((w) => <span key={w} className="muted small">⚠ {w}</span>)}
           </div>
           <label className="field">
             <span>Ghi chú thay đổi (tùy chọn, lưu vào lịch sử)</span>
@@ -610,23 +619,6 @@ function ArticleEditor({ articleId }: { articleId: string }) {
         </aside>
       </div>
     </section>
-  );
-}
-
-function BlocksPreview({ blocks }: { blocks: Block[] }) {
-  if (blocks.length === 0) return <div className="preview muted">(Chưa có nội dung)</div>;
-  return (
-    <div className="preview">
-      {blocks.map((b, i) =>
-        b.type === 'heading' ? (
-          b.level === 3 ? <h4 key={i}>{b.text}</h4> : <h3 key={i}>{b.text}</h3>
-        ) : b.type === 'quote' ? (
-          <blockquote key={i}>{b.text}</blockquote>
-        ) : (
-          <p key={i}>{b.text}</p>
-        ),
-      )}
-    </div>
   );
 }
 

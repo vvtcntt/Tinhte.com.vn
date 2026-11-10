@@ -32,7 +32,9 @@ DESKTOP ≥ 1024px                                      MOBILE < 768px
   - Khối `paragraph` hiển thị là `<p>`, giữ nguyên ngắt dòng.
   - `heading` cấp 2 hoặc 3 hiển thị là `<h2>`/`<h3>`.
   - `quote` hiển thị là `<blockquote>`.
-  - Kiểu khối khác (ảnh, nhúng, sau editor UX-CMS-02) **bị bỏ qua**, không hiện sai.
+  - Từ editor CMS (CHANGELOG v0.3 mục 22, DRAFT): `list` → `<ul>`/`<ol>`, `table` → bảng cuộn ngang trên mobile (có hàng tiêu đề, chú thích).
+  - Định dạng chữ theo `runs`: đậm, nghiêng, gạch chân, gạch ngang, màu chữ/nền (#rrggbb), liên kết (chỉ http(s)/mailto, `rel="nofollow noopener noreferrer"`). `align` center/right cho đoạn và tiêu đề. `runs` sai dạng → hiện `text` không định dạng.
+  - `image` **chưa hiển thị** cho tới khi có phân phối media công khai (WBS-035). Kiểu khối lạ (nhúng…) **bị bỏ qua**, không hiện sai.
 - **Trạng thái:**
   - API 308 (slug cũ): chuyển hướng 308 sang `/articles/{slug-mới}`.
   - API 404 hoặc 410 (đã gỡ / hết quyền): trang "Không tìm thấy", HTTP **404**. Next.js không trả được 410 từ trang; nếu SEO cần đúng 410 thì xử lý ở edge.

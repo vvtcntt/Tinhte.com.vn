@@ -25,7 +25,7 @@ internal static class AiSql
         return await command.ExecuteScalarAsync(ct) is true;
     }
 
-    /// <summary>Bài hoặc video theo id: revision working, nếu không có thì public. null = không có.</summary>
+    /// <summary>Bài hoặc video theo id: revision working, nếu không có thì public (thân video: cột body của 0355). null = không có.</summary>
     public static async Task<AiContentSource?> LoadContentAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid contentId, CancellationToken ct)
     {
         await using var command = Command(connection, transaction, """
@@ -34,7 +34,7 @@ internal static class AiSql
               LEFT JOIN tt.article_revisions r ON r.id = COALESCE(a.working_revision_id, a.public_revision_id)
              WHERE a.id = @id
             UNION ALL
-            SELECT 'VIDEO', COALESCE(r.title, ''), r.summary, NULL
+            SELECT 'VIDEO', COALESCE(r.title, ''), r.summary, r.body::text
               FROM tt.videos v
               LEFT JOIN tt.video_revisions r ON r.id = COALESCE(v.working_revision_id, v.public_revision_id)
              WHERE v.id = @id

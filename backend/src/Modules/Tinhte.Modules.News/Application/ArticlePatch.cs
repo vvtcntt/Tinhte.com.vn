@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tinhte.Modules.News.Domain;
+using BodyBlockRules = Tinhte.Platform.Content.BodyBlocks;
 using Tinhte.Platform.Errors;
 
 namespace Tinhte.Modules.News.Application;
@@ -81,7 +82,7 @@ public sealed class ArticlePatch
                     else Fail("categoryId", "Must be a uuid.");
                     break;
                 case "bodyBlocks":
-                    if (BodyBlocksError(v) is { } blocksError) Fail("bodyBlocks", blocksError);
+                    if (BodyBlockRules.Validate(v, "bodyBlocks") is { } blocksError) Fail(blocksError.Path, blocksError.Message);
                     else bodyBlocks = Optional<JsonElement>.Of(v.Clone());
                     break;
                 case "contentKind":
@@ -127,12 +128,6 @@ public sealed class ArticlePatch
             RightsExpiresAt = rightsExpiresAt, Slug = slug, Sponsorship = sponsorship, ChangeReason = changeReason,
         };
     }
-
-    /// <summary>bodyBlocks: mảng các object (schema <c>array of object</c>). null nếu hợp lệ.</summary>
-    public static string? BodyBlocksError(JsonElement value) =>
-        value.ValueKind != JsonValueKind.Array ? "Must be an array of objects."
-        : value.EnumerateArray().Any(b => b.ValueKind != JsonValueKind.Object) ? "Every block must be a JSON object."
-        : null;
 
     private static SponsorshipInput? ParseSponsorship(JsonElement v, Action<string, string> fail)
     {

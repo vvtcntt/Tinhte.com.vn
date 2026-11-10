@@ -427,6 +427,38 @@ async function behaviour(sc, db) {
     VALUES ('${U1}', 'ai.suggest_summary', 'VIDEO', '${id('d1')}', 'yescale', 'gpt', 1, repeat('Z', 64))`, /ck_ai_requests_input/);
   await expectError(sc, db, 'AI9 down 0353 từ chối khi đã có nhật ký AI', `${APPROVE('ai.assistance')} ${AI()} ${DOWN_0353}`, /Refusing to roll back 0353/);
 
+  // Viết lại đoạn văn (0354 + 0356): action ai.rewrite
+  const REWRITE = `INSERT INTO tt.ai_requests (actor_id, action, object_type, object_id, provider_key, model, input_chars, input_sha256)
+    VALUES ('${U1}', 'ai.rewrite', 'VIDEO', '${id('d1')}', 'yescale', 'gpt-5.4-mini', 42, repeat('b', 64));`;
+  const DOWN_0354 = read(path.join(MIG_DIR, '0354_ai_rewrite_action.down.sql'));
+  const ACTION_CHECK = `(SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'tt.ai_requests'::regclass AND conname = 'ck_ai_requests_action')`;
+  await expectOk(sc, db, 'AI10 ghi nhật ký ai.rewrite được (0354)', `${APPROVE('ai.assistance')} ${REWRITE}`);
+  await expectError(sc, db, 'AI11 action ngoài danh mục vẫn bị chặn', `${APPROVE('ai.assistance')}
+    INSERT INTO tt.ai_requests (actor_id, action, object_type, object_id, provider_key, model, input_chars, input_sha256)
+    VALUES ('${U1}', 'ai.translate', 'VIDEO', '${id('d1')}', 'yescale', 'gpt', 1, repeat('c', 64))`, /ck_ai_requests_action/);
+  await expectValue(sc, db, 'AI12 CHECK action đã VALIDATED (0356) và có đủ 3 hành động',
+    `SELECT c.convalidated AND ${ACTION_CHECK} LIKE '%''ai.suggest_summary''%''ai.rewrite''%' FROM pg_constraint c WHERE c.conrelid = 'tt.ai_requests'::regclass AND c.conname = 'ck_ai_requests_action'`, true);
+  await expectError(sc, db, 'AI13 down 0354 từ chối khi nhật ký đã có ai.rewrite', `${APPROVE('ai.assistance')} ${REWRITE} ${DOWN_0354}`, /Refusing to roll back 0354/);
+  await expectOk(sc, db, 'AI14 down 0354 (chưa có ai.rewrite) trả CHECK về 2 hành động của 0353', `${DOWN_0354}
+    DO $$ BEGIN IF ${ACTION_CHECK} LIKE '%ai.rewrite%' OR ${ACTION_CHECK} NOT LIKE '%''ai.suggest_tags''%' THEN RAISE EXCEPTION 'old check'; END IF; END $$;`);
+  await expectError(sc, db, 'AI15 sau down 0354, ai.rewrite bị chặn lại', `${DOWN_0354} ${APPROVE('ai.assistance')} ${REWRITE}`, /ck_ai_requests_action/);
+
+  // Thân video (0355 + 0356): cột body, mảng JSON, đóng băng cùng revision
+  const DOWN_0355 = read(path.join(MIG_DIR, '0355_video_revision_body.down.sql'));
+  const BODY = `'[{"type":"paragraph","text":"Mô tả video"}]'::jsonb`;
+  await expectValue(sc, db, 'VB1 revision video cũ nhận thân rỗng []', `SELECT body::text FROM tt.video_revisions WHERE id = '${id('d2')}'`, '[]');
+  await expectOk(sc, db, 'VB2 revision video DRAFT chưa public sửa được thân', `${VDRAFT} ${VREV('d3', `body = ${BODY}`)}
+    DO $$ BEGIN IF (SELECT body->0->>'text' FROM tt.video_revisions WHERE id = '${id('d3')}') <> 'Mô tả video' THEN RAISE EXCEPTION 'body'; END IF; END $$;`);
+  await expectError(sc, db, 'VB3 thân video không phải mảng bị chặn', `${VDRAFT} ${VREV('d3', `body = '{"type":"paragraph"}'::jsonb`)}`, /ck_video_revisions_body_array/);
+  await expectError(sc, db, 'VB4 thân video NULL bị chặn', `${VDRAFT} ${VREV('d3', `body = NULL`)}`, /null value|not-null|body/);
+  await expectError(sc, db, 'VB5 revision video đã gửi duyệt không sửa được thân → STATE_CONFLICT', `${VDRAFT} ${VREV('d3', `status = 'IN_REVIEW'`)} ${VREV('d3', `body = ${BODY}`)}`, /STATE_CONFLICT.*frozen/);
+  await expectError(sc, db, 'VB6 public revision video không sửa được thân → STATE_CONFLICT', `${VDRAFT} ${VREADY} ${VPUB('d3')} ${VREV('d3', `body = ${BODY}`)}`, /STATE_CONFLICT.*frozen/);
+  await expectValue(sc, db, 'VB7 CHECK thân video đã VALIDATED (0356)',
+    `SELECT convalidated FROM pg_constraint WHERE conrelid = 'tt.video_revisions'::regclass AND conname = 'ck_video_revisions_body_array'`, true);
+  await expectError(sc, db, 'VB8 down 0355 từ chối khi đã có thân video', `${VDRAFT} ${VREV('d3', `body = ${BODY}`)} ${DOWN_0355}`, /Refusing to roll back 0355/);
+  await expectOk(sc, db, 'VB9 down 0355 (thân rỗng) gỡ cột body', `${DOWN_0355}
+    DO $$ BEGIN IF tt_migration.has_column('video_revisions', 'body') THEN RAISE EXCEPTION 'column'; END IF; END $$;`);
+
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
 }

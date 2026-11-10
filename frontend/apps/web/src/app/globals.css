@@ -538,6 +538,17 @@ main:focus { outline: none; }
   margin-left: 0; margin-right: 0; padding: 4px 0 4px 18px;
   border-left: 4px solid var(--brand); color: var(--muted); font-style: italic; white-space: pre-line;
 }
+.article-body span { white-space: pre-line; }
+.article-body a { color: var(--brand); text-decoration: underline; }
+.article-body ul, .article-body ol { padding-left: 1.4em; }
+.article-body li + li { margin-top: 0.35em; }
+.article-body .align-center { text-align: center; }
+.article-body .align-right { text-align: right; }
+.article-table { overflow-x: auto; }
+.article-table table { width: 100%; border-collapse: collapse; font-size: 0.92em; line-height: 1.5; }
+.article-table caption { caption-side: bottom; padding-top: 6px; color: var(--muted); font-size: 0.9em; text-align: left; }
+.article-table th, .article-table td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+.article-table th { font-weight: var(--fw-bold); }
 .ad-slot--article { margin-top: var(--sp-6); }
 
 .article-aside { min-width: 0; }

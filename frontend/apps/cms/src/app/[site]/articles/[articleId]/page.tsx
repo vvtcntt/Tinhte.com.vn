@@ -1,3 +1,5 @@
+import '../../../videos.css';
+import '../../../editor.css';
 import { ArticleEditorPage } from '../../../../components/Articles';
 
 export default async function Page({ params }: { params: Promise<{ articleId: string }> }) {

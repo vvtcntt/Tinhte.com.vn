@@ -5,6 +5,7 @@ using System.Text.Json;
 using Npgsql;
 using Tinhte.Modules.News.Domain;
 using Tinhte.Modules.News.Infrastructure;
+using Tinhte.Platform.Content;
 using Tinhte.Platform.Data;
 using Tinhte.Platform.Errors;
 using Tinhte.Platform.Mvc;
@@ -121,11 +122,12 @@ public sealed partial class ArticleService(ITinhteDatabase database)
         var kind = request.ContentKind ?? ContentKinds.Editorial;
         var sponsorship = CheckSponsorship(kind, request.Sponsorship);
         var body = request.InitialBodyBlocks is { ValueKind: not JsonValueKind.Null } blocks ? blocks : ArticleSql.ParseBody(null);
-        if (ArticlePatch.BodyBlocksError(body) is { } bodyError) throw Invalid("initialBodyBlocks", bodyError);
+        if (BodyBlocks.Validate(body, "initialBodyBlocks") is { } bodyError) throw Invalid(bodyError.Path, bodyError.Message);
 
         return await database.InTransactionAsync(actorId, async (connection, tx) =>
         {
             var siteKey = await CategorySiteAsync(connection, tx, request.CategoryId!.Value, ct);
+            await BodyBlockMedia.EnsureImagesAttachableAsync(connection, tx, body, "initialBodyBlocks", ct);
             var articleId = Guid.CreateVersion7();
             var revisionId = Guid.CreateVersion7();
             var slug = await UniqueSlugAsync(connection, tx, ArticleSlug.FromTitle(request.Title), ct);
@@ -172,6 +174,8 @@ public sealed partial class ArticleService(ITinhteDatabase database)
             }
 
             if (patch.Slug.IsSet && patch.Slug.Value != article.Slug) await EnsureSlugFreeAsync(connection, tx, articleId, patch.Slug.Value, ct);
+            // FR-CMS-009: chỉ kiểm ảnh khi thân bài được gửi lên (sửa tiêu đề không bị chặn bởi ảnh cũ; publish/duyệt kiểm lại là việc của WBS-024/039).
+            if (patch.BodyBlocks.IsSet) await BodyBlockMedia.EnsureImagesAttachableAsync(connection, tx, patch.BodyBlocks.Value, "bodyBlocks", ct);
 
             var workingRevisionId = article.WorkingRevisionId;
             var status = article.Status;

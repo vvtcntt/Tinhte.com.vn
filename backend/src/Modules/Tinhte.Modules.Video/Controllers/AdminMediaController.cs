@@ -70,6 +70,35 @@ public sealed class AdminMediaController(MediaService media, IMediaStorage stora
     }
 
     /// <summary>
+    /// getAdminMediaContent (FR-CMS-009): xem ảnh của thư viện media trong trình soạn thảo CMS. Thẻ &lt;img&gt; gửi GET kèm cookie phiên
+    /// (cùng origin site cms) — GET không cần CSRF. Chỉ IMAGE + READY, còn lại 404. Kho thật → 302 tới URL đọc ký sẵn ngắn hạn;
+    /// kho Local (dev) → 200 trả byte với MIME đã lưu, nosniff, inline. Chưa cấu hình kho → 503 DEPENDENCY_UNAVAILABLE.
+    /// Không cho cache dùng chung: phiên staff + quyền ảnh có thể đổi.
+    /// </summary>
+    [HttpGet("{mediaId}/content", Name = "getAdminMediaContent")]
+    [RequirePermission(Permissions.ContentRead)]
+    public async Task<IActionResult> Content(Guid mediaId, CancellationToken cancellationToken)
+    {
+        if (!storage.IsConfigured) throw UnconfiguredMediaStorage.Unavailable();
+        var (storageKey, contentType) = await media.GetViewableImageAsync(mediaId, cancellationToken);
+        var content = await storage.OpenReadAsync(storageKey, cancellationToken)
+            ?? throw new DomainProblemException(ErrorCodes.NotFound, "Media not found", "The media file is missing from storage.");
+
+        Response.Headers.CacheControl = "private, no-store";
+        switch (content)
+        {
+            case MediaContentRedirect redirect:
+                return Redirect(redirect.Url.AbsoluteUri);
+            case MediaContentStream stream:
+                Response.Headers.XContentTypeOptions = "nosniff";
+                Response.Headers.ContentDisposition = "inline";
+                return File(stream.Content, contentType);
+            default:
+                throw new InvalidOperationException("Unknown media content kind.");
+        }
+    }
+
+    /// <summary>
     /// DEV-ONLY, NGOÀI HỢP ĐỒNG (ADR-0006): đích của <c>uploadUrl</c> khi kho lưu trữ là <see cref="LocalMediaStorage"/>.
     /// Production: client PUT thẳng lên object storage bằng URL ký sẵn, endpoint này trả 404.
     /// Cùng origin site cms nên trình duyệt gửi cookie phiên → vẫn cần <c>media.upload</c> + X-CSRF-Token như mọi request ghi.

@@ -127,3 +127,12 @@ test('lỗi: thông điệp theo mã của catalog, kèm lỗi từng trường'
   assert.match(mediaErrorLabel('UPLOAD_EXPIRED') ?? '', /hết hạn/);
   assert.match(mediaErrorLabel('SOMETHING_NEW') ?? '', /SOMETHING_NEW/);   // mã lạ của vendor → thông điệp chung
 });
+
+test('videoPatchBody: thân video (bodyBlocks) chỉ gửi khi đổi; API cũ chưa trả bodyBlocks → coi là rỗng', () => {
+  const video = { id: 'v', title: 'T', summary: null, contentKind: 'EDITORIAL', sponsorship: null } as unknown as Parameters<typeof draftFromVideo>[0];
+  const draft = draftFromVideo(video);
+  assert.equal(draft.body, '[]');
+  assert.equal(videoPatchBody(video, draft), null);
+  const blocks = [{ type: 'paragraph', text: 'Mô tả' }];
+  assert.deepEqual(videoPatchBody(video, { ...draft, body: JSON.stringify(blocks) }), { bodyBlocks: blocks });
+});

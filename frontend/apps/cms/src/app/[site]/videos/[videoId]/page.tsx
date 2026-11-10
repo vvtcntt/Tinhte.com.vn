@@ -1,4 +1,5 @@
 import '../../../videos.css';
+import '../../../editor.css';
 import { VideoDetailPage } from '../../../../components/Videos';
 
 export default async function Page({ params }: { params: Promise<{ videoId: string }> }) {

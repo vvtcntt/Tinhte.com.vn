@@ -19,6 +19,20 @@ public static class MediaStorageKeys
 /// <summary>Kết quả HEAD object: kích thước + sha256 (hex thường) do kho tính/xác nhận.</summary>
 public sealed record StoredObject(long SizeBytes, string ChecksumSha256);
 
+/// <summary>Cách trả nội dung object cho getAdminMediaContent.</summary>
+public abstract record MediaContent
+{
+    /// <summary>Kho thật: chuyển hướng 302 tới URL đọc có chữ ký, ngắn hạn (<see cref="MediaContentRedirect.ExpiresAt"/>).</summary>
+    public static MediaContent Redirect(Uri url, DateTimeOffset expiresAt) => new MediaContentRedirect(url, expiresAt);
+
+    /// <summary>Kho Local (dev): API tự trả byte.</summary>
+    public static MediaContent Stream(Stream content, long length) => new MediaContentStream(content, length);
+}
+
+public sealed record MediaContentRedirect(Uri Url, DateTimeOffset ExpiresAt) : MediaContent;
+
+public sealed record MediaContentStream(Stream Content, long Length) : MediaContent;
+
 /// <summary>
 /// Kho lưu trữ media (ADR-0006). Bản production (object storage + URL ký sẵn, WBS-039) chưa có vì chưa chọn vendor (WBS-035);
 /// bản dev là <see cref="LocalMediaStorage"/>. Object luôn PRIVATE: phục vụ công khai đi qua site <c>media</c> + grant (WBS-039).
@@ -37,6 +51,12 @@ public interface IMediaStorage
     Task<byte[]?> ReadHeaderAsync(string storageKey, int length, CancellationToken ct);
 
     Task DeleteAsync(string storageKey, CancellationToken ct);
+
+    /// <summary>
+    /// Đọc object để xem trong CMS (getAdminMediaContent). Adapter object storage trả <see cref="MediaContentRedirect"/> với URL đọc ký sẵn
+    /// sống ngắn (vài phút, chỉ đúng key này); kho Local trả luồng tệp. null nếu object không tồn tại.
+    /// </summary>
+    Task<MediaContent?> OpenReadAsync(string storageKey, CancellationToken ct);
 }
 
 /// <summary>Chưa cấu hình kho (mặc định ngoài Development): không nhận tải lên, fail-closed.</summary>
@@ -51,6 +71,8 @@ public sealed class UnconfiguredMediaStorage : IMediaStorage
     public Task<byte[]?> ReadHeaderAsync(string storageKey, int length, CancellationToken ct) => Task.FromResult<byte[]?>(null);
 
     public Task DeleteAsync(string storageKey, CancellationToken ct) => Task.CompletedTask;
+
+    public Task<MediaContent?> OpenReadAsync(string storageKey, CancellationToken ct) => throw Unavailable();
 
     public static DomainProblemException Unavailable() =>
         new(ErrorCodes.DependencyUnavailable, "Media storage unavailable", "Media storage is not configured for this environment.");
@@ -159,6 +181,15 @@ public sealed partial class LocalMediaStorage : IMediaStorage
         var path = PathOf(storageKey);
         if (File.Exists(path)) File.Delete(path);
         return Task.CompletedTask;
+    }
+
+    /// <summary>Mở tệp để API trả thẳng byte (không có URL ký cho kho Local). Người gọi đóng luồng.</summary>
+    public Task<MediaContent?> OpenReadAsync(string storageKey, CancellationToken ct)
+    {
+        var path = PathOf(storageKey);
+        if (!File.Exists(path)) return Task.FromResult<MediaContent?>(null);
+        var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true);
+        return Task.FromResult<MediaContent?>(MediaContent.Stream(file, file.Length));
     }
 
     /// <summary>Key do server sinh (<c>media/yyyy/MM/{uuid}</c>); vẫn kiểm định dạng để không bao giờ ghi ra ngoài thư mục gốc.</summary>

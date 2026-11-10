@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { ApiError, apiFetch } from '../lib/api';
 import { access, type Access } from '../lib/rbac';
 import { AiSuggest } from './AiSuggest';
+import { RichEditor } from './editor/RichEditor';
 import {
   ANY_ACCEPT, CONTENT_STATUSES, REASON_MAX, VIDEO_ACCEPT, canAttachToVideo, canSubmitVideo, contentStatusLabel, draftFromVideo, formatBytes,
   isApproved, isInReview, isMediaInFlight, isPendingDecision, mediaErrorLabel, mediaListQuery, mediaTypeLabel, pollDelayMs, publishBlockers,
@@ -404,6 +405,7 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
   onSaved: (v: AdminVideo, etag: string | null) => void;
   reload: Reload;
 }) {
+  const staff = useStaff();
   const [draft, setDraft] = useState<VideoDraft>(() => draftFromVideo(video));
   // Bản video mà form được dựng từ đó: video đổi từ nơi khác (gắn media, tải lại sau 412) mà người dùng chưa sửa gì → dựng lại form;
   // đang sửa dở → giữ nguyên thay đổi, lần lưu sau so với bản mới nhất.
@@ -471,6 +473,19 @@ function VideoEditor({ video, etag, canEdit, onSaved, reload }: {
           <textarea value={draft.summary} onChange={(e) => set('summary', e.target.value)} rows={4} />
         </label>
         <AiSuggest contentId={video.id} dirty={body !== null} canApply={editable && !busy} onUseSummary={(summary) => set('summary', summary)} />
+        <div className="field">
+          <span>Mô tả chi tiết</span>
+          <RichEditor
+            label="Mô tả chi tiết của video"
+            value={draft.body}
+            onChange={(value) => set('body', value)}
+            disabled={!editable || busy}
+            placeholder="Mô tả chi tiết, chương mục, thông số… (tùy chọn)"
+            contentId={video.id}
+            canUpload={access(staff, 'media.upload') === 'allowed'}
+            canUseAi={access(staff, 'ai.assist') === 'allowed'}
+          />
+        </div>
         <label className="field">
           <span>Loại nội dung</span>
           <select value={draft.contentKind} onChange={(e) => set('contentKind', e.target.value)}>

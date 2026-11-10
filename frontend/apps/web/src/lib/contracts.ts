@@ -35,7 +35,7 @@ export interface VideoSummary {
   sponsorLabel?: string | null;
 }
 
-/** Khối nội dung bài (bodyBlocks). Hiện CMS soạn: paragraph, heading (level 2|3), quote. Kiểu khác: bỏ qua khi hiển thị. */
+/** Khối nội dung bài (bodyBlocks, schema BodyBlock — CHANGELOG v0.3 mục 22): paragraph, heading, quote, list, table hiển thị; image chờ WBS-035; kiểu lạ bỏ qua. Đọc qua lib/body.ts. */
 export type BodyBlock = { type: string; text?: string; level?: number; [key: string]: unknown };
 
 /** Article (getPublicArticle; FR-NEWS-001). */

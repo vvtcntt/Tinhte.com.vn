@@ -89,7 +89,10 @@ public sealed class NewsArticleUnitTests(WebApplicationFactory<Program> factory)
         Assert.Contains("$", PatchErrors("""{"unknown":1}""").Keys);
         Assert.Contains("title", PatchErrors("""{"title":"   "}""").Keys);
         Assert.Contains("slug", PatchErrors("""{"slug":"Có Dấu"}""").Keys);
-        Assert.Contains("bodyBlocks", PatchErrors("""{"bodyBlocks":[1]}""").Keys);
+        // Lỗi thân bài chỉ đúng khối/trường (validator dùng chung BodyBlocks), không còn chỉ "bodyBlocks".
+        Assert.Contains("bodyBlocks[0]", PatchErrors("""{"bodyBlocks":[1]}""").Keys);
+        Assert.Contains("bodyBlocks", PatchErrors("""{"bodyBlocks":{"type":"paragraph"}}""").Keys);
+        Assert.Contains("bodyBlocks[1].runs[0].href", PatchErrors("""{"bodyBlocks":[{"type":"paragraph","text":""},{"type":"paragraph","text":"x","runs":[{"text":"x","href":"javascript:alert(1)"}]}]}""").Keys);
         Assert.Contains("contentKind", PatchErrors("""{"contentKind":"ADVERTORIAL"}""").Keys);
         Assert.Contains("sponsorship.validTo", PatchErrors("""{"sponsorship":{"sponsorName":"A","sponsorReference":"B","evidenceRef":"C","validFrom":"2026-01-01T00:00:00Z"}}""").Keys);
         // Taxonomy nguồn/giấy phép (WBS-023) chưa có: từ chối rõ ràng, không bỏ qua im lặng.

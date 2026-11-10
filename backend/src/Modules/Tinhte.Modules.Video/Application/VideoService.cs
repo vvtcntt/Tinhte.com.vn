@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using Npgsql;
 using Tinhte.Modules.Video.Domain;
 using Tinhte.Modules.Video.Infrastructure;
+using Tinhte.Platform.Content;
 using Tinhte.Platform.Data;
 using Tinhte.Platform.Errors;
 using Tinhte.Platform.Mvc;
@@ -78,7 +80,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
         while (await reader.ReadAsync(ct))
         {
             var row = VideoSql.ReadAdmin(reader);
-            rows.Add((row.Video, row.CreatedAt));
+            rows.Add((row.Video with { BodyBlocks = null }, row.CreatedAt));   // danh sách không kèm thân
         }
 
         return rows;
@@ -107,7 +109,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
             }
 
             await InsertRevisionAsync(connection, tx,
-                new RevisionContent(videoId, revisionId, 1, request.Title, request.Summary, request.MediaId, kind, sponsorship, null), actorId, ct);
+                new RevisionContent(videoId, revisionId, 1, request.Title, request.Summary, request.MediaId, kind, sponsorship, null, VideoSql.ParseBody(null)), actorId, ct);
 
             await using (var link = VideoSql.Command(connection, tx, "UPDATE tt.videos SET working_revision_id = @rev WHERE id = @id")
                 .WithUuid("rev", revisionId).WithUuid("id", videoId))
@@ -153,6 +155,8 @@ public sealed partial class VideoService(ITinhteDatabase database)
             // Media là nội dung của revision (0334): đổi media của video đã public = revision mới, bản công khai giữ media cũ tới khi publish.
             var next = Apply(current, patch);
             if (next.MediaId != current.MediaId && next.MediaId is { } media) await EnsureBindableMediaAsync(connection, tx, media, videoId, ct);
+            // FR-CMS-009: ảnh trong thân chỉ kiểm khi thân được gửi lên (giống bài viết).
+            if (patch.BodyBlocks.IsSet) await BodyBlockMedia.EnsureImagesAttachableAsync(connection, tx, patch.BodyBlocks.Value, "bodyBlocks", ct);
 
             var workingRevisionId = video.WorkingRevisionId;
             var status = video.Status;
@@ -193,10 +197,11 @@ public sealed partial class VideoService(ITinhteDatabase database)
 
     private sealed record RevisionContent(
         Guid VideoId, Guid RevisionId, int Number, string Title, string? Summary, Guid? MediaId, string ContentKind, VideoSponsorshipInput? Sponsorship,
-        string? ChangeReason);
+        string? ChangeReason, JsonElement Body);
 
     private sealed record CurrentRevision(Guid RevisionId, Guid VideoId, int Number, string Status, string Title, string? Summary, Guid? MediaId,
-        string ContentKind, VideoSponsorshipInput? Sponsorship, string? ChangeReason, Guid? AuthorId, Guid? SubmittedBy, int? ApprovedMediaGeneration);
+        string ContentKind, VideoSponsorshipInput? Sponsorship, string? ChangeReason, Guid? AuthorId, Guid? SubmittedBy, int? ApprovedMediaGeneration,
+        JsonElement Body);
 
     private static DomainProblemException NotFound() => new(ErrorCodes.NotFound, "Video not found", "No video with this id.");
 
@@ -231,7 +236,8 @@ public sealed partial class VideoService(ITinhteDatabase database)
             patch.Summary.IsSet ? patch.Summary.Value : current.Summary,
             patch.MediaId.IsSet ? patch.MediaId.Value : current.MediaId,
             kind, sponsorship,
-            patch.ChangeReason.IsSet ? patch.ChangeReason.Value : current.ChangeReason);
+            patch.ChangeReason.IsSet ? patch.ChangeReason.Value : current.ChangeReason,
+            patch.BodyBlocks.IsSet ? patch.BodyBlocks.Value : current.Body);
     }
 
     /// <summary>
@@ -261,9 +267,9 @@ public sealed partial class VideoService(ITinhteDatabase database)
     private static async Task InsertRevisionAsync(NpgsqlConnection connection, NpgsqlTransaction tx, RevisionContent c, Guid actorId, CancellationToken ct)
     {
         await using var command = VideoSql.Command(connection, tx, """
-            INSERT INTO tt.video_revisions (id, video_id, number, title, summary, media_id, author_id, updated_by, status,
+            INSERT INTO tt.video_revisions (id, video_id, number, title, summary, body, media_id, author_id, updated_by, status,
                 content_kind, sponsor_name, sponsor_reference, sponsorship_evidence_ref, sponsorship_valid_from, sponsorship_valid_to, change_reason)
-            VALUES (@id, @video, @number, @title, @summary, @media, @actor, @actor, 'DRAFT',
+            VALUES (@id, @video, @number, @title, @summary, @body, @media, @actor, @actor, 'DRAFT',
                 @kind, @sponsor_name, @sponsor_reference, @evidence, @valid_from, @valid_to, @reason)
             """);
         command.Parameters.AddWithValue("number", c.Number);
@@ -275,7 +281,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
     {
         await using var command = VideoSql.Command(connection, tx, """
             UPDATE tt.video_revisions
-               SET title = @title, summary = @summary, media_id = @media, content_kind = @kind,
+               SET title = @title, summary = @summary, body = @body, media_id = @media, content_kind = @kind,
                    sponsor_name = @sponsor_name, sponsor_reference = @sponsor_reference, sponsorship_evidence_ref = @evidence,
                    sponsorship_valid_from = @valid_from, sponsorship_valid_to = @valid_to, change_reason = @reason, updated_by = @actor,
                    sponsorship_approved_by = CASE WHEN @reset_approval THEN NULL ELSE sponsorship_approved_by END,
@@ -289,6 +295,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
     private static NpgsqlCommand BindContent(NpgsqlCommand command, RevisionContent c) => command
         .WithText("title", c.Title)
         .WithText("summary", c.Summary)
+        .WithJson("body", c.Body)
         .WithUuid("media", c.MediaId)
         .WithText("kind", c.ContentKind)
         .WithText("sponsor_name", c.Sponsorship?.SponsorName)
@@ -310,7 +317,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
         await using var command = VideoSql.Command(connection, tx, """
             SELECT id, video_id, number, status, title, summary, content_kind,
                    sponsor_name, sponsor_reference, sponsorship_evidence_ref, sponsorship_valid_from, sponsorship_valid_to, change_reason,
-                   media_id, author_id, submitted_by, approved_media_generation
+                   media_id, author_id, submitted_by, approved_media_generation, body::text
               FROM tt.video_revisions WHERE id = @id
             """).WithUuid("id", revisionId);
         await using var r = await command.ExecuteReaderAsync(ct);
@@ -320,7 +327,7 @@ public sealed partial class VideoService(ITinhteDatabase database)
             : new VideoSponsorshipInput(r.GetString(7), r.GetString(8), r.GetString(9), VideoSql.Time(r, 10), VideoSql.Time(r, 11));
         return new CurrentRevision(r.GetGuid(0), r.GetGuid(1), r.GetInt32(2), r.GetString(3), r.GetString(4), VideoSql.NullableText(r, 5),
             VideoSql.NullableGuid(r, 13), r.GetString(6), sponsorship, VideoSql.NullableText(r, 12), VideoSql.NullableGuid(r, 14), VideoSql.NullableGuid(r, 15),
-            r.IsDBNull(16) ? null : r.GetInt32(16));
+            r.IsDBNull(16) ? null : r.GetInt32(16), VideoSql.ParseBody(VideoSql.NullableText(r, 17)));
     }
 
     private static async Task<LockedVideo?> LockAsync(NpgsqlConnection connection, NpgsqlTransaction tx, Guid videoId, CancellationToken ct)
