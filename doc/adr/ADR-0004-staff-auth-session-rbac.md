@@ -93,6 +93,11 @@ related: ADR-0001 (D4/D5), ADR-0003, WBS-017, WBS-018, FR-ID-002, FR-ID-004, FR-
 | users.read | | | | | ✓ | |
 | users.manage | | | | | ✓ | ✓ |
 | audit.read | | | | | ✓ | ✓ |
+| aggregation.read ¹ | | ✓ | ✓ | | | |
+| aggregation.sources_manage ¹ | | ✓ | | | | |
+| aggregation.sources_approve ¹ | | | ✓ | | | ✓ |
+
+¹ Radar tin GĐ1 (ADR-0008 §8), thêm 10/11/2026, DRAFT chờ BA/PO duyệt. `sources_approve` cấp tạm cho APPROVER, chờ PO + Legal (ADR-0008 A-3).
 
 Muốn nhiều quyền thì cấp nhiều vai trò, ví dụ EDITOR + APPROVER. ADMIN cố ý **không** có quyền nội dung (tách quản trị khỏi biên tập).
 

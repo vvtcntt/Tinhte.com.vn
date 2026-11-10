@@ -16,7 +16,7 @@ created_at: 2026-11-09
 | Hạng mục | Kết quả |
 |---|---|
 | Chạy thật trên PostgreSQL | **Có**, PostgreSQL 18.6 qua PGlite 0.5.10 (WASM), dùng stub schema 04 |
-| Test tự động | **283/283 PASS** (chạy lại 09/11/2026 sau khi gộp 0322 — trang chủ, 0324/0325 — WBS-024, 0330–0333 — WBS-046, 0334/0335 — WBS-040; 179/179 sau 0320/0321; 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
+| Test tự động | **320/320 PASS** (chạy lại 10/11/2026 sau khi thêm 0340/0341 — nguồn/giấy phép + Radar tin GĐ1, 25 test hành vi AG1–AG25, log `tests/migration_test_run_2026-11-10.txt`; 283/283 ngày 09/11/2026 sau khi gộp 0322 — trang chủ, 0324/0325 — WBS-024, 0330–0333 — WBS-046, 0334/0335 — WBS-040; 179/179 sau 0320/0321; 157/157 sau 0313; log gốc `tests/migration_test_run_2026-11-09.txt` ghi lần 151/151), gồm 0312 site registry và 0313 staff access |
 | Kịch bản A: DB sạch | up → up lần 2 không đổi schema → 50+ test hành vi → down toàn bộ → schema **trùng khớp baseline** → up lại |
 | Kịch bản B: DB đã áp SQL v0.2 | SQL v0.2 chạy được (lần đầu được thử) → up → 0310 **dừng đúng** vì dữ liệu cũ → backfill → 0310 → down → schema và khóa cờ **trở về đúng v0.2** |
 | Kịch bản C: thiếu bảng tiên quyết | migration dừng, kèm thông báo rõ bảng còn thiếu |
@@ -54,6 +54,8 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | 0333 | `media_upload_quota` | Index cho hạn mức tải lên theo người tải `(created_by, created_at)` và dọn intent hết hạn `(upload_expires_at) WHERE status = 'UPLOADING'`. Chỉ index | ADR-0006, FR-VID-005 |
 | 0334 | `video_review_publish_gate` | Duyệt/xuất bản/gỡ video (WBS-040): `video_revisions.media_id` (media là nội dung revision, đóng băng cùng nội dung), `approved_media_generation`, `submitted_*`, `reviewed_*`, `review_note`, `published_*`; `videos.unpublished_at/by`, `unpublish_reason`. Trigger: bước chuyển trạng thái revision, lý do trả/từ chối (`REASON_REQUIRED`), hồ sơ duyệt không sửa được; **publish gate** khi đổi publish pointer: media READY + VIDEO (`MEDIA_NOT_READY`), quyền media/video CLEARED còn hạn (`RIGHTS_INVALID`), thế hệ media khớp lúc duyệt. `videos.media_id` thành cột dẫn xuất = media của public revision (ghi thẳng bị chặn). Backfill media vào revision working/public. Down từ chối khi có lịch sử duyệt/xuất bản/gỡ | ADR-0006 §6, FR-VID-008/010 |
 | 0335 | `validate_video_review` | `VALIDATE` các CHECK NOT VALID của 0334 | AIR-024 |
+| 0340 | `content_sources_licenses` | Danh mục nguồn `content_sources` (`kind` ORIGINAL/AGENCY/PARTNER/PRESS_RELEASE/OTHER, tên không trùng) và giấy phép `licenses` (`code`, phạm vi sử dụng, hiệu lực, `evidence_ref`); hàm `tt.license_active(id, at)`. **Chỉ phần tối thiểu ADR-0008 cần**: chưa có API nguồn/giấy phép, metadata quyền trên bài, khóa ngoại `media_assets.license_id` (ADR-0007 §1–§4). Down từ chối khi đã có dữ liệu | ADR-0007 §1, ADR-0008 §2 |
+| 0341 | `aggregation_radar` | Radar tin GĐ1: `agg_source_profiles` (1–1 với `content_sources`; PROPOSED/ENABLED/PAUSED/DEGRADED/RETIRED; M0–M3; M2/M3 phải có giấy phép; ENABLED phải có người duyệt; chế độ/giấy phép chỉ đổi kèm bản ghi duyệt khớp; RETIRED là cuối; không xóa; `site_keys` chỉ site public-web), `agg_source_approvals` (chỉ thêm; M2/M3 cần giấy phép hiệu lực → `VALIDATION_FAILED`, người đề xuất tự duyệt → `SOD_VIOLATION`), `agg_source_status_history` (trigger ghi; PAUSED/RETIRED cần `tt.reason` → `REASON_REQUIRED`), `agg_feeds` (https, URL không trùng, `next_fetch_at`/`lease_until`, sức khỏe; không xóa), `agg_fetch_log`, `agg_items` (khử trùng UNIQUE `(nguồn, guid)` và `(nguồn, url_hash)`; không đổi nguồn/feed), `agg_clusters`, `agg_cluster_actions` (chỉ thêm; bỏ qua cần lý do), `agg_category_rules`; cờ `aggregation.radar` (OFF, P2). Down từ chối khi có lịch sử duyệt/trạng thái/hành động cụm hoặc cờ đang bật | ADR-0008 §2–§9, FR-AGG-001…005 |
 | 0312 | `site_registry` | `tt.sites` (đồng bộ từ `config/sites/sites.json` bằng `tools/sites/generate-db-sync.mjs`, không xóa, chỉ retired); `articles/videos.primary_site_key`, `categories.site_key` mặc định `www`; nội dung chỉ thuộc site public-web | ADR-0001 D8 |
 | 0311 | `optional/privacy_requests.LEGAL_PENDING` | Lưu yêu cầu dữ liệu cá nhân không cần tài khoản (email mã hóa ở tầng ứng dụng). **Chỉ chạy khi Legal chọn kênh API** | AIR-017 |
 
@@ -76,6 +78,7 @@ Mỗi file chạy trong **một transaction** do công cụ migration bọc (cá
 | A-11 | `tt.article_revisions(title, body jsonb, author_id, created_at, UNIQUE(article_id, number))`, `tt.articles(category_id, created_at)`, `tt.categories(is_enabled)`. Ngày xuất bản thật của bài cũ: nếu schema 04 có cột riêng thì thay backfill `published_at = created_at` của 0320 | 0320 |
 | A-12 | `tt.media_assets(id, status, created_at)` (status cũ phải map sang enum `MediaStatus` trước 0332), `tt.video_revisions(id, video_id, number, title, created_at, UNIQUE(video_id, number))`, `tt.videos(slug UNIQUE, media_id, created_at)`. Cột tệp của media cũ để NULL (không backfill) | 0330, 0331 |
 | A-13 | `tt.videos.media_id` của schema 04 là media đang phát. Sau 0334 nó chỉ còn là media của public revision: video chưa public bị đặt NULL (media chuyển sang revision working). Nếu schema 04 có video UNPUBLISHED cũ, 0335 không đòi bản ghi gỡ (chỉ kiểm lý do khi có `unpublished_at`) | 0334 |
+| A-14 | Schema 04 **chưa** có bảng nguồn/giấy phép (ADR-0007 Q4). Nếu đã có, sửa 0340 để dùng bảng sẵn có và 0341 trỏ khóa ngoại vào đó | 0340, 0341 |
 
 Nếu schema 04 dùng **tên cột khác nhưng cùng nghĩa** (ví dụ `rights_state` thay cho `rights_status`), sửa migration để dùng cột có sẵn; đừng để tồn tại hai cột song song.
 
@@ -115,7 +118,7 @@ Tích hợp công cụ: với EF Core, mỗi file thành một migration gọi `
 ## 7. Chính sách rollback
 
 - Mỗi `.down.sql` chỉ gỡ đúng các đối tượng bản up đã tạo, dựa vào ledger. Cột có từ schema 04 hoặc SQL v0.2 được giữ lại.
-- **Từ chối rollback** nếu bảng chứa bằng chứng/audit có dữ liệu: `takedown_requests` (0303), `moderation_case_history` (0304), `article_slug_redirects` (0308), `privacy_requests` (0311). Muốn rollback phải xuất dữ liệu và có phê duyệt trước.
+- **Từ chối rollback** nếu bảng chứa bằng chứng/audit có dữ liệu: `takedown_requests` (0303), `moderation_case_history` (0304), `article_slug_redirects` (0308), `privacy_requests` (0311), `licenses`/`content_sources` (0340), `agg_source_approvals`/`agg_source_status_history`/`agg_cluster_actions` (0341; 0341 down cũng từ chối khi cờ `aggregation.radar` đang bật). Muốn rollback phải xuất dữ liệu và có phê duyệt trước.
 - 0300 down khôi phục khóa cờ cũ và trạng thái **tại thời điểm chạy 0300**; thay đổi cờ sau đó sẽ mất.
 - Down 0301/0302/0305/0306 làm mất dữ liệu ghi vào cột mới (metadata tài trợ, kích thước slot, trạng thái quyền). Xuất dữ liệu trước nếu đã dùng thật.
 
@@ -134,5 +137,6 @@ PGlite được ghim ở `0.5.10` (phát hành ngày 14/10/2026). Thư mục `no
 - DBA đối chiếu A-01…A-10 với schema 04 thật, rồi chạy lại test trên PostgreSQL bản production (Docker/CI).
 - Test đồng thời nhiều kết nối: tắt cờ trong lúc đang ghi bình luận/publish (cần PostgreSQL thật; PGlite không hỗ trợ).
 - Đo thời gian `ALTER TABLE ... ADD COLUMN ... DEFAULT` và `VALIDATE` trên dữ liệu cỡ production.
-- Guard cho like/report bình luận (bảng chưa rõ trong schema 04); khóa ngoại `license_id` khi có bảng giấy phép.
+- Guard cho like/report bình luận (bảng chưa rõ trong schema 04); khóa ngoại `media_assets.license_id` → `tt.licenses` (bảng đã có từ 0340; thêm NOT VALID + VALIDATE ở migration riêng khi DBA chốt ADR-0007 Q4).
+- Radar tin (0341): job dọn `agg_fetch_log` quá 30 ngày; test khóa `FOR UPDATE SKIP LOCKED` của worker trên PostgreSQL thật (PGlite chỉ một kết nối).
 - Job `rights-expiry` và job hết hạn tài trợ (BE) dùng các index `ix_*_rights_expiry`, `ix_*_sponsorship_expiry`.

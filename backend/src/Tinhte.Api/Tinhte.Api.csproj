@@ -12,6 +12,7 @@
     <ProjectReference Include="../Modules/Tinhte.Modules.Community/Tinhte.Modules.Community.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Ads/Tinhte.Modules.Ads.csproj" />
     <ProjectReference Include="../Modules/Tinhte.Modules.Identity/Tinhte.Modules.Identity.csproj" />
+    <ProjectReference Include="../Modules/Tinhte.Modules.Aggregation/Tinhte.Modules.Aggregation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Site Registry (ADR-0001) đi kèm bản build: tìm thấy tại <output>/config/sites/sites.json -->

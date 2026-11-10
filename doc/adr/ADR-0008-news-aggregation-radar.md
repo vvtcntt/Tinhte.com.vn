@@ -161,6 +161,20 @@ related: BA-01, ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0007, WBS-019, WBS-0
 - Không thêm mã lỗi mới ở GĐ1. Lỗi khi tải feed (timeout, 404 của nguồn, parse hỏng) là **dữ liệu** trong kết quả thử feed/sức khỏe nguồn (`FeedFailure`), không phải `Problem.code`.
 - 4 mã lỗi mới của BA-01 thuộc GĐ2.
 
+## Tiến độ hiện thực (10/11/2026) — vẫn PROPOSED, chờ duyệt
+
+Lát 1 (FR-AGG-001, một phần FR-AGG-002), theo phương án mặc định của ADR cho các câu hỏi chưa trả lời:
+
+- **Migration 0340** (`content_sources`, `licenses`, `tt.license_active`): phần tối thiểu của ADR-0007 §1. Chưa API nguồn/giấy phép.
+- **Migration 0341**: mọi bảng ở §9 + cờ `aggregation.radar` (OFF, P2). Ràng buộc DB như §9; thêm: chế độ/giấy phép chỉ đổi kèm bản ghi duyệt khớp, RETIRED là trạng thái cuối, feed/hồ sơ không xóa.
+- **Module `Tinhte.Modules.Aggregation`**: 9 thao tác (list/create/get/patch nguồn, approval, pause/resume/retire, POST feed, PATCH feed).
+  - Cờ đọc thẳng `tt.feature_gates`; thao tác ghi dùng `tt.flag_enabled_for_write` trong transaction.
+  - SSRF khi khai báo feed: https, cổng 443, không user:pass, chặn IP/tên nội bộ và tên phân giải ra IP nội bộ (danh sách dải chờ Security — A-4). Tên chưa phân giải được vẫn nhận; worker phải kiểm lại IP lúc kết nối.
+  - Thêm feed / đổi URL: xóa người duyệt hiện hành; ENABLED/DEGRADED → PROPOSED, PAUSED giữ PAUSED (không resume được tới khi duyệt lại).
+- **Quyền** (`rbac.json`, DRAFT — chờ BA/PO): EDITOR có `aggregation.read` + `aggregation.sources_manage`; APPROVER có `aggregation.read` + `aggregation.sources_approve` (**tạm** theo chỉ đạo chủ dự án 10/11/2026, chờ PO + Legal chốt A-3; APPROVER cần `read` để lấy ETag trước khi duyệt).
+- **Giả định cho A-1…A-5**: A-1 worker riêng (chưa làm); A-2 bảng 1–1, 0340 chạy trước 0341; A-3 như trên, không thêm vai trò mới; A-4 danh sách dải chặn như `FeedUrlPolicy` (chờ Security); A-5 giữ P2.
+- **Chưa làm**: worker thu thập, `feed-tests`, luật chuyên mục, mục tin, cụm/Radar, thống kê, màn CMS (WBS-144).
+
 ## Hệ quả
 
 - **Được:**

@@ -23,7 +23,10 @@ public static class FeatureFlagKeys
     public const string AiAssistance = "ai.assistance";
     public const string AiSearch = "ai.search";
 
-    /// <summary>Radar tin: thu thập RSS + gom cụm (ADR-0008, BA-01 GĐ1). Chưa có migration thêm vào tt.feature_gates.</summary>
+    /// <summary>
+    /// Radar tin: thu thập RSS + gom cụm (ADR-0008, BA-01 GĐ1). Dòng tt.feature_gates do migration 0341 thêm (OFF, P2).
+    /// Module Aggregation đọc cờ thẳng từ tt.feature_gates (ghi: tt.flag_enabled_for_write trong transaction), không qua reader cấu hình.
+    /// </summary>
     public const string AggregationRadar = "aggregation.radar";
 
     public static readonly IReadOnlyList<string> All =
