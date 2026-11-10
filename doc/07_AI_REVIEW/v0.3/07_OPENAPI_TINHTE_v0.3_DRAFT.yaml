@@ -213,6 +213,15 @@ x-feature-flags:
     legacyKeys: []
     description: 'News radar (ADR-0008, BA-01 phase 1): source profiles, feed collection, clustering and CMS radar. No AI. Scope recorded as P2
       until PO ranks it (BA-01 Q-AGG-06). The collector worker also stops while OFF.'
+  - key: discovery.most_read
+    scope: P1
+    productionDefault: false
+    approvers:
+    - PO
+    - Legal
+    legacyKeys: []
+    description: '"Đọc nhiều" block (UX-PUB-01 đợt 3, PROPOSED). Ranking derived from aggregated read events (FR-ANL-001); the data source
+      and the definition of a counted read are not decided (TL/PO/Legal). While OFF, GET /discovery/most-read returns 200 with empty items.'
 x-error-catalog:
   description: 'Error codes returned in Problem.code (AIR-009). Each code maps to exactly one HTTP status. Evaluation order: 400 syntax → 401
     → 403 CSRF_INVALID → 403 FEATURE_DISABLED → 403 FORBIDDEN/ELIGIBILITY_REQUIRED/SOD_VIOLATION → 404 → 428/412 → 422 → 409 → 429 (a gateway
@@ -5001,6 +5010,54 @@ paths:
       x-flag-off-behavior: 200 with empty items
       x-error-codes:
       - BAD_REQUEST
+  /discovery/most-read:
+    get:
+      tags:
+      - Discovery
+      summary: Most read articles of the site (proposal)
+      description: 'Proposal only, not implemented (UX-PUB-01 đợt 3): the "Đọc nhiều" block. Ranking of articles of the site resolved from Host by
+        counted reads inside the window, computed from aggregated FR-ANL-001 events — no per-user data, no personalisation. Only articles visible
+        right now (same rules as getHome) are returned; SPONSORED articles are excluded from the ranking (proposal, PO/Legal decide). When there
+        is not enough data (below the threshold PO sets) items is empty and the client hides the block. The data source (aggregate table fed
+        by the events pipeline vs snapshots exported from an analytics store) and the definition of a counted read are pending TL/PO/Legal.
+        Access: Public, no session. Feature gate `discovery.most_read` (production default OFF), enforced server-side.'
+      operationId: getMostReadArticles
+      security: []
+      parameters:
+      - name: window
+        in: query
+        required: false
+        description: Counting window.
+        schema:
+          type: string
+          enum:
+          - 24h
+          - 7d
+          default: 24h
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+      responses:
+        '200':
+          description: Ranked articles; empty items when discovery.most_read is OFF or data is insufficient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MostReadArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-requirements:
+      - FR-DISC-008
+      x-scope: P1
+      x-feature-gate: discovery.most_read
+      x-flag-off-behavior: 200 with empty items
+      x-error-codes:
+      - BAD_REQUEST
   /admin/ad-placements:
     get:
       tags:
@@ -7747,6 +7804,31 @@ components:
             enabled and belongs to the same site; otherwise null. Optional: clients must render the card without it.'
       allOf:
       - $ref: '#/components/schemas/SponsoredLabelRule'
+    MostReadArticleList:
+      type: object
+      description: 'PROPOSED (UX-PUB-01 đợt 3). Ranked public article cards for the "Đọc nhiều" block. No counts are exposed (avoid leaking
+        traffic numbers and gaming); ordering carries the rank.'
+      required:
+      - window
+      - items
+      properties:
+        window:
+          type: string
+          enum:
+          - 24h
+          - 7d
+        generatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When the ranking was computed (aggregation lag is expected); null when items is empty.
+        items:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/ArticleSummary'
+          description: Rank order, 1 = most read. Articles withdrawn after the ranking was computed are dropped, not replaced.
     CategoryRef:
       type: object
       description: Minimal public category reference for cards; link with /categories/{slug} on the same site.

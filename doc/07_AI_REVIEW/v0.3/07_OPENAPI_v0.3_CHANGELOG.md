@@ -313,3 +313,11 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - **Backend đã trả `category` ở `GET /home`.** Chưa trả ở `getPublicArticle` (vẫn có `categorySlug`) và ở danh sách bài đang làm trên nhánh khác — chỉ cần thêm cột/JOIN `PublicArticleCategorySql` khi gộp.
 - Không đổi đường dẫn, mã lỗi, cờ hay migration (dùng cột `category_id`, `site_key`, `is_enabled` sẵn có).
 - Test tĩnh T30 thêm 3 trường hợp (`category` đủ trường, `null`, thiếu `name`). Kiểm lại: 34/34 PASS.
+
+## 18. Đợt 3 trang chủ — đề xuất khối "Đọc nhiều" (UX-PUB-01, 2026-11-10)
+
+- **Chỉ là đề xuất, chưa hiện thực, không có migration.** Repo chưa có dữ liệu lượt đọc; nguồn dữ liệu là quyết định hạ tầng analytics (TL/PO/Legal) — hai phương án ghi ở `doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md`, điểm còn mở 9.
+- **Thêm 1 thao tác** `GET /discovery/most-read` (`getMostReadArticles`, tag Discovery, công khai): `window` = `24h` | `7d` (mặc định `24h`), `limit` 1–10 (mặc định 5) → `MostReadArticleList` (`window`, `generatedAt`, `items[]` là `ArticleSummary` theo thứ hạng; không lộ số lượt). Chỉ bài đang hiển thị của site trong Host; đề xuất loại bài SPONSORED; chưa đủ dữ liệu → `items` rỗng.
+- **Registry cờ: thêm `discovery.most_read`** (P1 tạm, production OFF, người duyệt PO + Legal, không `legacyKeys`, không `publicConfigField`). OFF → 200 rỗng (`x-flag-off-behavior`). Registry thành 19 khóa; `FeatureFlagKeys` (C#) và test khớp spec cập nhật theo. Chưa thêm hàng vào `tt.feature_gates` (thêm bằng migration khi hiện thực, như `aggregation.radar`).
+- **Truy vết:** FR tạm `FR-DISC-008` (ngoài SRS, gói P1 tạm, BA cấp mã chính thức) trong `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`; chưa có WBS/effort (PM). Inventory thêm 1 dòng, `ReviewStatus = PROPOSED_NOT_IMPLEMENTED`.
+- Không thêm mã lỗi. Kiểm lại: 34/34 test tĩnh v0.3 PASS.

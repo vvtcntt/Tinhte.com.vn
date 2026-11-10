@@ -3,7 +3,7 @@
 **Trạng thái:** DRAFT, chờ UX/PO duyệt (WBS-004 khóa 18 màn hình). Ngày 09/11/2026.
 **Cập nhật 10/11/2026 — giao diện đợt 1:** font Be Vietnam Pro + token chữ/khoảng cách, bỏ hộp thẻ, cột phải 300px, logo SVG có bản tối, menu "Thêm", nút ‹ › cho dải video, footer nhiều cột, luôn có đường sang danh sách tin.
 **Cập nhật 10/11/2026 — đợt 2, vùng quảng cáo:** dựng sẵn 6 vùng banner ①–⑥ phía frontend (Bước 3 "Vùng quảng cáo"). Khi backend có `GET /ads/placements` và CMS tạo placement, banner tự hiện, không cần deploy. Không có banner thì trang y hệt đợt 1. Mã placement vẫn là đề xuất, chờ WBS-131 chốt.
-**Cập nhật 10/11/2026 — đợt 3 (DRAFT, chờ TL/PO/BA duyệt):** hợp đồng + DB quảng cáo theo site, tách vị trí khỏi đặt chỗ, nhiều kích thước theo breakpoint (OpenAPI v0.3 changelog §16, migration 0350); backend có `GET /ads/placements`; FE chuyển sang `creatives[]`, giữ 10 mã đề xuất và hành vi "không có banner thì không có khung".
+**Cập nhật 10/11/2026 — đợt 3 (DRAFT, chờ TL/PO/BA duyệt):** (A) hợp đồng + DB quảng cáo theo site, tách vị trí khỏi đặt chỗ, nhiều kích thước theo breakpoint (OpenAPI v0.3 changelog §16, migration 0350); backend có `GET /ads/placements`; FE chuyển sang `creatives[]`, giữ 10 mã đề xuất và hành vi "không có banner thì không có khung". (B) chuyên mục trên thẻ bài (§17). (C) khối "Đọc nhiều": chỉ đề xuất hợp đồng sau cờ OFF, chờ chọn nguồn dữ liệu analytics (§18, điểm còn mở 9).
 **Truy vết:** `FR-DISC-003` (vùng tin mới, tin nổi bật, video nổi bật) · `WBS-027` (SSR, responsive, đổi block không cần deploy) · `FR-ID-001` (khách đọc không cần tài khoản) · `FR-DISC-004/005`, `FR-VID-010` (không lộ nội dung đã gỡ) · `FR-ADS-001/002`, `FR-NEWS-008`, `WBS-133` (nhãn tài trợ, 1–2 slot tĩnh, không CLS) · `NFR-SEO-001`, `WBS-052`.
 **Hợp đồng:** `GET /home` → `HomePage`, `GET /categories`, `GET /ads/placements` (OpenAPI v0.3 DRAFT).
 **Code:** `frontend/apps/web/src/app/[site]/page.tsx`, `frontend/apps/web/src/components/home/*`, `frontend/apps/web/src/lib/*`.
@@ -273,3 +273,15 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
    - ④ "dạng tin" (native): `PublicAdCreative` chỉ có ảnh. Bài tài trợ dạng tin hiện đi qua `contentKind: SPONSORED` trong `recentArticles`; muốn native ad riêng thì phải thêm kiểu creative vào hợp đồng.
    - **CSP**: `img-src` chỉ cho `'self' data:` + origin media (đang Report-Only). Creative phải nằm trên origin media của Tinhte, hoặc thêm origin ad server vào CSP khi chuyển sang enforce (WBS-071).
    - Mật độ/khoảng cách quảng cáo hiện do FE tự giữ (`homeAdPlan`); nếu Commercial cần đổi vị trí mà không deploy thì phải có cấu hình bố cục từ backend (liên quan điểm 1).
+9. **Khối "Đọc nhiều" — chỉ đề xuất, chưa làm (đợt 3, cần TL/PO/Legal quyết).** Repo chưa có dữ liệu lượt đọc: không có `view_count` hay page view; `POST /analytics/events` mới có hợp đồng, chưa có pipeline (WBS-053/054). Không bịa dữ liệu, không dựng component, không thêm migration.
+   - **Hợp đồng đề xuất** (OpenAPI v0.3 changelog §18): `GET /discovery/most-read?window=24h|7d&limit=1..10` → `MostReadArticleList` (thẻ `ArticleSummary` theo thứ hạng, **không lộ số lượt**). Sau cờ `discovery.most_read` (P1 tạm, production OFF; OFF → 200 rỗng). FR tạm `FR-DISC-008` trong `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`, chưa có WBS/effort (PM).
+   - **Nguồn dữ liệu — hai phương án.** Đây là quyết định hạ tầng analytics nên dừng ở đề xuất:
+     a. *Bảng tổng hợp trong PostgreSQL*: `tt.article_read_counts(site_key, article_id, hour, counted_reads)`. Worker cộng từ sự kiện "đọc được tính" của `POST /analytics/events` sau khi khử trùng theo phiên và lọc bot. API cộng theo cửa sổ 24h/7d, cache vài phút. Làm nhanh, không cần hạ tầng mới; nhưng tải ghi tăng theo lưu lượng đọc.
+     b. *Kho analytics riêng* (theo WBS-053/054, công nghệ chưa chọn): định kỳ 10–15 phút xuất ảnh chụp xếp hạng vào `tt.most_read_snapshots(site_key, window, generated_at, article_ids)`; API chỉ đọc ảnh chụp. Tách tải khỏi DB nghiệp vụ; độ trễ phụ thuộc lịch xuất.
+   - **Cần quyết trước khi làm:**
+     - thế nào là "một lượt đọc được tính": page load, impression hay engaged read (FR-ANL-001);
+     - có được đếm khi người đọc chưa đồng ý cookie không (FR-ANL-004 — Legal);
+     - loại bài tài trợ khỏi xếp hạng (đề xuất: loại);
+     - ngưỡng tối thiểu để hiện khối (ví dụ đủ 5 bài, mỗi bài ≥ N lượt);
+     - vị trí: đề xuất cột phải Tin mới dưới ⑤ trên desktop, sau ④ trên mobile; cần tính lại mật độ quảng cáo mobile (≤ ~30%).
+   - **Khi có API:** component ẩn hoàn toàn khi `items` rỗng hoặc API lỗi, như vùng quảng cáo. Không dùng dữ liệu mẫu ở staging/production.

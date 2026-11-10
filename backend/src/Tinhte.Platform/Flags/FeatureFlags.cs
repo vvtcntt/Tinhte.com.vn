@@ -26,11 +26,14 @@ public static class FeatureFlagKeys
     /// <summary>Radar tin: thu thập RSS + gom cụm (ADR-0008, BA-01 GĐ1). Chưa có migration thêm vào tt.feature_gates.</summary>
     public const string AggregationRadar = "aggregation.radar";
 
+    /// <summary>Khối "Đọc nhiều" (UX-PUB-01 đợt 3, ĐỀ XUẤT): chưa có endpoint, chưa có hàng trong tt.feature_gates — chờ chọn nguồn dữ liệu analytics.</summary>
+    public const string DiscoveryMostRead = "discovery.most_read";
+
     public static readonly IReadOnlyList<string> All =
     [
         CommunityVideoComments, CommunityArticleComments, CommunityMember, CommunityModeration, CommunityUgc, CommunityAppeals,
         MemberBookmarks, AdsSponsoredPublication, AdsDisplaySlots, AdsShortsInstream, AdsCampaignAdvanced, DiscoverySeries,
-        DiscoverySearchSuggestions, CmsRelatedSuggestions, AnalyticsOperations, AiAssistance, AiSearch, AggregationRadar,
+        DiscoverySearchSuggestions, CmsRelatedSuggestions, AnalyticsOperations, AiAssistance, AiSearch, AggregationRadar, DiscoveryMostRead,
     ];
 
     /// <summary>Mặc định production: mọi cờ OFF trừ community.moderation (công cụ staff).</summary>
