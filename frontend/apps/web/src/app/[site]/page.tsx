@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { findSite, isIndexable, originFor, parseSiteEnv } from '@tinhte/sites';
-import { AdPairSlot, AdSlot } from '../../components/home/AdSlot';
+import { AdZone } from '../../components/home/AdSlot';
 import { SectionHeading } from '../../components/home/parts';
 import { RailControls } from '../../components/home/RailControls';
 import { LeadStory, StoryCard } from '../../components/home/Stories';
@@ -106,7 +106,7 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
       )}
 
       {/* ① Màn hình đầu: không lazy-load. */}
-      <AdPairSlot pair={plan.top} eager className="ad-slot--top" />
+      <AdZone views={plan.top} eager className="ad-slot--top" />
 
       {lead && (
         <section className="home-section" aria-labelledby="tin-noi-bat">
@@ -114,12 +114,12 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
           <div className="featured">
             <LeadStory article={lead} />
             {secondary.length > 0 && (
-              <div className={plan.heroSide ? 'featured__side featured__side--with-ad' : 'featured__side'}>
+              <div className={plan.heroSide.length > 0 ? 'featured__side featured__side--with-ad' : 'featured__side'}>
                 {secondary.map((a) => (
                   <StoryCard key={a.id} article={a} variant="compact" />
                 ))}
                 {/* ② Có banner: 3 tin phụ + 300×250 (homeFeaturedLimit), không có: 4 tin phụ. */}
-                <AdSlot slot={plan.heroSide} className="ad-slot--rail" />
+                <AdZone views={plan.heroSide} className="ad-slot--rail" />
               </div>
             )}
           </div>
@@ -145,7 +145,7 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
       )}
 
       {/* ③ Giữa Video nổi bật và Tin mới. */}
-      <AdPairSlot pair={plan.mid} className="ad-slot--mid" />
+      <AdZone views={plan.mid} className="ad-slot--mid" />
 
       {/* Tin mới rỗng (mọi bài đang ở Tin nổi bật) vẫn phải có đường sang trang danh sách. */}
       {home.recentArticles.length === 0 && !empty && (
@@ -167,13 +167,13 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
               </Link>
             }
           />
-          <div className={plan.sidebar ? 'latest latest--with-aside' : 'latest'}>
+          <div className={plan.sidebar.length > 0 ? 'latest latest--with-aside' : 'latest'}>
             <div className="latest__list">
               {recentHead.map((a) => (
                 <StoryCard key={a.id} article={a} variant="row" />
               ))}
               {/* ④ Sau tin mới thứ HOME_FEED_AD_AFTER. */}
-              <AdPairSlot pair={plan.feed} className="ad-slot--inline" />
+              <AdZone views={plan.feed} className="ad-slot--inline" />
               {recentTail.map((a) => (
                 <StoryCard key={a.id} article={a} variant="row" />
               ))}
@@ -183,10 +183,10 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
                 </Link>
               </p>
             </div>
-            {plan.sidebar && (
+            {plan.sidebar.length > 0 && (
               <div className="latest__aside">
                 {/* ⑤ Chỉ ≥ 1024px, đứng yên khi cuộn. */}
-                <AdSlot slot={plan.sidebar} media="wide" className="ad-slot--rail ad-slot--sticky" />
+                <AdZone views={plan.sidebar} className="ad-slot--rail ad-slot--sticky" />
               </div>
             )}
           </div>
@@ -194,7 +194,7 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
       )}
 
       {/* ⑥ Trên footer. */}
-      <AdPairSlot pair={plan.bottom} className="ad-slot--bottom" />
+      <AdZone views={plan.bottom} className="ad-slot--bottom" />
     </div>
   );
 }

@@ -31,10 +31,12 @@ internal static class PublicArticleSql
          AND (r.content_kind <> 'SPONSORED' OR @sponsorLabel))
         """;
 
-    /// <summary>Cột của thẻ bài công khai, đọc bằng <see cref="ReadSummary"/>.</summary>
-    public const string SummaryColumns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind";
+    /// <summary>Cột của thẻ bài công khai (kèm chuyên mục — <see cref="PublicArticleCategorySql"/>), đọc bằng <see cref="ReadSummary"/>.</summary>
+    public const string SummaryColumns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind, " + PublicArticleCategorySql.Columns;
 
-    public const string JoinPublicRevision = "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id";
+    /// <summary>Public revision (<c>r</c>) và chuyên mục của thẻ bài (<c>cat</c>, LEFT JOIN — không làm rơi bài).</summary>
+    public const string JoinPublicRevision =
+        "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id " + PublicArticleCategorySql.Join;
 
     /// <summary>Schema ArticleSummary. Nhãn tài trợ chỉ gắn cho SPONSORED (đã lọc bằng <see cref="Visible"/>).</summary>
     public static PublicArticleSummary ReadSummary(DbDataReader r, string? sponsorLabel)
@@ -48,6 +50,9 @@ internal static class PublicArticleSql
             PublishedAt: ArticleSql.Time(r, 4),
             ThumbnailUrl: null,                 // ảnh đại diện: thuộc WBS media
             ContentKind: kind,
-            SponsorLabel: kind == ContentKinds.Sponsored ? sponsorLabel : null);
+            SponsorLabel: kind == ContentKinds.Sponsored ? sponsorLabel : null)
+        {
+            Category = PublicArticleCategorySql.Read(r, 6),
+        };
     }
 }

@@ -15,6 +15,7 @@ export function demoHome(now: number = Date.now()): HomePage {
     thumbnailUrl: null,
     contentKind: 'EDITORIAL',
     sponsorLabel: null,
+    category: demoCategoryOf(n),
     ...extra,
   });
   const video = (n: number, title: string, sec: number, m: number): VideoSummary => ({
@@ -62,6 +63,14 @@ export function demoHome(now: number = Date.now()): HomePage {
       video(7, 'Bàn phím cơ cho người mới', 95, 2000),
     ],
   };
+}
+
+// Chuyên mục mẫu của bài mẫu (đợt 3: ArticleSummary.category). Bài 16 cố ý không có chuyên mục — thẻ không nhãn.
+const DEMO_ARTICLE_CATEGORY: Readonly<Record<number, string>> = { 1: 'c1', 2: 'c2', 3: 'c6', 4: 'c1', 5: 'c4', 11: 'c1', 12: 'c3', 13: 'c1', 14: 'c2', 15: 'c4', 17: 'c2', 18: 'c4', 19: 'c6', 20: 'c5' };
+
+function demoCategoryOf(n: number): ArticleSummary['category'] {
+  const c = demoCategories.find((x) => x.id === DEMO_ARTICLE_CATEGORY[n]);
+  return c ? { id: c.id, slug: c.slug, name: c.name } : null;
 }
 
 export const demoCategories: Category[] = [

@@ -15,7 +15,14 @@ public sealed record PublicArticleSummary(
     DateTimeOffset PublishedAt,
     string? ThumbnailUrl,
     string ContentKind,
-    string? SponsorLabel);
+    string? SponsorLabel)
+{
+    /// <summary>ArticleSummary.category (DRAFT đợt 3): init-only để nơi khác dựng thẻ bài không phải đổi chữ ký; null = không hiện.</summary>
+    public PublicCategoryRef? Category { get; init; }
+}
+
+/// <summary>Schema CategoryRef (chuyên mục tối thiểu trên thẻ bài).</summary>
+public sealed record PublicCategoryRef(Guid Id, string Slug, string Name);
 
 /// <summary>Schema HomePage. featuredVideos: thuộc module video (WBS-041/046) — tạm rỗng tới khi có feed video công khai.</summary>
 public sealed record HomePage(

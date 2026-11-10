@@ -130,8 +130,17 @@ const FIXTURES = `
 `;
 const TAKEDOWN = `INSERT INTO tt.takedown_requests (id, content_type, content_id, requester_type, reason)
   VALUES ('${id('7d1')}', 'VIDEO', '${id('d1')}', 'RIGHTS_HOLDER', 'Khiếu nại bản quyền');`;
-const SLOT = (over = '') => `INSERT INTO tt.ad_placements (code, label, status, media_asset_id, alt_text, target_url, width, height, approved_by, approved_at)
-  VALUES ${over || `('article_bottom', 'Quảng cáo', 'ACTIVE', '${id('e1')}', 'Banner ACME', 'https://acme.vn', 728, 90, '${U1}', now())`};`;
+// Quảng cáo (0302 + 0350): vị trí thuộc site, kích thước theo breakpoint, đặt chỗ + banner.
+const PL = id('ad1'), BK = id('ad2');
+const PLACEMENT = (code = 'home_top', site = 'www', pid = PL) => `INSERT INTO tt.ad_placements (id, site_key, code, label, status, approved_by, approved_at)
+  VALUES ('${pid}', '${site}', '${code}', 'Quảng cáo', 'ACTIVE', '${U1}', now());`;
+const SIZES = (pid = PL) => `INSERT INTO tt.ad_placement_sizes (placement_id, breakpoint, width, height)
+  VALUES ('${pid}', 'DESKTOP', 970, 90), ('${pid}', 'DESKTOP', 970, 250), ('${pid}', 'TABLET', 728, 90), ('${pid}', 'MOBILE', 320, 100);`;
+const BOOKING = (status = 'ACTIVE', target = `'https://acme.vn'`, appr = true) => `INSERT INTO tt.ad_bookings (id, placement_id, status, target_url, approved_by, approved_at)
+  VALUES ('${BK}', '${PL}', '${status}', ${target}, ${appr ? `'${U1}', now()` : 'NULL, NULL'});`;
+const CREATIVE = (bp, w, h, booking = BK, placement = PL) => `INSERT INTO tt.ad_booking_creatives (booking_id, placement_id, breakpoint, width, height, media_asset_id, alt_text)
+  VALUES ('${booking}', '${placement}', '${bp}', ${w}, ${h}, '${id('e1')}', 'Banner ACME');`;
+const AD = `${PLACEMENT()} ${SIZES()} ${BOOKING()}`;
 
 async function behaviour(sc, db) {
   // Registry cờ (0300)
@@ -167,18 +176,6 @@ async function behaviour(sc, db) {
   const COMMENT = `INSERT INTO tt.comments (video_id, author_id, text) VALUES ('${id('d1')}', '${U2}', 'Xin chào');`;
   await expectError(sc, db, 'C1 ghi bình luận khi cờ OFF → FEATURE_DISABLED', COMMENT, /FEATURE_DISABLED/);
   await expectOk(sc, db, 'C2 ghi bình luận khi cờ ON (có duyệt)', APPROVE('community.video_comments') + COMMENT);
-
-  // Slot quảng cáo (0302)
-  const S = (code, status, media, alt, url, w, h, appr) => SLOT(`('${code}', 'Quảng cáo', '${status}', ${media}, ${alt}, ${url}, ${w}, ${h}, ${appr ? `'${U1}', now()` : 'NULL, NULL'})`);
-  const M = `'${id('e1')}'`;
-  await expectError(sc, db, 'A1 targetUrl javascript: bị chặn', S('slot_a', 'DRAFT', 'NULL', 'NULL', `'javascript:alert(1)'`, 728, 90, false), /ck_ad_placements_target_https/);
-  await expectError(sc, db, 'A2 ACTIVE chưa duyệt bị chặn', S('slot_a', 'ACTIVE', M, `'alt'`, `'https://acme.vn'`, 728, 90, false), /ck_ad_placements_approval/);
-  await expectError(sc, db, 'A3 APPROVED thiếu alt/media bị chặn', S('slot_a', 'APPROVED', 'NULL', 'NULL', `'https://acme.vn'`, 728, 90, true), /ck_ad_placements_serving_complete/);
-  await expectError(sc, db, 'A4 code sai định dạng bị chặn', S('Bad Code', 'DRAFT', 'NULL', 'NULL', 'NULL', 728, 90, false), /ck_ad_placements_code_format/);
-  await expectError(sc, db, 'A5 thiếu kích thước bị chặn (chống CLS)', S('slot_a', 'DRAFT', 'NULL', 'NULL', 'NULL', 'NULL', 90, false), /ck_ad_placements_dimensions/);
-  await expectError(sc, db, 'A6 status ngoài enum bị chặn', S('slot_a', 'LIVE', 'NULL', 'NULL', 'NULL', 728, 90, false), /ck_ad_placements_status/);
-  await expectOk(sc, db, 'A7 slot ACTIVE đầy đủ hợp lệ; UPDATE tăng row_version', `${SLOT()} UPDATE tt.ad_placements SET label = 'QC' WHERE code = 'article_bottom';
-    DO $$ BEGIN IF (SELECT row_version FROM tt.ad_placements WHERE code = 'article_bottom') <> 2 THEN RAISE EXCEPTION 'row_version'; END IF; END $$;`);
 
   // Takedown (0303)
   await expectOk(sc, db, 'T1 ghi nhận yêu cầu takedown', TAKEDOWN);
@@ -361,6 +358,53 @@ async function behaviour(sc, db) {
     INSERT INTO tt.home_featured_articles (site_key, article_id, position) VALUES ('www', '${id('b1')}', 11);`, /home_featured_articles_position_check/);
   await expectError(sc, db, 'H6 lịch sử tin nổi bật chỉ thêm', `${LAYOUT} UPDATE tt.home_layouts SET updated_by = '${U1}'; DELETE FROM tt.home_featured_history`, /APPEND_ONLY/);
 
+  // Quảng cáo theo site + đặt chỗ nhiều kích thước (0302 + 0350, ADR-0001, UX-PUB-01 đợt 3) — cần tt.sites (đồng bộ registry)
+  const GAME = generateDbSync(withGame);
+  await expectError(sc, db, 'A1 targetUrl javascript: của đặt chỗ bị chặn', `${SYNC} ${PLACEMENT()} ${BOOKING('DRAFT', `'javascript:alert(1)'`, false)}`, /ck_ad_bookings_target_https/);
+  await expectError(sc, db, 'A2 đặt chỗ ACTIVE chưa duyệt bị chặn', `${SYNC} ${PLACEMENT()} ${BOOKING('ACTIVE', `'https://acme.vn'`, false)}`, /ck_ad_bookings_approval/);
+  await expectError(sc, db, 'A3 đặt chỗ APPROVED thiếu link bị chặn', `${SYNC} ${PLACEMENT()} ${BOOKING('APPROVED', 'NULL')}`, /ck_ad_bookings_serving_target/);
+  await expectError(sc, db, 'A4 code sai định dạng bị chặn', `${SYNC} ${PLACEMENT('Bad Code')}`, /ck_ad_placements_code_format/);
+  await expectError(sc, db, 'A5 banner khác kích thước vị trí cho phép ở breakpoint đó bị chặn (chống CLS/vỡ khung)', `${SYNC} ${AD} ${CREATIVE('MOBILE', 970, 90)}`, /fk_ad_booking_creatives_size/);
+  await expectError(sc, db, 'A6 status vị trí ngoài enum bị chặn', `${SYNC} ${PLACEMENT()} UPDATE tt.ad_placements SET status = 'LIVE' WHERE id = '${PL}'`, /ck_ad_placements_status/);
+  await expectOk(sc, db, 'A7 vị trí + 3 banner theo breakpoint hợp lệ; vị trí mặc định thuộc www; UPDATE đặt chỗ tăng row_version', `${SYNC} ${AD}
+    ${CREATIVE('DESKTOP', 970, 250)} ${CREATIVE('TABLET', 728, 90)} ${CREATIVE('MOBILE', 320, 100)}
+    INSERT INTO tt.ad_placements (code, label) VALUES ('article_bottom', 'Quảng cáo');
+    UPDATE tt.ad_bookings SET priority = 10 WHERE id = '${BK}';
+    DO $$ BEGIN
+      IF (SELECT row_version FROM tt.ad_bookings WHERE id = '${BK}') <> 2 THEN RAISE EXCEPTION 'row_version'; END IF;
+      IF (SELECT site_key FROM tt.ad_placements WHERE code = 'article_bottom') <> 'www' THEN RAISE EXCEPTION 'default site'; END IF;
+      IF (SELECT count(*) FROM tt.ad_booking_creatives WHERE booking_id = '${BK}') <> 3 THEN RAISE EXCEPTION 'creatives'; END IF;
+    END $$;`);
+  await expectOk(sc, db, 'A8 cùng mã ở hai site được phép (unique theo site, ADR-0001)', `${GAME} ${PLACEMENT()} ${PLACEMENT('home_top', 'game', id('ad3'))}`);
+  await expectError(sc, db, 'A9 trùng (site, mã) bị chặn', `${SYNC} ${PLACEMENT()} ${PLACEMENT('home_top', 'www', id('ad3'))}`, /uq_ad_placements_site_code/);
+  await expectError(sc, db, 'A10 vị trí cho site cms bị chặn (chỉ public-web)', `${SYNC} ${PLACEMENT('home_top', 'cms')}`, /VALIDATION_FAILED/);
+  await expectError(sc, db, 'A11 banner gắn đặt chỗ của vị trí khác bị chặn', `${GAME} ${AD} ${PLACEMENT('home_top', 'game', id('ad3'))} ${SIZES(id('ad3'))}
+    ${CREATIVE('MOBILE', 320, 100, BK, id('ad3'))}`, /fk_ad_booking_creatives_booking/);
+  await expectError(sc, db, 'A12 hai banner cùng breakpoint trong một đặt chỗ bị chặn', `${SYNC} ${AD} ${CREATIVE('DESKTOP', 970, 90)} ${CREATIVE('DESKTOP', 970, 250)}`, /ad_booking_creatives_pkey/);
+  await expectError(sc, db, 'A13 gỡ kích thước còn banner dùng bị chặn', `${SYNC} ${AD} ${CREATIVE('TABLET', 728, 90)}
+    DELETE FROM tt.ad_placement_sizes WHERE placement_id = '${PL}' AND breakpoint = 'TABLET'`, /fk_ad_booking_creatives_size/);
+  await expectError(sc, db, 'A14 mở vị trí (ACTIVE) vẫn phải có người duyệt', `${SYNC} INSERT INTO tt.ad_placements (code, status) VALUES ('home_mid', 'ACTIVE')`, /ck_ad_placements_approval/);
+  await expectError(sc, db, 'A15 down 0350 từ chối khi cùng mã đã có trên nhiều site', `${GAME} ${PLACEMENT()} ${PLACEMENT('home_top', 'game', id('ad3'))}
+    ${read(path.join(MIG_DIR, '0350_ad_site_bookings.down.sql'))}`, /Refusing to roll back 0350/);
+  await expectError(sc, db, 'A16 breakpoint ngoài MOBILE/TABLET/DESKTOP bị chặn', `${SYNC} ${PLACEMENT()}
+    INSERT INTO tt.ad_placement_sizes (placement_id, breakpoint, width, height) VALUES ('${PL}', 'WATCH', 100, 100)`, /ck_ad_placement_sizes_breakpoint/);
+  await expectError(sc, db, 'A17 ưu tiên ngoài 0..100 bị chặn', `${SYNC} ${PLACEMENT()} ${BOOKING('DRAFT', 'NULL', false)} UPDATE tt.ad_bookings SET priority = 101`, /ck_ad_bookings_priority/);
+
+  // Vai trò AD_OPS (0351 + 0352, ADR-0004; ma trận quyền DRAFT chờ BA/PO)
+  const GRANT = (role) => `INSERT INTO tt.user_roles (user_id, role, reason) VALUES ('${U2}', '${role}', 'Cấp thử');`;
+  const DOWN_0351 = read(path.join(MIG_DIR, '0351_ad_ops_role.down.sql'));
+  const ROLE_CHECK = `(SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'tt.user_roles'::regclass AND conname = 'ck_user_roles_role')`;
+  await expectOk(sc, db, 'K1 cấp vai trò AD_OPS được (0351); lịch sử GRANT được ghi', `${GRANT('AD_OPS')}
+    DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM tt.user_role_history WHERE user_id = '${U2}' AND role = 'AD_OPS' AND action = 'GRANT') THEN RAISE EXCEPTION 'history'; END IF; END $$;`);
+  await expectError(sc, db, 'K2 vai trò ngoài danh mục vẫn bị chặn', GRANT('SALES'), /ck_user_roles_role/);
+  await expectValue(sc, db, 'K3 CHECK vai trò đã VALIDATED (0352) và có đủ 6 vai trò',
+    `SELECT c.convalidated AND ${ROLE_CHECK} LIKE '%''ADMIN''%''AD_OPS''%' FROM pg_constraint c WHERE c.conrelid = 'tt.user_roles'::regclass AND c.conname = 'ck_user_roles_role'`, true);
+  await expectError(sc, db, 'K4 down 0351 từ chối khi còn người giữ AD_OPS', `${GRANT('AD_OPS')} ${DOWN_0351}`, /Refusing to roll back 0351/);
+  await expectOk(sc, db, 'K5 down 0351 (không ai giữ AD_OPS) trả CHECK về 5 vai trò của 0313', `${DOWN_0351}
+    DO $$ BEGIN IF ${ROLE_CHECK} LIKE '%AD_OPS%' OR ${ROLE_CHECK} NOT LIKE '%''MODERATOR''%' THEN RAISE EXCEPTION 'old check'; END IF; END $$;
+    ${GRANT('EDITOR')}`);
+  await expectError(sc, db, 'K6 sau down 0351, AD_OPS bị chặn lại', `${DOWN_0351} ${GRANT('AD_OPS')}`, /ck_user_roles_role/);
+
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
 }
@@ -393,7 +437,9 @@ async function behaviour(sc, db) {
   catch (e) { record(sc, 'SQL addendum v0.2 chạy được trên stub (lần đầu được chạy thử)', false, errText(e)); }
   await db.exec(`INSERT INTO tt.ad_placements (code, status) VALUES ('legacy_slot', 'DRAFT');`);  // dòng v0.2 chưa có kích thước
   const baseline = await snapshot(db);
-  const main = UPS.filter((f) => !base(f).startsWith('0310'));
+  // 0350 gỡ CHECK kích thước của 0302 → báo cáo/0310 phải chạy trước nó, đúng thứ tự số khi deploy.
+  const later = UPS.filter((f) => base(f) >= '0350');
+  const main = UPS.filter((f) => !base(f).startsWith('0310') && !later.includes(f));
   const validate = UPS.find((f) => base(f).startsWith('0310'));
   await applyAll(sc, db, main, 'UP');
   await expectValue(sc, db, 'Khóa v0.2 đổi sang registry, giữ trạng thái OFF',
@@ -411,6 +457,18 @@ async function behaviour(sc, db) {
   await applyAll(sc, db, [validate], 'UP sau backfill');
   await expectValue(sc, db, 'Mọi ràng buộc v0.3 đã VALIDATED',
     `SELECT count(*)::int FROM pg_constraint c JOIN tt_migration.ledger l ON l.object_name = c.conname WHERE l.object_type = 'constraint' AND NOT c.convalidated`, 0);
+  // Banner kiểu 0302 đang chạy (sau backfill + 0310) → 0350 chuyển thành đặt chỗ cùng id + banner cho 3 breakpoint.
+  await db.exec(`INSERT INTO tt.users (id, display_name) VALUES ('${U1}', 'Approver');
+    INSERT INTO tt.media_assets (id) VALUES ('${id('e1')}');
+    INSERT INTO tt.ad_placements (id, code, label, status, media_asset_id, alt_text, target_url, width, height, approved_by, approved_at)
+      VALUES ('${id('ad9')}', 'legacy_live', 'Quảng cáo', 'ACTIVE', '${id('e1')}', 'Banner cũ', 'https://acme.vn', 728, 90, '${U1}', now());`);
+  await applyAll(sc, db, later, 'UP sau 0310');
+  await expectValue(sc, db, '0350 chuyển banner cũ: đặt chỗ ACTIVE cùng id, 3 banner 728×90 giữ alt, vị trí thuộc www',
+    `SELECT string_agg(b.status || ':' || c.breakpoint || ':' || c.width || 'x' || c.height || ':' || c.alt_text || ':' || p.site_key, ',' ORDER BY c.breakpoint)
+       FROM tt.ad_bookings b JOIN tt.ad_booking_creatives c ON c.booking_id = b.id JOIN tt.ad_placements p ON p.id = b.placement_id
+      WHERE b.id = '${id('ad9')}'`,
+    'ACTIVE:DESKTOP:728x90:Banner cũ:www,ACTIVE:MOBILE:728x90:Banner cũ:www,ACTIVE:TABLET:728x90:Banner cũ:www');
+  await expectValue(sc, db, '0350 không chuyển vị trí cũ chưa có banner', `SELECT count(*)::int FROM tt.ad_bookings`, 1);
   await applyAll(sc, db, UPS.map(toDown).reverse(), 'DOWN');
   expectSame(sc, 'Sau down, schema + khóa cờ trở về đúng trạng thái v0.2', baseline, await snapshot(db));
   await db.close();

@@ -46,11 +46,13 @@ public sealed partial class PublicArticleService(ITinhteDatabase database, IOpti
                {PublicArticleSql.RightsOk} AS rights_ok,
                r.id, r.title, r.summary, r.body::text, r.content_kind, r.published_at,
                {PublicArticleSql.SponsorOk} AS sponsor_ok,
-               c.slug, u.display_name
+               c.slug, u.display_name,
+               {PublicArticleCategorySql.Columns}
           FROM tt.articles a
           JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id
           LEFT JOIN tt.categories c ON c.id = r.category_id
           LEFT JOIN tt.users u ON u.id = a.owner_id
+          {PublicArticleCategorySql.Join}
         """;
 
     public async Task<PublicArticleResult> GetAsync(string siteKey, string slug, CancellationToken ct)
@@ -122,7 +124,10 @@ public sealed partial class PublicArticleService(ITinhteDatabase database, IOpti
             AuthorDisplayName: r.IsDBNull(14) ? null : r.GetString(14),
             CategorySlug: r.IsDBNull(13) ? null : r.GetString(13),
             BodyBlocks: ArticleSql.ParseBody(r.IsDBNull(9) ? null : r.GetString(9)),
-            RelatedVideoIds: []);               // liên kết bài–video: FR-DISC-005/FR-VID-009, WBS khác
+            RelatedVideoIds: [])                // liên kết bài–video: FR-DISC-005/FR-VID-009, WBS khác
+        {
+            Category = PublicArticleCategorySql.Read(r, 15),
+        };
     }
 
     private static DomainProblemException NotFound() => new(ErrorCodes.NotFound, "Article not found", "No published article with this slug.");

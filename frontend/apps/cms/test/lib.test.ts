@@ -1,7 +1,7 @@
 // Kiểm thư viện CMS (node:test, chạy TS trực tiếp như packages/sites).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { access, grantedPermissions, hasLockedPermissions, ALL_PERMISSIONS } from '../src/lib/rbac.ts';
 import { loginUrl, readCookie, sanitizeReturnTo, toProblem } from '../src/lib/api.ts';
 import { SECTIONS, sectionFor } from '../src/lib/nav.ts';
@@ -16,10 +16,15 @@ test('rbac: cùng quyết định với PermissionMatrix (C#)', () => {
   assert.throws(() => access({ roles: ['ADMIN'], mfaSatisfied: true }, 'nope' as never));
 });
 
-test('rbac: vai trò khớp CHECK của migration 0313', () => {
-  const sql = readFileSync(new URL('../../../../doc/07_AI_REVIEW/v0.3/db/migrations/0313_staff_access.up.sql', import.meta.url), 'utf8');
-  const list = /ck_user_roles_role CHECK \(role IN \(([^)]*)\)\)/.exec(sql)?.[1] ?? '';
-  const fromSql = [...list.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]).sort();
+test('rbac: vai trò khớp CHECK ck_user_roles_role của migration mới nhất định nghĩa nó (0313, rồi 0351 thêm AD_OPS)', () => {
+  const dir = new URL('../../../../doc/07_AI_REVIEW/v0.3/db/migrations/', import.meta.url);
+  // "CONSTRAINT ck_user_roles_role CHECK (role IN ('A', …))" hoặc tt_migration.add_constraint(…, 'ck_user_roles_role', 'CHECK (role IN (''A'', …))').
+  const pattern = /ck_user_roles_role(?:',\s*')?\s*CHECK \(role IN \(([^)]*)\)\)/;
+  const checks = readdirSync(dir).filter((f) => f.endsWith('.up.sql')).sort()
+    .map((f) => ({ file: f, list: pattern.exec(readFileSync(new URL(f, dir), 'utf8'))?.[1] }))
+    .filter((x) => x.list !== undefined);
+  assert.equal(checks.at(-1)?.file, '0351_ad_ops_role.up.sql');
+  const fromSql = [...(checks.at(-1)?.list ?? '').matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]).sort();
   const rbac = JSON.parse(readFileSync(new URL('../../../../config/rbac/rbac.json', import.meta.url), 'utf8'));
   assert.deepEqual(Object.keys(rbac.roles).sort(), fromSql);
 });

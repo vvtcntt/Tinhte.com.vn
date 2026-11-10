@@ -1,63 +1,52 @@
-import type { PublicAdSlot } from '../../lib/contracts';
-import type { AdPair } from '../../lib/home-model';
+import { AD_BREAKPOINTS, AD_RANGE, type AdView } from '../../lib/ads';
 import { safeHttpUrl } from '../../lib/routes';
 
-/**
- * Màn hình slot được hiện: `all` mọi nơi; `desktop` từ 768px; `mobile` dưới 768px; `wide` từ 1024px.
- * Mốc trùng với globals.css (`.ad-slot--{media}`).
- */
-export type AdMedia = 'all' | 'desktop' | 'mobile' | 'wide';
-
-// Media query của khoảng màn hình slot bị ẩn. Viết bằng min-width + `not` để hai nửa luôn bù nhau (không có độ rộng lẻ
-// như 767.5px nào hiện cả hai hay ẩn cả hai).
-const HIDDEN_WHEN: Record<Exclude<AdMedia, 'all'>, string> = {
-  desktop: 'not all and (min-width: 768px)',
-  mobile: '(min-width: 768px)',
-  wide: 'not all and (min-width: 1024px)',
-};
-// GIF 1×1 trong suốt. Ở màn hình slot bị ẩn, <picture> chọn ảnh này nên trình duyệt không tải creative —
-// kể cả slot không lazy (①). CSP `img-src` đã cho phép `data:` (packages/sites securityHeaders).
+// GIF 1×1 trong suốt. Ở màn hình khung bị ẩn, <picture> chọn ảnh này nên trình duyệt không tải creative —
+// kể cả khung không lazy (①). CSP `img-src` đã cho phép `data:` (packages/sites securityHeaders).
 const BLANK_GIF = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-// Slot quảng cáo tĩnh (P0-ADS, WBS-133). Chỉ render khi API trả slot → cờ OFF không để lại khung trống.
-// SSR với width/height + aspect-ratio → giữ chỗ trước khi ảnh tải, không gây CLS. Creative hiện đúng kích thước
-// (không phóng to), thu nhỏ khi khung hẹp hơn.
+/**
+ * Một khung quảng cáo tĩnh (P0-ADS, WBS-133): một banner hiện ở các breakpoint của nó, ẩn ở breakpoint khác bằng CSS
+ * (`.ad-slot--no-{mobile|tablet|desktop}`, cùng mốc với lib/ads.ts AD_RANGE). SSR với width/height + aspect-ratio → giữ chỗ trước khi
+ * ảnh tải, không gây CLS. Creative hiện đúng kích thước (không phóng to), thu nhỏ khi khung hẹp hơn.
+ */
 export function AdSlot({
-  slot,
-  media = 'all',
+  view,
   eager = false,
   className = '',
 }: {
-  slot: PublicAdSlot | undefined;
-  media?: AdMedia;
-  /** Slot ở màn hình đầu (①): không lazy-load. Không đặt fetchpriority cao để không tranh với ảnh LCP. */
+  view: AdView;
+  /** Khung ở màn hình đầu (①): không lazy-load. Không đặt fetchpriority cao để không tranh với ảnh LCP. */
   eager?: boolean;
   className?: string;
 }) {
-  if (!slot) return null;
-  const creative = safeHttpUrl(slot.creativeUrl);
-  if (!creative) return null;
-  const target = safeHttpUrl(slot.targetUrl, { httpsOnly: true });
+  const { creative, breakpoints } = view;
+  // Đã lọc ở acceptAdSlots; kiểm lại để component không bao giờ render URL lạ dù được gọi từ chỗ khác.
+  const src = safeHttpUrl(creative.creativeUrl);
+  if (!src) return null;
+  const target = safeHttpUrl(creative.targetUrl, { httpsOnly: true });
   // Nhãn luôn hiện (FR-ADS-001): API không gửi nhãn thì dùng nhãn mặc định.
-  const label = slot.label?.trim() || 'Quảng cáo';
-  const hiddenWhen = media === 'all' ? null : HIDDEN_WHEN[media];
+  const label = view.label.trim() || 'Quảng cáo';
+  const hidden = AD_BREAKPOINTS.filter((bp) => !breakpoints.includes(bp));
+  const hiddenWhen = hidden.map((bp) => AD_RANGE[bp]).join(', ');
+  const classes = ['ad-slot', ...hidden.map((bp) => `ad-slot--no-${bp.toLowerCase()}`), className].filter(Boolean).join(' ');
   const picture = (
     <picture>
       {hiddenWhen && <source media={hiddenWhen} srcSet={BLANK_GIF} />}
       <img
-        src={creative}
-        alt={slot.altText}
-        width={slot.width}
-        height={slot.height}
+        src={src}
+        alt={creative.altText}
+        width={creative.width}
+        height={creative.height}
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
-        style={{ aspectRatio: `${slot.width} / ${slot.height}` }}
+        style={{ aspectRatio: `${creative.width} / ${creative.height}` }}
       />
     </picture>
   );
-  const box = { maxWidth: slot.width };
+  const box = { maxWidth: creative.width };
   return (
-    <aside className={`ad-slot ad-slot--${media} ${className}`.trim()} aria-label={label} data-placement={slot.code}>
+    <aside className={classes} aria-label={label} data-placement={view.code} data-breakpoints={breakpoints.join(' ').toLowerCase()}>
       <span className="ad-slot__label">{label}</span>
       {target ? (
         <a className="ad-slot__media" style={box} href={target} target="_blank" rel="sponsored noopener">
@@ -72,12 +61,16 @@ export function AdSlot({
   );
 }
 
-/** Một vùng có bản desktop (≥ 768px) và mobile (< 768px) — hai mã riêng vì mỗi mã chỉ một kích thước. */
-export function AdPairSlot({ pair, eager = false, className = '' }: { pair: AdPair; eager?: boolean; className?: string }) {
+/**
+ * Một vùng quảng cáo (①–⑥, cuối bài): mỗi banner khác nhau một khung, mỗi breakpoint tối đa một khung hiện (lib/ads.ts resolveAdZone).
+ * Rỗng → không render gì (không khung trống, FR-ADS-002).
+ */
+export function AdZone({ views, eager = false, className = '' }: { views: readonly AdView[]; eager?: boolean; className?: string }) {
   return (
     <>
-      <AdSlot slot={pair.desktop} media="desktop" eager={eager} className={className} />
-      <AdSlot slot={pair.mobile} media="mobile" eager={eager} className={className} />
+      {views.map((view) => (
+        <AdSlot key={`${view.code}:${view.breakpoints.join('-')}`} view={view} eager={eager} className={className} />
+      ))}
     </>
   );
 }

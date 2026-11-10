@@ -213,6 +213,15 @@ x-feature-flags:
     legacyKeys: []
     description: 'News radar (ADR-0008, BA-01 phase 1): source profiles, feed collection, clustering and CMS radar. No AI. Scope recorded as P2
       until PO ranks it (BA-01 Q-AGG-06). The collector worker also stops while OFF.'
+  - key: discovery.most_read
+    scope: P1
+    productionDefault: false
+    approvers:
+    - PO
+    - Legal
+    legacyKeys: []
+    description: '"Đọc nhiều" block (UX-PUB-01 đợt 3, PROPOSED). Ranking derived from aggregated read events (FR-ANL-001); the data source
+      and the definition of a counted read are not decided (TL/PO/Legal). While OFF, GET /discovery/most-read returns 200 with empty items.'
 x-error-catalog:
   description: 'Error codes returned in Problem.code (AIR-009). Each code maps to exactly one HTTP status. Evaluation order: 400 syntax → 401
     → 403 CSRF_INVALID → 403 FEATURE_DISABLED → 403 FORBIDDEN/ELIGIBILITY_REQUIRED/SOD_VIOLATION → 404 → 428/412 → 422 → 409 → 429 (a gateway
@@ -4973,8 +4982,12 @@ paths:
       tags:
       - Advertising
       summary: Eligible public ad placements without user targeting
-      description: 'No user targeting. Only ACTIVE placements inside their schedule window are returned. Access: Public, no session. Feature gate
-        `ads.display_slots` (production default OFF), enforced server-side.'
+      description: 'No user targeting. Placements belong to a site (ADR-0001): only placements of the site resolved from Host are considered,
+        so the same code on two sites never leaks across. A slot is returned only when its placement is ACTIVE and at least one breakpoint
+        has a creative to serve; per breakpoint the server picks one creative from ACTIVE bookings inside their schedule window (highest
+        priority, then latest startsAt, then booking id) whose media is READY, IMAGE, PUBLIC and rights CLEARED. No creative → no slot (the
+        page renders no empty frame). Unknown or inactive codes are omitted, not errors. Access: Public, no session. Feature gate `ads.display_slots`
+        (production default OFF), enforced server-side. DRAFT v0.3 (đợt 3 trang chủ): multi-size slots replace the single width/height.'
       operationId: getAdsPlacements
       security: []
       parameters:
@@ -4997,16 +5010,67 @@ paths:
       x-flag-off-behavior: 200 with empty items
       x-error-codes:
       - BAD_REQUEST
+  /discovery/most-read:
+    get:
+      tags:
+      - Discovery
+      summary: Most read articles of the site (proposal)
+      description: 'Proposal only, not implemented (UX-PUB-01 đợt 3): the "Đọc nhiều" block. Ranking of articles of the site resolved from Host by
+        counted reads inside the window, computed from aggregated FR-ANL-001 events — no per-user data, no personalisation. Only articles visible
+        right now (same rules as getHome) are returned; SPONSORED articles are excluded from the ranking (proposal, PO/Legal decide). When there
+        is not enough data (below the threshold PO sets) items is empty and the client hides the block. The data source (aggregate table fed
+        by the events pipeline vs snapshots exported from an analytics store) and the definition of a counted read are pending TL/PO/Legal.
+        Access: Public, no session. Feature gate `discovery.most_read` (production default OFF), enforced server-side.'
+      operationId: getMostReadArticles
+      security: []
+      parameters:
+      - name: window
+        in: query
+        required: false
+        description: Counting window.
+        schema:
+          type: string
+          enum:
+          - 24h
+          - 7d
+          default: 24h
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+      responses:
+        '200':
+          description: Ranked articles; empty items when discovery.most_read is OFF or data is insufficient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MostReadArticleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      x-requirements:
+      - FR-DISC-008
+      x-scope: P1
+      x-feature-gate: discovery.most_read
+      x-flag-off-behavior: 200 with empty items
+      x-error-codes:
+      - BAD_REQUEST
   /admin/ad-placements:
     get:
       tags:
       - Advertising
-      summary: List ad slot configs
-      description: 'Staff configuration works while ads.display_slots is OFF so P0-ADS can be built and tested before public activation. Access:
-        Staff session (cmsSession) with RBAC enforced in the domain layer.'
+      summary: List ad placements (positions) of a site
+      description: 'Placements are positions on a site page (code, allowed sizes per breakpoint); banners live in bookings. Staff configuration
+        works while ads.display_slots is OFF so P0-ADS can be built and tested before public activation. Access: Staff session (cmsSession)
+        with RBAC enforced in the domain layer (proposed permission ads.manage in config/rbac/rbac.json — DRAFT, pending BA/PO approval).'
       operationId: getAdminAdPlacements
       security:
       - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/SiteKeyFilter'
       responses:
         '200':
           description: Success
@@ -5014,6 +5078,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdPlacementList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -5022,13 +5088,16 @@ paths:
       - FR-ADS-002
       x-scope: P0-ADS
       x-error-codes:
+      - BAD_REQUEST
       - UNAUTHENTICATED
       - FORBIDDEN
     post:
       tags:
       - Advertising
       summary: Create an ad placement (DRAFT)
-      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Retry-safe with Idempotency-Key.'
+      description: 'Creates a position on one public-web site. (siteKey, code) is unique; the same code may exist on several sites (ADR-0001).
+        A siteKey that is not an active/planned public-web site, duplicate sizes or an already used (siteKey, code) → VALIDATION_FAILED. Access:
+        Staff session (cmsSession) with RBAC enforced in the domain layer. Retry-safe with Idempotency-Key.'
       operationId: createAdPlacement
       security:
       - cmsSession: []
@@ -5075,7 +5144,6 @@ paths:
       - IDEMPOTENCY_KEY_REUSED
       - VALIDATION_FAILED
       - RATE_LIMITED
-      - UNSAFE_URL
   /admin/ad-placements/{placementId}:
     get:
       tags:
@@ -5116,9 +5184,16 @@ paths:
     put:
       tags:
       - Advertising
-      summary: Set placement creative and schedule
-      description: 'Staff configuration works while ads.display_slots is OFF so P0-ADS can be built and tested before public activation. Access:
-        Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the latest ETag.'
+      summary: Update an ad placement (code, label, status, allowed sizes)
+      description: 'Full replacement of the position: code, label, status and allowed sizes per breakpoint. Banners, schedule and priority
+        are set on bookings (/admin/ad-placements/{placementId}/bookings). APPROVED/ACTIVE require the approval permission (proposed ads.approve,
+        MFA — DRAFT); the server records approvedBy/approvedAt. Status transitions follow the booking rules: DRAFT → APPROVED, APPROVED → ACTIVE,
+        ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT (clears approvedBy/approvedAt), any → EXPIRED (final); keeping the status is always allowed;
+        anything else → STATE_CONFLICT. Entering APPROVED or ACTIVE (including PAUSED → ACTIVE) needs the approval permission; PAUSED, DRAFT
+        and EXPIRED need only ads.manage. code stays unique within the site (VALIDATION_FAILED). Removing a size that a booking creative still
+        uses → STATE_CONFLICT. siteKey cannot change (create a new placement instead). Staff configuration works while ads.display_slots is
+        OFF so P0-ADS can be built and tested before public activation. Access: Staff session (cmsSession) with RBAC enforced in the domain
+        layer. Optimistic concurrency: send If-Match with the latest ETag.'
       operationId: putAdminAdPlacementsPlacementid
       security:
       - cmsSession: []
@@ -5142,6 +5217,202 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdPlacement'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-ADS-002
+      x-scope: P0-ADS
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - REVISION_CONFLICT
+      - PRECONDITION_REQUIRED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+  /admin/ad-placements/{placementId}/bookings:
+    get:
+      tags:
+      - Advertising
+      summary: List bookings (banners + schedule + priority) of a placement
+      description: 'Newest first, every status, so staff see the queue of upcoming and past bookings. Access: Staff session (cmsSession) with RBAC
+        enforced in the domain layer (proposed permission ads.manage — DRAFT).'
+      operationId: listAdminAdBookings
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/PlacementId'
+      responses:
+        '200':
+          description: Bookings of the placement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdBookingList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-ADS-002
+      x-scope: P0-ADS
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - NOT_FOUND
+    post:
+      tags:
+      - Advertising
+      summary: Book a placement (DRAFT)
+      description: 'Creates a DRAFT booking with at most one creative per breakpoint. Each creative size must be one of the placement sizes for
+        that breakpoint (else VALIDATION_FAILED); targetUrl must be https (UNSAFE_URL). Booking an EXPIRED placement → STATE_CONFLICT. Access: Staff
+        session (cmsSession) with RBAC enforced in the domain layer (proposed permission ads.manage — DRAFT). Retry-safe with Idempotency-Key.'
+      operationId: createAdBooking
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/PlacementId'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/XCsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdBookingCreate'
+      responses:
+        '201':
+          description: Created
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdBooking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+      x-requirements:
+      - FR-ADS-002
+      x-scope: P0-ADS
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - CSRF_INVALID
+      - FORBIDDEN
+      - NOT_FOUND
+      - STATE_CONFLICT
+      - IDEMPOTENCY_KEY_REUSED
+      - VALIDATION_FAILED
+      - RATE_LIMITED
+      - UNSAFE_URL
+  /admin/ad-bookings/{bookingId}:
+    get:
+      tags:
+      - Advertising
+      summary: Get an ad booking
+      description: 'Access: Staff session (cmsSession) with RBAC enforced in the domain layer (proposed permission ads.manage — DRAFT).'
+      operationId: getAdBooking
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/BookingId'
+      responses:
+        '200':
+          description: Booking
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdBooking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      x-requirements:
+      - FR-ADS-002
+      x-scope: P0-ADS
+      x-error-codes:
+      - BAD_REQUEST
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - NOT_FOUND
+    put:
+      tags:
+      - Advertising
+      summary: Update an ad booking (creatives, schedule, priority, status)
+      description: 'Full replacement. Creatives, targetUrl, advertiserName and the schedule change only while the booking is DRAFT; on an APPROVED,
+        ACTIVE or PAUSED booking set status DRAFT first (re-approval required), otherwise STATE_CONFLICT. priority can change in any status. Status
+        transitions: DRAFT → APPROVED (approval permission, proposed ads.approve with MFA — DRAFT; the server records approvedBy/approvedAt), APPROVED
+        → ACTIVE, ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT, any → EXPIRED (final); keeping the status is always allowed; anything else → STATE_CONFLICT.
+        Entering ACTIVE (from APPROVED or PAUSED) also needs the approval permission; PAUSED, DRAFT and EXPIRED need only ads.manage. Back to
+        DRAFT clears approvedBy/approvedAt. APPROVED/ACTIVE require targetUrl and at least one creative (VALIDATION_FAILED). Access: Staff session
+        (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the latest ETag.'
+      operationId: putAdminAdBooking
+      security:
+      - cmsSession: []
+      parameters:
+      - $ref: '#/components/parameters/BookingId'
+      - $ref: '#/components/parameters/XCsrfToken'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdBookingUpdate'
+      responses:
+        '200':
+          description: Updated
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdBooking'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -7010,6 +7281,21 @@ components:
       schema:
         type: string
         format: uuid
+    BookingId:
+      name: bookingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SiteKeyFilter:
+      name: siteKey
+      in: query
+      required: false
+      description: Only items of this Site Registry key (config/sites/sites.json, public-web). Omitted → every site. Unknown key → BAD_REQUEST.
+      schema:
+        type: string
+        pattern: ^[a-z][a-z0-9-]{0,30}$
     RevisionId:
       name: revisionId
       in: path
@@ -7514,8 +7800,54 @@ components:
           - string
           - 'null'
           description: Display label, e.g. 'Nội dung tài trợ' (text approved by Legal)
+        category:
+          oneOf:
+          - $ref: '#/components/schemas/CategoryRef'
+          - type: 'null'
+          description: 'DRAFT v0.3 (đợt 3 trang chủ): category of the article as last published (tt.articles.category_id), only when it is
+            enabled and belongs to the same site; otherwise null. Optional: clients must render the card without it.'
       allOf:
       - $ref: '#/components/schemas/SponsoredLabelRule'
+    MostReadArticleList:
+      type: object
+      description: 'PROPOSED (UX-PUB-01 đợt 3). Ranked public article cards for the "Đọc nhiều" block. No counts are exposed (avoid leaking
+        traffic numbers and gaming); ordering carries the rank.'
+      required:
+      - window
+      - items
+      properties:
+        window:
+          type: string
+          enum:
+          - 24h
+          - 7d
+        generatedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: When the ranking was computed (aggregation lag is expected); null when items is empty.
+        items:
+          type: array
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/ArticleSummary'
+          description: Rank order, 1 = most read. Articles withdrawn after the ranking was computed are dropped, not replaced.
+    CategoryRef:
+      type: object
+      description: Minimal public category reference for cards; link with /categories/{slug} on the same site.
+      required:
+      - id
+      - slug
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
     Article:
       allOf:
       - $ref: '#/components/schemas/ArticleSummary'
@@ -8896,81 +9228,42 @@ components:
       - metrics
     AdPlacement:
       type: object
+      description: 'Ad position on one site page (ADR-0001). Banners, schedule and priority live in AdBooking, not here (DRAFT v0.3, đợt 3 trang
+        chủ; replaces the single-banner placement of migration 0302).'
       required:
       - id
+      - siteKey
       - code
       - status
       - label
-      - width
-      - height
+      - sizes
       - rowVersion
       properties:
         id:
           type: string
           format: uuid
+        siteKey:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{0,30}$
+          description: Site Registry key (config/sites/sites.json) of a public-web site. Immutable after create (ADR-0001).
         code:
           type: string
           pattern: ^[a-z0-9_-]{2,80}$
+          description: Unique per site, not globally — (siteKey, code).
         label:
           type: string
           minLength: 1
           maxLength: 150
           default: Quảng cáo
-        advertiserName:
-          type:
-          - string
-          - 'null'
-          maxLength: 180
-        mediaAssetId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        altText:
-          type:
-          - string
-          - 'null'
-          maxLength: 250
-        targetUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-          pattern: ^https://
-          maxLength: 2000
-        width:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        height:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        startsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        endsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
         status:
-          type: string
-          enum:
-          - DRAFT
-          - APPROVED
-          - ACTIVE
-          - PAUSED
-          - EXPIRED
-        creativeUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-          readOnly: true
-          description: Derived signed CDN URL of mediaAssetId
+          $ref: '#/components/schemas/AdStatus'
+        sizes:
+          type: array
+          maxItems: 12
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/AdSize'
+          description: Allowed creative sizes per breakpoint. A breakpoint without a size cannot be booked (the slot shows nothing there).
         approvedBy:
           type:
           - string
@@ -8987,6 +9280,243 @@ components:
           type: integer
           format: int64
           minimum: 1
+    AdStatus:
+      type: string
+      enum:
+      - DRAFT
+      - APPROVED
+      - ACTIVE
+      - PAUSED
+      - EXPIRED
+      description: Lifecycle of placements and bookings. APPROVED/ACTIVE need an approver (server-set). Only ACTIVE bookings of ACTIVE placements
+        inside their schedule window are served. EXPIRED is final.
+    AdBreakpoint:
+      type: string
+      enum:
+      - MOBILE
+      - TABLET
+      - DESKTOP
+      description: 'Viewport range of a creative (UX-PUB-01): MOBILE < 768px, TABLET 768–1023px, DESKTOP ≥ 1024px. The client shows a creative
+        only inside its range and must not download it elsewhere.'
+    AdSize:
+      type: object
+      required:
+      - breakpoint
+      - width
+      - height
+      properties:
+        breakpoint:
+          $ref: '#/components/schemas/AdBreakpoint'
+        width:
+          type: integer
+          minimum: 1
+          maximum: 4000
+        height:
+          type: integer
+          minimum: 1
+          maximum: 4000
+    AdCreative:
+      type: object
+      required:
+      - breakpoint
+      - width
+      - height
+      - mediaAssetId
+      - altText
+      properties:
+        breakpoint:
+          $ref: '#/components/schemas/AdBreakpoint'
+        width:
+          type: integer
+          minimum: 1
+          maximum: 4000
+        height:
+          type: integer
+          minimum: 1
+          maximum: 4000
+        mediaAssetId:
+          type: string
+          format: uuid
+          description: IMAGE media. Served only while READY, PUBLIC and rights CLEARED.
+        altText:
+          type: string
+          minLength: 1
+          maxLength: 250
+        creativeUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          readOnly: true
+          description: Derived public URL of mediaAssetId; null while the media cannot be served.
+    AdBooking:
+      type: object
+      description: A banner booking on one placement — creatives per breakpoint, link, schedule, priority and approval (DRAFT v0.3, đợt 3).
+      required:
+      - id
+      - placementId
+      - status
+      - priority
+      - creatives
+      - rowVersion
+      properties:
+        id:
+          type: string
+          format: uuid
+        placementId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/AdStatus'
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Higher wins when several ACTIVE bookings of a placement overlap on a breakpoint (ties → latest startsAt, then id). No rotation in P0-ADS.
+        advertiserName:
+          type:
+          - string
+          - 'null'
+          maxLength: 180
+        targetUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          pattern: ^https://
+          maxLength: 2000
+        startsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: null = serve as soon as the booking is ACTIVE.
+        endsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Must be after startsAt; null = no end date.
+        creatives:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AdCreative'
+        approvedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          readOnly: true
+        approvedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          readOnly: true
+        rowVersion:
+          type: integer
+          format: int64
+          minimum: 1
+    AdBookingCreate:
+      type: object
+      description: Created as DRAFT.
+      required:
+      - creatives
+      properties:
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Higher wins when several ACTIVE bookings of a placement overlap on a breakpoint (ties → latest startsAt, then id). No rotation in P0-ADS.
+        advertiserName:
+          type:
+          - string
+          - 'null'
+          maxLength: 180
+        targetUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          pattern: ^https://
+          maxLength: 2000
+        startsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: null = serve as soon as the booking is ACTIVE.
+        endsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Must be after startsAt; null = no end date.
+        creatives:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AdCreative'
+          description: At most one creative per breakpoint; each size must be allowed by the placement for that breakpoint.
+    AdBookingUpdate:
+      type: object
+      required:
+      - status
+      - priority
+      - creatives
+      properties:
+        status:
+          $ref: '#/components/schemas/AdStatus'
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Higher wins when several ACTIVE bookings of a placement overlap on a breakpoint (ties → latest startsAt, then id). No rotation in P0-ADS.
+        advertiserName:
+          type:
+          - string
+          - 'null'
+          maxLength: 180
+        targetUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          pattern: ^https://
+          maxLength: 2000
+        startsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: null = serve as soon as the booking is ACTIVE.
+        endsAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Must be after startsAt; null = no end date.
+        creatives:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AdCreative'
+          description: At most one creative per breakpoint; each size must be allowed by the placement for that breakpoint.
+    AdBookingList:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdBooking'
     AdPlacementList:
       type: object
       properties:
@@ -9000,67 +9530,28 @@ components:
       type: object
       required:
       - code
-      - status
       - label
-      - width
-      - height
+      - status
+      - sizes
       properties:
         code:
           type: string
           pattern: ^[a-z0-9_-]{2,80}$
+          description: Unique per site, not globally — (siteKey, code).
         label:
           type: string
           minLength: 1
           maxLength: 150
           default: Quảng cáo
-        advertiserName:
-          type:
-          - string
-          - 'null'
-          maxLength: 180
-        mediaAssetId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        altText:
-          type:
-          - string
-          - 'null'
-          maxLength: 250
-        targetUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-          pattern: ^https://
-          maxLength: 2000
-        width:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        height:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        startsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        endsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
         status:
-          type: string
-          enum:
-          - DRAFT
-          - APPROVED
-          - ACTIVE
-          - PAUSED
-          - EXPIRED
+          $ref: '#/components/schemas/AdStatus'
+        sizes:
+          type: array
+          maxItems: 12
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/AdSize'
+          description: Allowed creative sizes per breakpoint. A breakpoint without a size cannot be booked (the slot shows nothing there).
     Campaign:
       type: object
       properties:
@@ -9905,69 +10396,39 @@ components:
     AdPlacementCreate:
       type: object
       required:
+      - siteKey
       - code
       - label
-      - width
-      - height
+      - sizes
       properties:
+        siteKey:
+          type: string
+          pattern: ^[a-z][a-z0-9-]{0,30}$
+          description: Site Registry key (config/sites/sites.json) of a public-web site. Immutable after create (ADR-0001).
         code:
           type: string
           pattern: ^[a-z0-9_-]{2,80}$
+          description: Unique per site, not globally — (siteKey, code).
         label:
           type: string
           minLength: 1
           maxLength: 150
           default: Quảng cáo
-        advertiserName:
-          type:
-          - string
-          - 'null'
-          maxLength: 180
-        mediaAssetId:
-          type:
-          - string
-          - 'null'
-          format: uuid
-        altText:
-          type:
-          - string
-          - 'null'
-          maxLength: 250
-        targetUrl:
-          type:
-          - string
-          - 'null'
-          format: uri
-          pattern: ^https://
-          maxLength: 2000
-        width:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        height:
-          type: integer
-          minimum: 1
-          maximum: 4000
-        startsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        endsAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-      description: Created as DRAFT. APPROVED/ACTIVE require approver, mediaAssetId, altText and targetUrl (server-enforced, 409/422).
+        sizes:
+          type: array
+          minItems: 1
+          maxItems: 12
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/AdSize'
+          description: Allowed creative sizes per breakpoint. A breakpoint without a size cannot be booked (the slot shows nothing there).
+      description: Created as DRAFT. Banners are added as bookings (POST /admin/ad-placements/{placementId}/bookings).
     PublicAdSlot:
       type: object
       required:
       - code
       - label
-      - creativeUrl
-      - altText
-      - width
-      - height
+      - creatives
       - rel
       properties:
         code:
@@ -9975,6 +10436,29 @@ components:
           pattern: ^[a-z0-9_-]{2,80}$
         label:
           type: string
+        creatives:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/PublicAdCreative'
+          description: At most one creative per breakpoint. A breakpoint without a creative shows nothing (no empty frame).
+        rel:
+          type: string
+          const: sponsored noopener
+      description: 'Public slot without internal status/schedule/booking fields (AIR-013). DRAFT v0.3 (đợt 3): creatives per breakpoint replace
+        the single creativeUrl/width/height.'
+    PublicAdCreative:
+      type: object
+      required:
+      - breakpoint
+      - creativeUrl
+      - altText
+      - width
+      - height
+      properties:
+        breakpoint:
+          $ref: '#/components/schemas/AdBreakpoint'
         creativeUrl:
           type: string
           format: uri
@@ -9995,10 +10479,7 @@ components:
           type: integer
           minimum: 1
           maximum: 4000
-        rel:
-          type: string
-          const: sponsored noopener
-      description: Public slot without internal status/schedule fields (AIR-013).
+      description: Width/height are the intrinsic creative size; the client reserves the box from them (no CLS) and never upscales.
     PublicAdSlotList:
       type: object
       required:

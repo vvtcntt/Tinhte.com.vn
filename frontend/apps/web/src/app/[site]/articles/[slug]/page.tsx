@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { findSite, isIndexable, originFor, parseSiteEnv } from '@tinhte/sites';
 import logo from '../../../../assets/logo.png';
 import { ArticleBody } from '../../../../components/article/ArticleBody';
-import { AdSlot } from '../../../../components/home/AdSlot';
+import { AdZone } from '../../../../components/home/AdSlot';
 import { SponsorBadge, TimeAgo } from '../../../../components/home/parts';
 import { StoryCard } from '../../../../components/home/Stories';
 import { loadArticle, loadArticleAd, loadRelated } from '../../../../lib/article';
@@ -72,7 +72,8 @@ export default async function ArticlePage({ params }: Props) {
   const env = parseSiteEnv(process.env.TT_SITE_ENV);
   const origin = originFor(site, env);
   const [categories, related, ad] = await Promise.all([loadNavCategories(site), loadRelated(site, article.id, demo), loadArticleAd(site)]);
-  const category = categories.find((c) => c.slug === article.categorySlug);
+  // Article.category (DRAFT v0.3 mục 17): null = API chủ ý không hiện (chuyên mục tắt/khác site). Chỉ API cũ (chưa có trường) mới tra theo categorySlug.
+  const category = article.category !== undefined ? article.category : categories.find((c) => c.slug === article.categorySlug);
   const image = safeHttpUrl(article.thumbnailUrl);
   const url = `${origin}${routes.article(article.slug)}`;
 
@@ -151,7 +152,7 @@ export default async function ArticlePage({ params }: Props) {
           )}
 
           <ArticleBody blocks={article.bodyBlocks} />
-          <AdSlot slot={ad} className="ad-slot--article" />
+          <AdZone views={ad} className="ad-slot--article" />
         </article>
 
         {related.length > 0 && (

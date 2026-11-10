@@ -288,3 +288,50 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - đọc thêm file addendum (biến `TT_FR_ADDENDUM_FILE`, mặc định cạnh file FR84); T22 vẫn kiểm đúng 84 FR gốc và không trùng FR;
   - T30 thêm 9 trường hợp cho quy tắc duyệt chế độ khai thác, PATCH không đổi chế độ, feed https.
 - Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`); backend 192 PASS / 64 SKIP (test DB, chưa đặt `TT_TEST_PG`).
+
+## 16. Đợt 3 trang chủ — quảng cáo theo site, tách vị trí khỏi đặt chỗ, nhiều kích thước (UX-PUB-01, WBS-133, 2026-11-10)
+
+- **DRAFT, chờ TL/PO/BA duyệt** (Commercial + Legal cho quy tắc chọn banner; BA/PO cho quyền `ads.*`). Nguồn: điểm còn mở 8 của `doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md`.
+- **Vị trí thuộc một site (ADR-0001).** `AdPlacement` thêm `siteKey` (bất biến sau khi tạo); `code` chỉ unique trong site — `(siteKey, code)`. `GET /ads/placements` chỉ xét vị trí của site trong Host. `GET /admin/ad-placements` thêm tham số lọc `siteKey` (`SiteKeyFilter`, mã lạ → 400).
+- **Tách vị trí khỏi đặt chỗ/banner.**
+  - Vị trí (`AdPlacement`): code, label, status, `sizes[]` = kích thước cho phép theo breakpoint (`AdSize`). Bỏ `mediaAssetId`, `altText`, `targetUrl`, `advertiserName`, `width`, `height`, `startsAt`, `endsAt`, `creativeUrl` khỏi vị trí. Mở vị trí (APPROVED/ACTIVE) vẫn cần người duyệt.
+  - Đặt chỗ (`AdBooking`, mới): link https, nhà quảng cáo, `startsAt`/`endsAt`, `priority` 0–100, status (`AdStatus`), người duyệt, `creatives[]` — mỗi breakpoint tối đa một banner (`AdCreative`: breakpoint, width, height, mediaAssetId, altText; `creativeUrl` chỉ đọc). Kích thước banner phải thuộc `sizes` của vị trí ở breakpoint đó.
+  - Thêm 4 thao tác P0-ADS (`x-requirements: FR-ADS-002`): `GET`/`POST /admin/ad-placements/{placementId}/bookings`, `GET`/`PUT /admin/ad-bookings/{bookingId}` (ETag/If-Match, Idempotency-Key cho POST, CSRF, 401/403/404/409/412/422/428/429 theo ma trận). Quy tắc trạng thái đặt chỗ ghi trong mô tả `putAdminAdBooking`.
+- **`PublicAdSlot` nhiều kích thước — thay đổi phá vỡ so với v0.3 trước đó:** bỏ `creativeUrl`/`altText`/`targetUrl`/`width`/`height` ở cấp slot, thay bằng `creatives[]` (`PublicAdCreative`: breakpoint, creativeUrl, altText, targetUrl, width, height; 1–3 phần tử). `AdBreakpoint`: MOBILE < 768px, TABLET 768–1023px, DESKTOP ≥ 1024px. Chọn banner mỗi breakpoint: đặt chỗ ACTIVE trong khung giờ của vị trí ACTIVE, ưu tiên cao nhất → `startsAt` mới nhất → id; media READY + IMAGE + PUBLIC + quyền CLEARED. Không có banner → không trả slot. Không xoay vòng (P1, `ads.campaign_advanced`).
+- `AdPlacementUpdate`/`AdPlacementCreate` đổi theo; tạo/sửa vị trí không còn `UNSAFE_URL` (vị trí không có URL). Schema mới: `AdStatus`, `AdBreakpoint`, `AdSize`, `AdCreative`, `AdBooking`, `AdBookingCreate`, `AdBookingUpdate`, `AdBookingList`, `PublicAdCreative`. Tham số mới: `BookingId`, `SiteKeyFilter`.
+- **Không thêm cờ, không thêm mã lỗi.** Vẫn gate bằng `ads.display_slots` (production OFF; OFF → 200 rỗng).
+- Đếm sau thay đổi: 125 path / 146 thao tác / 155 schema / 66 tham số (trước: 123 / 142 / 146 / 64).
+- Inventory: thêm 4 dòng, sửa mã lỗi 3 dòng. FR84: FR-ADS-002 thêm 4 API, migration `0350`.
+- Test tĩnh: T29 kiểm kích thước qua `AdPlacement.sizes[]` + `PublicAdCreative`; T30 thêm 12 trường hợp (vị trí thiếu site/kích thước/breakpoint lạ, link `javascript:`, banner thiếu alt, ưu tiên > 100, slot không banner, slot kiểu cũ); T10 nhận thêm `PAUSED`/`EXPIRED`/`PUBLIC` là giá trị enum, không phải mã lỗi.
+- **Migration `0350_ad_site_bookings`** (xem `db/README.md`). **Backend:** `GET /api/v1/ads/placements` (module Ads). **Chưa làm:** API quản trị vị trí/đặt chỗ và màn hình CMS — chờ duyệt quyền `ads.manage`/`ads.approve` trong `config/rbac/rbac.json`.
+- Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`).
+
+## 17. Đợt 3 trang chủ — chuyên mục trên thẻ bài (UX-PUB-01, FR-DISC-003, 2026-11-10)
+
+- **DRAFT, chờ PO/UX duyệt.** `ArticleSummary` thêm `category` (không bắt buộc, có thể `null`): `CategoryRef` = `{id, slug, name}` (schema mới). Giá trị là chuyên mục của bài theo bản đã xuất bản (`tt.articles.category_id`, cùng cột mà danh sách theo chuyên mục lọc), chỉ khi chuyên mục đang bật và cùng site với bài; ngược lại `null`.
+- Không phá vỡ tương thích: trường mới tùy chọn, client cũ bỏ qua. Ảnh hưởng mọi nơi dùng `ArticleSummary` (`getHome`, danh sách bài, `Article` kế thừa).
+- **Backend đã trả `category` ở `GET /home`.** Chưa trả ở `getPublicArticle` (vẫn có `categorySlug`) và ở danh sách bài đang làm trên nhánh khác — chỉ cần thêm cột/JOIN `PublicArticleCategorySql` khi gộp.
+- Không đổi đường dẫn, mã lỗi, cờ hay migration (dùng cột `category_id`, `site_key`, `is_enabled` sẵn có).
+- Test tĩnh T30 thêm 3 trường hợp (`category` đủ trường, `null`, thiếu `name`). Kiểm lại: 34/34 PASS.
+
+## 18. Đợt 3 trang chủ — đề xuất khối "Đọc nhiều" (UX-PUB-01, 2026-11-10)
+
+- **Chỉ là đề xuất, chưa hiện thực, không có migration.** Repo chưa có dữ liệu lượt đọc; nguồn dữ liệu là quyết định hạ tầng analytics (TL/PO/Legal) — hai phương án ghi ở `doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md`, điểm còn mở 9.
+- **Thêm 1 thao tác** `GET /discovery/most-read` (`getMostReadArticles`, tag Discovery, công khai): `window` = `24h` | `7d` (mặc định `24h`), `limit` 1–10 (mặc định 5) → `MostReadArticleList` (`window`, `generatedAt`, `items[]` là `ArticleSummary` theo thứ hạng; không lộ số lượt). Chỉ bài đang hiển thị của site trong Host; đề xuất loại bài SPONSORED; chưa đủ dữ liệu → `items` rỗng.
+- **Registry cờ: thêm `discovery.most_read`** (P1 tạm, production OFF, người duyệt PO + Legal, không `legacyKeys`, không `publicConfigField`). OFF → 200 rỗng (`x-flag-off-behavior`). Registry thành 19 khóa; `FeatureFlagKeys` (C#) và test khớp spec cập nhật theo. Chưa thêm hàng vào `tt.feature_gates` (thêm bằng migration khi hiện thực, như `aggregation.radar`).
+- **Truy vết:** FR tạm `FR-DISC-008` (ngoài SRS, gói P1 tạm, BA cấp mã chính thức) trong `trace/07_FR_ADDENDUM_v0.3_DRAFT.csv`; chưa có WBS/effort (PM). Inventory thêm 1 dòng, `ReviewStatus = PROPOSED_NOT_IMPLEMENTED`.
+- Không thêm mã lỗi. Kiểm lại: 34/34 test tĩnh v0.3 PASS.
+
+## 19. Quản trị quảng cáo — quy tắc trạng thái vị trí, quyền theo bước (P0-ADS, FR-ADS-002, 2026-11-10)
+
+- **DRAFT, chờ TL/PO/BA duyệt.** Hiện thực các thao tác admin của mục 16 (`getAdminAdPlacements`, `createAdPlacement`, `getAdPlacement`, `putAdminAdPlacementsPlacementid`, `listAdminAdBookings`, `createAdBooking`, `getAdBooking`, `putAdminAdBooking`) + màn CMS. Hợp đồng chỉ **làm rõ mô tả**, không đổi đường dẫn, schema, mã lỗi hay cờ.
+- `putAdminAdPlacementsPlacementid`: trước đây chỉ ghi "APPROVED/ACTIVE cần quyền duyệt", không nói bước chuyển nào hợp lệ. Nay ghi rõ vị trí dùng **cùng vòng đời với đặt chỗ**: DRAFT → APPROVED, APPROVED → ACTIVE, ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT (xóa `approvedBy`/`approvedAt`), mọi trạng thái → EXPIRED (cuối); giữ nguyên trạng thái luôn được; còn lại → `STATE_CONFLICT`. `code` phải unique trong site (`VALIDATION_FAILED`).
+- Quyền theo bước (cả vị trí lẫn đặt chỗ): **vào APPROVED hoặc ACTIVE** (kể cả PAUSED → ACTIVE) cần quyền duyệt (`ads.approve`, MFA); PAUSED, DRAFT, EXPIRED chỉ cần `ads.manage` — dừng quảng cáo không phải chờ người duyệt. `putAdminAdBooking` ghi thêm: vào ACTIVE cũng cần quyền duyệt; về DRAFT xóa người duyệt.
+- **Ma trận quyền (DRAFT, chờ BA/PO — không coi là đã duyệt):** `config/rbac/rbac.json` thêm `ads.manage` (không MFA), `ads.approve` (MFA), vai trò `AD_OPS` = `content.read` + `media.upload` + `ads.manage`; `APPROVER` thêm `ads.manage` + `ads.approve`. Migration `0351` (CHECK `ck_user_roles_role` thêm `AD_OPS`, NOT VALID) + `0352` (VALIDATE). Chưa có SoD theo dữ liệu (người duyệt tự duyệt đặt chỗ mình tạo): muốn chặn thì phải thêm `SOD_VIOLATION` vào `x-error-codes` của hai thao tác PUT.
+- Không thêm mã lỗi, cờ, schema. Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`).
+
+## 20. `getPublicArticle` trả `category` (FR-NEWS-001, FR-DISC-003, 2026-11-10)
+
+- **Không đổi hợp đồng** — chỉ hiện thực phần còn thiếu của mục 17: `Article` kế thừa `ArticleSummary` nên đã có `category` (`CategoryRef`, có thể `null`). Backend nay trả `category` ở `GET /articles/{slug}`: chuyên mục theo `tt.articles.category_id`, chỉ khi đang bật và cùng site với bài (cùng quy tắc với `GET /home`); ngược lại `null`. **Giữ `categorySlug`** cho client cũ.
+- FE trang bài dùng `category` của API (null = không hiện chuyên mục); chỉ khi API cũ chưa có trường này mới tra theo `categorySlug`.
+- Danh sách `/articles`, `/categories/{slug}/articles` đang làm ở nhánh khác: gộp bằng cách nối `PublicArticleCategorySql` (alias `cat`) vào truy vấn thẻ bài.

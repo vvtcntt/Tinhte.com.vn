@@ -1,10 +1,10 @@
 import { cache } from 'react';
 import { parseSiteEnv, type SiteDefinition } from '@tinhte/sites';
 import { ApiError, apiGet, apiRequest } from './api';
-import type { Article, ArticleSummary, HomePage, PublicAdSlot, PublicAdSlotList } from './contracts';
+import { acceptAdSlots, AD_BREAKPOINTS, resolveAdZone, type AdView } from './ads';
+import type { Article, ArticleSummary, HomePage, PublicAdSlotList } from './contracts';
 import { demoHome } from './demo-home';
 import { isDisplayable } from './home';
-import { safeHttpUrl } from './routes';
 
 // Trang bài công khai (UX-PUB-03, FR-NEWS-001/002, FR-DISC-007). Thiết kế: doc/ux/UX-PUB-03_TRANG_BAI_v0.1_DRAFT.md
 
@@ -67,14 +67,13 @@ export async function loadRelated(site: SiteDefinition, excludeId: string, demo:
     .slice(0, RELATED_LIMIT);
 }
 
-export async function loadArticleAd(site: SiteDefinition): Promise<PublicAdSlot | undefined> {
+/** Slot cuối bài: một mã cho mọi màn hình, banner theo breakpoint (lib/ads.ts). Lỗi/cờ OFF/không banner → không khung. */
+export async function loadArticleAd(site: SiteDefinition): Promise<AdView[]> {
   try {
     const list = await apiGet<PublicAdSlotList>(site, `/ads/placements?placementCodes=${ARTICLE_AD_CODE}`);
-    return list.items.find(
-      (s) => s.code === ARTICLE_AD_CODE && safeHttpUrl(s.creativeUrl) && (!s.targetUrl || safeHttpUrl(s.targetUrl, { httpsOnly: true })) && s.width > 0 && s.height > 0,
-    );
+    return resolveAdZone(acceptAdSlots(list.items, [ARTICLE_AD_CODE]), [{ code: ARTICLE_AD_CODE, breakpoints: AD_BREAKPOINTS }]);
   } catch {
-    return undefined;
+    return [];
   }
 }
 

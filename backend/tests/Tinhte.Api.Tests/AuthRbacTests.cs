@@ -41,12 +41,18 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     // ---------------------------------------------------------------- ma trận quyền
 
     [Fact]
-    public void Role_catalog_matches_migration_0313_check_constraint()
+    public void Role_catalog_matches_the_latest_ck_user_roles_role_migration()
     {
-        var sql = File.ReadAllText(RepoPaths.File("doc", "07_AI_REVIEW", "v0.3", "db", "migrations", "0313_staff_access.up.sql"));
-        var check = RoleCheck().Match(sql);
-        Assert.True(check.Success);
-        var roles = Regex.Matches(check.Groups["list"].Value, "'([A-Z_]+)'").Select(m => m.Groups[1].Value).Order().ToList();
+        // 0313 tạo CHECK; migration sau (0351: AD_OPS) thay nó. Ba nơi phải khớp: rbac.json, StaffRoles, CHECK mới nhất.
+        var checks = Directory.GetFiles(RepoPaths.File("doc", "07_AI_REVIEW", "v0.3", "db", "migrations"), "*.up.sql")
+            .Order(StringComparer.Ordinal)
+            .Select(f => (File: Path.GetFileName(f), Match: RoleCheck().Match(File.ReadAllText(f))))
+            .Where(x => x.Match.Success)
+            .ToList();
+        Assert.Equal("0313_staff_access.up.sql", checks[0].File);
+        var latest = checks[^1];
+        Assert.Equal("0351_ad_ops_role.up.sql", latest.File);
+        var roles = Regex.Matches(latest.Match.Groups["list"].Value, "'([A-Z_]+)'").Select(m => m.Groups[1].Value).Order().ToList();
         Assert.Equal(StaffRoles.All.Order(), roles);
     }
 
@@ -88,6 +94,14 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
     [InlineData("MODERATOR", true, Permissions.ContentPublish, AccessDecision.MissingPermission)]
     [InlineData("ADMIN", true, Permissions.ContentPublish, AccessDecision.MissingPermission)]     // admin quản lý user, không tự xuất bản
     [InlineData("ADMIN", false, Permissions.UsersRead, AccessDecision.Allowed)]
+    // Quảng cáo (ĐỀ XUẤT, chờ BA/PO): AD_OPS chuẩn bị, không tự mở; APPROVER mở cần MFA.
+    [InlineData("AD_OPS", false, Permissions.AdsManage, AccessDecision.Allowed)]
+    [InlineData("AD_OPS", true, Permissions.AdsApprove, AccessDecision.MissingPermission)]
+    [InlineData("AD_OPS", false, Permissions.ContentRead, AccessDecision.Allowed)]                // mở thư viện media để chọn banner
+    [InlineData("AD_OPS", true, Permissions.ContentPublish, AccessDecision.MissingPermission)]
+    [InlineData("APPROVER", false, Permissions.AdsApprove, AccessDecision.MfaRequired)]
+    [InlineData("APPROVER", true, Permissions.AdsApprove, AccessDecision.Allowed)]
+    [InlineData("EDITOR", false, Permissions.AdsManage, AccessDecision.MissingPermission)]
     [InlineData("ADMIN", false, Permissions.UsersManage, AccessDecision.MfaRequired)]
     [InlineData("UNKNOWN_ROLE", true, Permissions.ContentRead, AccessDecision.MissingPermission)]
     public void Matrix_decisions(string role, bool mfa, string permission, AccessDecision expected) =>
@@ -300,6 +314,7 @@ public sealed partial class AuthRbacTests(WebApplicationFactory<Program> factory
         Assert.Contains("Auth:Staff", error.ToString(), StringComparison.Ordinal);
     }
 
-    [GeneratedRegex(@"ck_user_roles_role CHECK \(role IN \((?<list>[^)]*)\)\)")]
+    // "CONSTRAINT ck_user_roles_role CHECK (role IN ('A', …))" (0313) hoặc tt_migration.add_constraint(…, 'ck_user_roles_role', 'CHECK (role IN (''A'', …))').
+    [GeneratedRegex(@"ck_user_roles_role(?:',\s*')?\s*CHECK \(role IN \((?<list>[^)]*)\)\)")]
     private static partial Regex RoleCheck();
 }

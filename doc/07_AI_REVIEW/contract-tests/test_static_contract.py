@@ -236,7 +236,7 @@ class StatusCodeMatrix(unittest.TestCase):
             found = set(re.findall(r"\b[A-Z][A-Z_]{5,}\b", op.get("description", "") + op.get("summary", "")))
             found |= set(op.get("x-error-codes", []))
             found -= {"SPONSORED", "EDITORIAL", "APPROVED", "PUBLISHED", "RECEIVED", "TRIAGED", "ACTIONED", "REJECTED", "CLOSED",
-                       "CLEARED", "ACTIVE", "PENDING"}
+                       "CLEARED", "ACTIVE", "PENDING", "PAUSED", "EXPIRED", "PUBLIC"}  # 3 cuối: AdStatus, visibility media
             if found - guide_codes:
                 problems.append((m, p, sorted(found - guide_codes)))
             for code in op.get("x-error-codes", []):
@@ -291,10 +291,17 @@ class FeatureGatesAndAds(unittest.TestCase):
         self.assertEqual(bad, [], "DTO công khai:" + fmt(bad))
 
     def test_T29_ad_placement_has_dimensions(self):
-        """AIR-013: slot quảng cáo cần kích thước dự phòng để chống CLS."""
+        """AIR-013: slot quảng cáo cần kích thước dự phòng để chống CLS.
+        v0.3 đợt 3: kích thước nằm trong AdPlacement.sizes[] (theo breakpoint) và mỗi creative công khai có width/height."""
         props = COMP["schemas"]["AdPlacement"]["properties"]
-        self.assertTrue({"width", "height"} <= set(props) or "aspectRatio" in props,
-                        "AdPlacement không có width/height/aspectRatio")
+        if "sizes" in props:
+            size = resolve(props["sizes"]["items"])["properties"]
+            creative = resolve(COMP["schemas"]["PublicAdSlot"]["properties"]["creatives"]["items"])
+            self.assertTrue({"breakpoint", "width", "height"} <= set(size), "AdSize thiếu breakpoint/width/height")
+            self.assertTrue({"width", "height"} <= set(creative.get("required", [])), "PublicAdCreative không bắt buộc width/height")
+        else:
+            self.assertTrue({"width", "height"} <= set(props) or "aspectRatio" in props,
+                            "AdPlacement không có width/height/aspectRatio")
 
 
 class DomainContract(unittest.TestCase):
@@ -382,6 +389,32 @@ class SchemaBehaviour(unittest.TestCase):
             ("ModerationActionRequest", {"action": "LOCK", "reason": "spam lặp"}, True),
             ("Problem", {"type": "about:blank", "title": "x", "status": 403, "code": "COMMENT_DISABLED", "traceId": "t"}, False),
         ]
+        if "CategoryRef" in COMP["schemas"]:  # đợt 3: chuyên mục trên thẻ bài, có thể null
+            cat = {"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "slug": "dien-thoai", "name": "Điện thoại"}
+            cases += [
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": cat}, True),
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": None}, True),
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": {"slug": "dien-thoai"}}, False),
+            ]
+        if "AdBookingCreate" in COMP["schemas"]:  # đợt 3: vị trí theo site, banner nằm ở đặt chỗ, nhiều kích thước
+            size = {"breakpoint": "DESKTOP", "width": 970, "height": 90}
+            place = {"siteKey": "www", "code": "home_top", "label": "Quảng cáo", "sizes": [size]}
+            cre = {**size, "mediaAssetId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "altText": "Banner ACME"}
+            pub = {"breakpoint": "MOBILE", "width": 320, "height": 100, "creativeUrl": "https://media.example.test/a.png", "altText": "ACME"}
+            cases = [c for c in cases if c[0] != "AdPlacementCreate"] + [
+                ("AdPlacementCreate", place, True),
+                ("AdPlacementCreate", {k: v for k, v in place.items() if k != "siteKey"}, False),
+                ("AdPlacementCreate", {**place, "sizes": []}, False),
+                ("AdPlacementCreate", {**place, "sizes": [{**size, "breakpoint": "WATCH"}]}, False),
+                ("AdBookingCreate", {"creatives": [cre], "targetUrl": "javascript:alert(1)"}, False),
+                ("AdBookingCreate", {"creatives": [cre], "targetUrl": "https://acme.vn"}, True),
+                ("AdBookingCreate", {"creatives": [], "targetUrl": "https://acme.vn"}, False),
+                ("AdBookingCreate", {"creatives": [{**cre, "altText": ""}]}, False),
+                ("AdBookingCreate", {"creatives": [cre], "priority": 101}, False),
+                ("PublicAdSlot", {"code": "home_top", "label": "Quảng cáo", "rel": "sponsored noopener", "creatives": [pub]}, True),
+                ("PublicAdSlot", {"code": "home_top", "label": "Quảng cáo", "rel": "sponsored noopener", "creatives": []}, False),
+                ("PublicAdSlot", {**slot, "creativeUrl": "https://x.test/a.png", "altText": "x", "rel": "sponsored noopener"}, False),
+            ]
         if "AggregationSourceApprovalRequest" in COMP["schemas"]:  # ADR-0008: chế độ khai thác chỉ đổi qua duyệt
             lic = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
             cases += [

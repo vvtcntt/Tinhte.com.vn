@@ -1,5 +1,5 @@
-import type { ArticleSummary, HomePage, PublicAdSlot, VideoSummary } from './contracts.ts';
-import { safeHttpUrl } from './routes.ts';
+import { acceptAdSlots as acceptSlots, AD_BREAKPOINTS, coveredBreakpoints, resolveAdZone, type AdSlots, type AdView } from './ads.ts';
+import type { AdBreakpoint, ArticleSummary, HomePage, PublicAdSlot, VideoSummary } from './contracts.ts';
 
 // Phần thuần của trang chủ (UX-PUB-01): lọc nội dung và quyết định vùng quảng cáo nào được hiện.
 // Không gọi mạng, không phụ thuộc Next → kiểm bằng node:test (apps/web/test/home-model.test.ts).
@@ -11,9 +11,9 @@ export const HOME_LIMITS = { featured: 5, videos: 8, recent: 12 } as const;
  * (UX-PUB-01 mục "Điểm còn mở" số 3). Đổi mã ở đây, không rải chuỗi ra component.
  * Phạm vi: WBS-133 (P0) chỉ cam kết 1–2 slot tĩnh; FE dựng sẵn 6 vùng, vùng nào hiện là do placement nào được tạo.
  *
- * Hợp đồng hiện tại cho mỗi mã đúng một width/height → desktop và mobile là hai mã (hậu tố `_mobile`):
- * mã `_mobile` hiện ở < 768px, mã không hậu tố hiện từ 768px (tablet dùng banner desktop thu nhỏ theo khung).
- * Ngoại lệ: ② dùng một mã cho mọi màn hình (cùng 300×250); ⑤ chỉ có ở ≥ 1024px.
+ * Đợt 2 tách mã desktop/mobile (hậu tố `_mobile`) vì hợp đồng cũ chỉ cho một kích thước mỗi mã. Hợp đồng đợt 3 (DRAFT) cho mỗi mã
+ * nhiều banner theo breakpoint, nhưng vẫn GIỮ 10 mã này tới khi WBS-131 chốt (gộp cặp mã là việc của WBS-131, không cần đổi FE:
+ * HOME_AD_BREAKPOINTS quyết định mã nào hiện ở breakpoint nào).
  */
 export const HOME_AD_CODES = {
   top: 'home_top', //                  ① dưới header, trên Tin nổi bật
@@ -31,8 +31,8 @@ export type HomeAdCode = (typeof HOME_AD_CODES)[keyof typeof HOME_AD_CODES];
 export const HOME_AD_CODE_LIST: readonly HomeAdCode[] = Object.values(HOME_AD_CODES);
 
 /**
- * Kích thước đề xuất khi tạo placement trong CMS. FE không ép kích thước: AdSlot giữ chỗ theo width/height API trả,
- * nên ① đổi sang 970×250 cho chiến dịch lớn chỉ cần sửa placement, không cần deploy.
+ * Kích thước đề xuất khi tạo placement trong CMS (một cỡ cho mọi breakpoint của mã). FE không ép kích thước: AdSlot giữ chỗ theo
+ * width/height từng banner API trả, nên ① chạy song song 970×90 và 970×250 chỉ cần thêm kích thước cho placement, không cần deploy.
  */
 export const HOME_AD_SIZES: Readonly<Record<HomeAdCode, { width: number; height: number }>> = {
   home_top: { width: 970, height: 90 },
@@ -47,6 +47,23 @@ export const HOME_AD_SIZES: Readonly<Record<HomeAdCode, { width: number; height:
   home_bottom_mobile: { width: 320, height: 100 },
 };
 
+/**
+ * Breakpoint mỗi mã được hiện ở trang chủ: mã `_mobile` < 768px; mã không hậu tố từ 768px (TABLET + DESKTOP; thiếu banner TABLET thì
+ * dùng banner DESKTOP thu nhỏ — lib/ads.ts BORROW); ② mọi màn hình; ⑤ chỉ ≥ 1024px. API trả banner ở breakpoint khác thì bỏ qua.
+ */
+export const HOME_AD_BREAKPOINTS: Readonly<Record<HomeAdCode, readonly AdBreakpoint[]>> = {
+  home_top: ['TABLET', 'DESKTOP'],
+  home_top_mobile: ['MOBILE'],
+  home_hero_side: AD_BREAKPOINTS,
+  home_mid: ['TABLET', 'DESKTOP'],
+  home_mid_mobile: ['MOBILE'],
+  home_feed: ['TABLET', 'DESKTOP'],
+  home_feed_mobile: ['MOBILE'],
+  home_sidebar: ['DESKTOP'],
+  home_bottom: ['TABLET', 'DESKTOP'],
+  home_bottom_mobile: ['MOBILE'],
+};
+
 /** OpenAPI v0.3 `PlacementCodes`: tối đa 10 mã mỗi lần gọi `GET /ads/placements`. Trang chủ đang dùng đủ 10. */
 export const PLACEMENT_CODES_MAX = 10;
 /** Slot ④ chèn sau bài thứ N của Tin mới (đề xuất, PO duyệt). Số chẵn để khớp lưới 2 cột desktop. */
@@ -57,26 +74,29 @@ export const HOME_FEED_AD_AFTER = 6;
  */
 export const HOME_MID_AD_MIN_RECENT = 10;
 
-export type HomeAds = Partial<Record<HomeAdCode, PublicAdSlot>>;
+export type HomeAds = AdSlots<HomeAdCode>;
 
-/** Giữ slot thuộc danh sách mã đã xin, creative là URL http(s), target chỉ https, kích thước dương. Trùng mã: lấy slot đầu. */
+/** Lọc slot của trang chủ (lib/ads.ts acceptAdSlots): mã lạ, banner không an toàn/hỏng kích thước/breakpoint lạ bị bỏ. */
 export function acceptAdSlots(items: readonly PublicAdSlot[] | null | undefined, codes: readonly HomeAdCode[] = HOME_AD_CODE_LIST): HomeAds {
-  const allowed = new Set<string>(codes);
-  const out: HomeAds = {};
-  for (const slot of items ?? []) {
-    if (!slot || !allowed.has(slot.code)) continue;
-    const code = slot.code as HomeAdCode;
-    if (out[code]) continue;
-    if (!safeHttpUrl(slot.creativeUrl) || (slot.targetUrl && !safeHttpUrl(slot.targetUrl, { httpsOnly: true }))) continue;
-    if (!(Number.isFinite(slot.width) && slot.width > 0 && Number.isFinite(slot.height) && slot.height > 0)) continue;
-    out[code] = slot;
-  }
-  return out;
+  return acceptSlots(items, codes);
+}
+
+const zone = (ads: HomeAds, ...codes: HomeAdCode[]): AdView[] =>
+  resolveAdZone(ads, codes.map((code) => ({ code, breakpoints: HOME_AD_BREAKPOINTS[code] })));
+
+/**
+ * ② đổi bố cục cột phải ở mọi màn hình (3 tin phụ thay vì 4) → chỉ tính là có khi banner phủ đủ MOBILE, TABLET và DESKTOP
+ * (TABLET/DESKTOP mượn nhau). Thiếu một màn hình thì bỏ ② để màn hình đó không có cột trống.
+ */
+function heroSideZone(ads: HomeAds): AdView[] {
+  const views = zone(ads, HOME_AD_CODES.heroSide);
+  const covered = coveredBreakpoints(views);
+  return AD_BREAKPOINTS.every((bp) => covered.has(bp)) ? views : [];
 }
 
 /** Có banner ② thì cột phải còn chỗ cho 3 tin phụ (thay vì 4) để hai cột vẫn cân. */
 export function homeFeaturedLimit(ads: HomeAds): number {
-  return ads[HOME_AD_CODES.heroSide] ? HOME_LIMITS.featured - 1 : HOME_LIMITS.featured;
+  return heroSideZone(ads).length > 0 ? HOME_LIMITS.featured - 1 : HOME_LIMITS.featured;
 }
 
 type WithKind = { contentKind?: unknown; sponsorLabel?: string | null };
@@ -128,49 +148,41 @@ export function prepareHome(raw: Partial<HomePage>, { featured = HOME_LIMITS.fea
   return { featuredArticles, recentArticles, featuredVideos };
 }
 
-/** Cặp slot của một vùng: `desktop` hiện từ 768px, `mobile` dưới 768px. */
-export interface AdPair {
-  desktop?: PublicAdSlot;
-  mobile?: PublicAdSlot;
-}
-
+/** Khung quảng cáo của từng vùng; mảng rỗng = vùng không render gì. */
 export interface HomeAdPlan {
-  top: AdPair;
-  heroSide?: PublicAdSlot;
-  mid: AdPair;
-  feed: AdPair;
-  sidebar?: PublicAdSlot;
-  bottom: AdPair;
+  top: AdView[];
+  heroSide: AdView[];
+  mid: AdView[];
+  feed: AdView[];
+  sidebar: AdView[];
+  bottom: AdView[];
 }
 
 /**
  * Vùng nào được hiện, dựa trên nội dung thật của trang (không có banner → không có khung, FR-ADS-002):
  * - trang rỗng → không quảng cáo nào;
- * - ② cần ít nhất một tin phụ (cột phải không chỉ có quảng cáo);
+ * - ② cần ít nhất một tin phụ (cột phải không chỉ có quảng cáo) và banner cho mọi màn hình (heroSideZone);
  * - ③ cần khối phía trên (Tin nổi bật hoặc Video) và Tin mới đủ dài phía dưới (HOME_MID_AD_MIN_RECENT — giữ mật độ
  *   mobile ≤ ~30%); không có Video mà có ② thì bỏ ③ vì hai banner sẽ đứng sát nhau;
  * - ④ chỉ khi Tin mới dài hơn HOME_FEED_AD_AFTER (banner nằm giữa các tin, không ở cuối danh sách);
  * - ⑤ đi cùng vùng Tin mới.
  */
 export function homeAdPlan(home: HomePage, ads: HomeAds): HomeAdPlan {
-  const none: AdPair = {};
-  const pair = (desktop: HomeAdCode, mobile: HomeAdCode): AdPair => ({
-    ...(ads[desktop] && { desktop: ads[desktop] }),
-    ...(ads[mobile] && { mobile: ads[mobile] }),
-  });
   const hasRecent = home.recentArticles.length > 0;
   const hasVideos = home.featuredVideos.length > 0;
-  if (home.featuredArticles.length === 0 && !hasRecent && !hasVideos) return { top: none, mid: none, feed: none, bottom: none };
+  if (home.featuredArticles.length === 0 && !hasRecent && !hasVideos) {
+    return { top: [], heroSide: [], mid: [], feed: [], sidebar: [], bottom: [] };
+  }
 
-  const heroSide = home.featuredArticles.length > 1 ? ads[HOME_AD_CODES.heroSide] : undefined;
+  const heroSide = home.featuredArticles.length > 1 ? heroSideZone(ads) : [];
   const midAllowed =
-    (home.featuredArticles.length > 0 || hasVideos) && home.recentArticles.length >= HOME_MID_AD_MIN_RECENT && (hasVideos || !heroSide);
+    (home.featuredArticles.length > 0 || hasVideos) && home.recentArticles.length >= HOME_MID_AD_MIN_RECENT && (hasVideos || heroSide.length === 0);
   return {
-    top: pair(HOME_AD_CODES.top, HOME_AD_CODES.topMobile),
+    top: zone(ads, HOME_AD_CODES.top, HOME_AD_CODES.topMobile),
     heroSide,
-    mid: midAllowed ? pair(HOME_AD_CODES.mid, HOME_AD_CODES.midMobile) : none,
-    feed: home.recentArticles.length > HOME_FEED_AD_AFTER ? pair(HOME_AD_CODES.feed, HOME_AD_CODES.feedMobile) : none,
-    sidebar: hasRecent ? ads[HOME_AD_CODES.sidebar] : undefined,
-    bottom: pair(HOME_AD_CODES.bottom, HOME_AD_CODES.bottomMobile),
+    mid: midAllowed ? zone(ads, HOME_AD_CODES.mid, HOME_AD_CODES.midMobile) : [],
+    feed: home.recentArticles.length > HOME_FEED_AD_AFTER ? zone(ads, HOME_AD_CODES.feed, HOME_AD_CODES.feedMobile) : [],
+    sidebar: hasRecent ? zone(ads, HOME_AD_CODES.sidebar) : [],
+    bottom: zone(ads, HOME_AD_CODES.bottom, HOME_AD_CODES.bottomMobile),
   };
 }

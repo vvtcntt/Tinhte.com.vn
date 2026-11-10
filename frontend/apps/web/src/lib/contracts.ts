@@ -3,6 +3,13 @@
 
 export type ContentKind = 'EDITORIAL' | 'SPONSORED';
 
+/** CategoryRef (DRAFT đợt 3): chuyên mục tối thiểu trên thẻ bài. */
+export interface CategoryRef {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface ArticleSummary {
   id: string;
   slug: string;
@@ -12,6 +19,8 @@ export interface ArticleSummary {
   thumbnailUrl?: string | null;
   contentKind: ContentKind;
   sponsorLabel?: string | null;
+  /** DRAFT đợt 3: chuyên mục theo bản đã xuất bản; null/thiếu → thẻ không có nhãn chuyên mục. */
+  category?: CategoryRef | null;
 }
 
 export interface VideoSummary {
@@ -56,15 +65,24 @@ export interface CategoryList {
   items: Category[];
 }
 
-/** PublicAdSlot (AIR-013): không có trạng thái/lịch nội bộ. */
-export interface PublicAdSlot {
-  code: string;
-  label: string;
+/** AdBreakpoint: MOBILE < 768px, TABLET 768–1023px, DESKTOP ≥ 1024px. */
+export type AdBreakpoint = 'MOBILE' | 'TABLET' | 'DESKTOP';
+
+/** PublicAdCreative: một banner cho một breakpoint; width/height là kích thước thật để giữ chỗ (không CLS). */
+export interface PublicAdCreative {
+  breakpoint: AdBreakpoint;
   creativeUrl: string;
   altText: string;
   targetUrl?: string | null;
   width: number;
   height: number;
+}
+
+/** PublicAdSlot (AIR-013; DRAFT đợt 3): không có trạng thái/lịch/đặt chỗ nội bộ, tối đa một banner mỗi breakpoint. */
+export interface PublicAdSlot {
+  code: string;
+  label: string;
+  creatives: PublicAdCreative[];
   rel: 'sponsored noopener';
 }
 
