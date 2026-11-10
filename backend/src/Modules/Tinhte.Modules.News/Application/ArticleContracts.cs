@@ -110,7 +110,14 @@ public sealed record PublicArticle(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AuthorDisplayName,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CategorySlug,
     JsonElement BodyBlocks,
-    IReadOnlyList<Guid> RelatedVideoIds);
+    IReadOnlyList<Guid> RelatedVideoIds)
+{
+    /// <summary>
+    /// Article kế thừa ArticleSummary.category (DRAFT v0.3 mục 17): chuyên mục theo <c>tt.articles.category_id</c>, chỉ khi đang bật và cùng
+    /// site với bài (<see cref="Infrastructure.PublicArticleCategorySql"/>); null = không hiện. <c>categorySlug</c> giữ để client cũ không vỡ.
+    /// </summary>
+    public PublicCategoryRef? Category { get; init; }
+}
 
 /// <summary>Bộ lọc của getAdminArticles (sau khi đã kiểm tham số query).</summary>
 public sealed record AdminArticleFilter(

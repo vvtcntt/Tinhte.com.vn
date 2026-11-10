@@ -329,3 +329,9 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - Quyền theo bước (cả vị trí lẫn đặt chỗ): **vào APPROVED hoặc ACTIVE** (kể cả PAUSED → ACTIVE) cần quyền duyệt (`ads.approve`, MFA); PAUSED, DRAFT, EXPIRED chỉ cần `ads.manage` — dừng quảng cáo không phải chờ người duyệt. `putAdminAdBooking` ghi thêm: vào ACTIVE cũng cần quyền duyệt; về DRAFT xóa người duyệt.
 - **Ma trận quyền (DRAFT, chờ BA/PO — không coi là đã duyệt):** `config/rbac/rbac.json` thêm `ads.manage` (không MFA), `ads.approve` (MFA), vai trò `AD_OPS` = `content.read` + `media.upload` + `ads.manage`; `APPROVER` thêm `ads.manage` + `ads.approve`. Migration `0351` (CHECK `ck_user_roles_role` thêm `AD_OPS`, NOT VALID) + `0352` (VALIDATE). Chưa có SoD theo dữ liệu (người duyệt tự duyệt đặt chỗ mình tạo): muốn chặn thì phải thêm `SOD_VIOLATION` vào `x-error-codes` của hai thao tác PUT.
 - Không thêm mã lỗi, cờ, schema. Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`).
+
+## 20. `getPublicArticle` trả `category` (FR-NEWS-001, FR-DISC-003, 2026-11-10)
+
+- **Không đổi hợp đồng** — chỉ hiện thực phần còn thiếu của mục 17: `Article` kế thừa `ArticleSummary` nên đã có `category` (`CategoryRef`, có thể `null`). Backend nay trả `category` ở `GET /articles/{slug}`: chuyên mục theo `tt.articles.category_id`, chỉ khi đang bật và cùng site với bài (cùng quy tắc với `GET /home`); ngược lại `null`. **Giữ `categorySlug`** cho client cũ.
+- FE trang bài dùng `category` của API (null = không hiện chuyên mục); chỉ khi API cũ chưa có trường này mới tra theo `categorySlug`.
+- Danh sách `/articles`, `/categories/{slug}/articles` đang làm ở nhánh khác: gộp bằng cách nối `PublicArticleCategorySql` (alias `cat`) vào truy vấn thẻ bài.
