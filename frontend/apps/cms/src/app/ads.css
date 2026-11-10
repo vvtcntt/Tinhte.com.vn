@@ -1,0 +1,37 @@
+/* Màn Quảng cáo (P0-ADS, WBS-136). Chỉ dùng token màu của globals.css; dùng chung lớp của videos.css (grid.wide, picker, badge.bad, hide-sm). */
+
+.legend { font-size: 13px; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions .lock { margin-left: 4px; }
+.title-row h1 code { font-size: inherit; }
+/* Ô bị khóa (đặt chỗ đã duyệt/đang chạy, vị trí đã kết thúc): theme tối khó phân biệt nếu không làm mờ. */
+.ads .field input:disabled, .ads .field select:disabled, .ads .check input:disabled { opacity: 0.55; cursor: not-allowed; }
+.flush-table { overflow-x: auto; margin: 0 -20px; }
+.flush-table .table th:first-child, .flush-table .table td:first-child { padding-left: 20px; }
+
+/* Kích thước theo breakpoint */
+.size-row { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.size-row:last-of-type { border-bottom: 0; }
+.size-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.chips { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); font-size: 13px; white-space: nowrap;
+}
+.chip.warn { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+.chip-x { border: 0; background: none; color: var(--muted); font: inherit; font-size: 16px; line-height: 1; padding: 0 2px; cursor: pointer; }
+.chip-x:hover { color: var(--error-text); }
+.chip-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+.chip-note { color: var(--muted); font-size: 11px; }
+.size-add { display: flex; gap: 8px; align-items: center; max-width: 360px; }
+.size-add input {
+  flex: 1 1 auto; min-width: 0; font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; min-height: 30px;
+}
+.size-add input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Banner theo breakpoint */
+.creative { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid var(--border); }
+.creative-head { align-items: center; }
+.creative-media { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; min-width: 0; }
+.creative-preview { max-width: 100%; height: auto; max-height: 160px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }

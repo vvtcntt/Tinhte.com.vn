@@ -125,6 +125,7 @@ INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('d
 
 - Công khai: `GET /ads/placements?placementCodes=` trên site public-web — chỉ vị trí của site trong Host, mỗi breakpoint một banner, cờ `ads.display_slots` OFF → rỗng (production mặc định OFF).
 - Quản trị (site `cms`): `GET/POST /admin/ad-placements` (lọc `siteKey`), `GET/PUT /admin/ad-placements/{id}` (If-Match), `GET/POST /admin/ad-placements/{id}/bookings`, `GET/PUT /admin/ad-bookings/{id}` (If-Match). POST cần `Idempotency-Key`. Vòng đời chung: DRAFT → APPROVED → ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT, mọi trạng thái → EXPIRED. Banner/link/lịch chỉ sửa khi DRAFT; ưu tiên sửa mọi lúc. Migration 0350.
+- CMS `/ads` (WBS-136): danh sách vị trí theo site, tạo/sửa vị trí + kích thước theo màn hình (kích thước đang có banner không gỡ được); `/ads/{id}` có hàng đặt chỗ; `/ads/{id}/bookings/{bookingId|new}` sửa banner theo màn hình (chọn/tải ảnh từ thư viện media), link, lịch, ưu tiên, nút Duyệt / Bắt đầu chạy / Tạm dừng / Về nháp / Kết thúc theo quyền (nút cần MFA hiện khóa khi phiên chưa MFA), xử lý 412.
 - **Quyền ĐỀ XUẤT, chưa duyệt (BA/PO):** `ads.manage` (tạo/sửa, tạm dừng, về nháp, kết thúc) và `ads.approve` (vào APPROVED/ACTIVE, cần MFA); vai trò mới `AD_OPS` = `content.read` + `media.upload` + `ads.manage`; `APPROVER` thêm `ads.manage` + `ads.approve`. Migration 0351/0352 (CHECK vai trò). Dev: `grant-role --role AD_OPS`.
 
 ## Đa subdomain (tóm tắt ADR-0001)

@@ -16,6 +16,7 @@ export const SECTIONS: Section[] = [
   { href: '/review', label: 'Duyệt bài', permission: 'content.read', wbs: 'WBS-031', summary: 'Hàng đợi duyệt, trả bài và xuất bản theo vai trò.' },
   { href: '/videos', label: 'Video', permission: 'content.read', wbs: 'WBS-046', summary: 'Tải lên, theo dõi xử lý, thư viện media.' },
   { href: '/taxonomy', label: 'Chuyên mục & tag', permission: 'taxonomy.manage', wbs: 'WBS-032', summary: 'Chuyên mục, tag, nguồn và thông tin bản quyền.' },
+  { href: '/ads', label: 'Quảng cáo', permission: 'ads.manage', wbs: 'WBS-136', summary: 'Vị trí quảng cáo theo site, đặt chỗ, banner theo màn hình, duyệt/chạy/tạm dừng (P0-ADS, DRAFT).' },
   { href: '/moderation', label: 'Kiểm duyệt', permission: 'moderation.act', wbs: 'WBS-065', summary: 'Hàng đợi báo cáo và quyết định kiểm duyệt.' },
   { href: '/users', label: 'Tài khoản', permission: 'users.read', wbs: 'WBS-115', summary: 'Tài khoản staff, đình chỉ, cấp/thu hồi vai trò.' },
   { href: '/audit', label: 'Nhật ký thao tác', permission: 'audit.read', wbs: 'WBS-019, WBS-138', summary: 'Nhật ký các thao tác đặc quyền.' },
