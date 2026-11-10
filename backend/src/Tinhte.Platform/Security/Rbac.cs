@@ -21,7 +21,7 @@ public static class TinhteClaims
 
 /// <summary>
 /// Vai trò staff — ĐỀ XUẤT theo FR-ID-002 ("author/editor/approver/moderator/admin"). Danh sách phải khớp CHECK
-/// <c>ck_user_roles_role</c> của migration 0313 (test giữ khớp). BA + TL + PO duyệt trước sign-off.
+/// <c>ck_user_roles_role</c> của migration mới nhất định nghĩa nó (0313; 0351 thêm AD_OPS) — test giữ khớp. BA + TL + PO duyệt trước sign-off.
 /// </summary>
 public static class StaffRoles
 {
@@ -31,7 +31,10 @@ public static class StaffRoles
     public const string Moderator = "MODERATOR";
     public const string Admin = "ADMIN";
 
-    public static readonly IReadOnlyList<string> All = [Author, Editor, Approver, Moderator, Admin];
+    /// <summary>Vận hành quảng cáo (P0-ADS) — ĐỀ XUẤT 10/11/2026, chờ BA/PO duyệt (config/rbac/rbac.json, migration 0351).</summary>
+    public const string AdOps = "AD_OPS";
+
+    public static readonly IReadOnlyList<string> All = [Author, Editor, Approver, Moderator, Admin, AdOps];
 }
 
 /// <summary>Quyền theo hành động của API admin. Controller/service kiểm quyền, không kiểm tên vai trò.</summary>
@@ -50,6 +53,12 @@ public static class Permissions
     public const string UsersRead = "users.read";
     public const string UsersManage = "users.manage";
     public const string AuditRead = "audit.read";
+
+    /// <summary>Tạo/sửa vị trí và đặt chỗ quảng cáo, tạm dừng/đưa về nháp/kết thúc (P0-ADS) — ĐỀ XUẤT, chờ BA/PO duyệt.</summary>
+    public const string AdsManage = "ads.manage";
+
+    /// <summary>Duyệt và mở (APPROVED/ACTIVE) vị trí, đặt chỗ quảng cáo; cần MFA — ĐỀ XUẤT, chờ BA/PO duyệt.</summary>
+    public const string AdsApprove = "ads.approve";
 }
 
 /// <summary>

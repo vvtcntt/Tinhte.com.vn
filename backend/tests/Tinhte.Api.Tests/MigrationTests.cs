@@ -16,7 +16,7 @@ public sealed class MigrationTests : IDisposable
     public void Discovers_v03_migrations_in_numeric_order_without_optional_ones()
     {
         var scripts = MigrationRunner.Discover(MigrationsDir);
-        Assert.Equal(["0299", "0300", "0301", "0302", "0303", "0304", "0305", "0306", "0307", "0308", "0309", "0310", "0312", "0313", "0314", "0320", "0321", "0322", "0324", "0325", "0330", "0331", "0332", "0333", "0334", "0335", "0350"], scripts.Select(s => s.Version));
+        Assert.Equal(["0299", "0300", "0301", "0302", "0303", "0304", "0305", "0306", "0307", "0308", "0309", "0310", "0312", "0313", "0314", "0320", "0321", "0322", "0324", "0325", "0330", "0331", "0332", "0333", "0334", "0335", "0350", "0351", "0352"], scripts.Select(s => s.Version));
         Assert.DoesNotContain(scripts, s => s.Name.Contains("privacy", StringComparison.Ordinal)); // 0311 chỉ chạy khi Legal quyết định
         Assert.All(scripts, s => Assert.DoesNotMatch(@"(?im)^\s*(BEGIN|COMMIT)\s*;", s.Sql)); // runner bọc transaction
     }

@@ -121,6 +121,12 @@ INSERT INTO tt.categories (slug, name) VALUES ('cong-nghe', 'Công nghệ'), ('d
 - **Duyệt/xuất bản/gỡ (WBS-040, ADR-0006 §6, migration 0334/0335):** `POST /admin/videos/{id}/submit|approve|request-changes|reject|publish|unpublish` theo quy ước duyệt bài WBS-024 (SoD, MFA, lý do). Media là nội dung revision: đổi media của video đã public = revision mới. Publish chỉ khi media READY và quyền media + video CLEARED còn hạn (422 `MEDIA_NOT_READY`/`RIGHTS_INVALID`) — quyền CLEARED do WBS-023 đặt (dev: SQL). CMS: khối "Duyệt & xuất bản" trên `/videos/{id}`.
 - Chưa có: lên lịch video (WBS-025), lan truyền gỡ grant/CDN/feed (WBS-039/128), transcode/quét mã độc/CDN (WBS-036…039), xem trước/phát trong CMS.
 
+### Quảng cáo (P0-ADS, FR-ADS-001/002 — DRAFT chờ TL/PO/BA)
+
+- Công khai: `GET /ads/placements?placementCodes=` trên site public-web — chỉ vị trí của site trong Host, mỗi breakpoint một banner, cờ `ads.display_slots` OFF → rỗng (production mặc định OFF).
+- Quản trị (site `cms`): `GET/POST /admin/ad-placements` (lọc `siteKey`), `GET/PUT /admin/ad-placements/{id}` (If-Match), `GET/POST /admin/ad-placements/{id}/bookings`, `GET/PUT /admin/ad-bookings/{id}` (If-Match). POST cần `Idempotency-Key`. Vòng đời chung: DRAFT → APPROVED → ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT, mọi trạng thái → EXPIRED. Banner/link/lịch chỉ sửa khi DRAFT; ưu tiên sửa mọi lúc. Migration 0350.
+- **Quyền ĐỀ XUẤT, chưa duyệt (BA/PO):** `ads.manage` (tạo/sửa, tạm dừng, về nháp, kết thúc) và `ads.approve` (vào APPROVED/ACTIVE, cần MFA); vai trò mới `AD_OPS` = `content.read` + `media.upload` + `ads.manage`; `APPROVER` thêm `ads.manage` + `ads.approve`. Migration 0351/0352 (CHECK vai trò). Dev: `grant-role --role AD_OPS`.
+
 ## Đa subdomain (tóm tắt ADR-0001)
 
 - Mỗi subdomain là một mục trong `config/sites/sites.json`. Routing (Next `proxy.ts`, middleware ASP.NET), CSP, robots/sitemap, tên cookie, bề mặt API, bảng `tt.sites`, DNS/TLS/edge đều **suy ra** từ đó.

@@ -1,7 +1,8 @@
 {
-  "$comment": "Ma trận vai trò → quyền của staff (ADR-0004). Nguồn sự thật duy nhất cho backend (Tinhte.Platform.Security.PermissionMatrix, nhúng lúc build) và CMS (ẩn/hiện giao diện). Danh sách vai trò phải khớp CHECK ck_user_roles_role (migration 0313).",
+  "$comment": "Ma trận vai trò → quyền của staff (ADR-0004). Nguồn sự thật duy nhất cho backend (Tinhte.Platform.Security.PermissionMatrix, nhúng lúc build) và CMS (ẩn/hiện giao diện). Danh sách vai trò phải khớp CHECK ck_user_roles_role của migration mới nhất định nghĩa nó (0313, sau đó 0351 thêm AD_OPS).",
   "version": 1,
   "status": "DRAFT — chờ BA/TL/PO duyệt (07_API_IMPLEMENTATION_GUIDE: role-policy matrix trước sign-off)",
+  "$comment_ads": "ĐỀ XUẤT 10/11/2026, chờ BA/PO duyệt riêng: quyền ads.manage (không MFA), ads.approve (MFA), vai trò AD_OPS (chuẩn bị vị trí/đặt chỗ, chọn/tải banner từ thư viện media — cần content.read để mở thư viện, media.upload để tải banner) và APPROVER thêm ads.manage + ads.approve (mở vị trí/đặt chỗ là quyết định đưa nội dung tài trợ lên trang công khai, cùng nhóm với content.publish; tách người chuẩn bị và người mở theo vai trò). Chưa có SoD theo dữ liệu (người duyệt tự duyệt đặt chỗ mình tạo) — cần thêm mã lỗi vào hợp đồng nếu BA/PO yêu cầu.",
   "permissions": {
     "content.read": { "label": "Xem nội dung trong CMS", "mfa": false },
     "content.write_own": { "label": "Soạn và sửa bài của mình", "mfa": false },
@@ -15,7 +16,9 @@
     "moderation.act": { "label": "Xử lý kiểm duyệt", "mfa": true },
     "users.read": { "label": "Xem tài khoản", "mfa": false },
     "users.manage": { "label": "Đình chỉ tài khoản, cấp/thu hồi vai trò", "mfa": true },
-    "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true }
+    "audit.read": { "label": "Xem nhật ký thao tác", "mfa": true },
+    "ads.manage": { "label": "Quản lý vị trí và đặt chỗ quảng cáo", "mfa": false },
+    "ads.approve": { "label": "Duyệt, mở vị trí và đặt chỗ quảng cáo", "mfa": true }
   },
   "roles": {
     "AUTHOR": { "label": "Tác giả", "permissions": ["content.read", "content.write_own", "media.upload"] },
@@ -25,9 +28,10 @@
     },
     "APPROVER": {
       "label": "Người duyệt xuất bản",
-      "permissions": ["content.read", "content.review", "content.approve", "content.publish", "content.takedown"]
+      "permissions": ["content.read", "content.review", "content.approve", "content.publish", "content.takedown", "ads.manage", "ads.approve"]
     },
     "MODERATOR": { "label": "Kiểm duyệt viên", "permissions": ["moderation.act"] },
-    "ADMIN": { "label": "Quản trị tài khoản", "permissions": ["users.read", "users.manage", "audit.read"] }
+    "ADMIN": { "label": "Quản trị tài khoản", "permissions": ["users.read", "users.manage", "audit.read"] },
+    "AD_OPS": { "label": "Vận hành quảng cáo", "permissions": ["content.read", "media.upload", "ads.manage"] }
   }
 }

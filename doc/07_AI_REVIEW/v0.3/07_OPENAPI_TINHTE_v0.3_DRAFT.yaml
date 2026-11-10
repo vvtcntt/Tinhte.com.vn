@@ -5065,7 +5065,7 @@ paths:
       summary: List ad placements (positions) of a site
       description: 'Placements are positions on a site page (code, allowed sizes per breakpoint); banners live in bookings. Staff configuration
         works while ads.display_slots is OFF so P0-ADS can be built and tested before public activation. Access: Staff session (cmsSession)
-        with RBAC enforced in the domain layer (proposed permission ads.manage — DRAFT, pending config/rbac/rbac.json approval).'
+        with RBAC enforced in the domain layer (proposed permission ads.manage in config/rbac/rbac.json — DRAFT, pending BA/PO approval).'
       operationId: getAdminAdPlacements
       security:
       - cmsSession: []
@@ -5187,10 +5187,13 @@ paths:
       summary: Update an ad placement (code, label, status, allowed sizes)
       description: 'Full replacement of the position: code, label, status and allowed sizes per breakpoint. Banners, schedule and priority
         are set on bookings (/admin/ad-placements/{placementId}/bookings). APPROVED/ACTIVE require the approval permission (proposed ads.approve,
-        MFA — DRAFT); the server records approvedBy/approvedAt. Removing a size that a booking creative still uses → STATE_CONFLICT. siteKey
-        cannot change (create a new placement instead). Staff configuration works while ads.display_slots is OFF so P0-ADS can be built and
-        tested before public activation. Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency:
-        send If-Match with the latest ETag.'
+        MFA — DRAFT); the server records approvedBy/approvedAt. Status transitions follow the booking rules: DRAFT → APPROVED, APPROVED → ACTIVE,
+        ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT (clears approvedBy/approvedAt), any → EXPIRED (final); keeping the status is always allowed;
+        anything else → STATE_CONFLICT. Entering APPROVED or ACTIVE (including PAUSED → ACTIVE) needs the approval permission; PAUSED, DRAFT
+        and EXPIRED need only ads.manage. code stays unique within the site (VALIDATION_FAILED). Removing a size that a booking creative still
+        uses → STATE_CONFLICT. siteKey cannot change (create a new placement instead). Staff configuration works while ads.display_slots is
+        OFF so P0-ADS can be built and tested before public activation. Access: Staff session (cmsSession) with RBAC enforced in the domain
+        layer. Optimistic concurrency: send If-Match with the latest ETag.'
       operationId: putAdminAdPlacementsPlacementid
       security:
       - cmsSession: []
@@ -5383,9 +5386,10 @@ paths:
       description: 'Full replacement. Creatives, targetUrl, advertiserName and the schedule change only while the booking is DRAFT; on an APPROVED,
         ACTIVE or PAUSED booking set status DRAFT first (re-approval required), otherwise STATE_CONFLICT. priority can change in any status. Status
         transitions: DRAFT → APPROVED (approval permission, proposed ads.approve with MFA — DRAFT; the server records approvedBy/approvedAt), APPROVED
-        → ACTIVE, ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT, any → EXPIRED (final); anything else → STATE_CONFLICT. APPROVED/ACTIVE require targetUrl
-        and at least one creative (VALIDATION_FAILED). Access: Staff session (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency:
-        send If-Match with the latest ETag.'
+        → ACTIVE, ACTIVE ↔ PAUSED, APPROVED/PAUSED → DRAFT, any → EXPIRED (final); keeping the status is always allowed; anything else → STATE_CONFLICT.
+        Entering ACTIVE (from APPROVED or PAUSED) also needs the approval permission; PAUSED, DRAFT and EXPIRED need only ads.manage. Back to
+        DRAFT clears approvedBy/approvedAt. APPROVED/ACTIVE require targetUrl and at least one creative (VALIDATION_FAILED). Access: Staff session
+        (cmsSession) with RBAC enforced in the domain layer. Optimistic concurrency: send If-Match with the latest ETag.'
       operationId: putAdminAdBooking
       security:
       - cmsSession: []

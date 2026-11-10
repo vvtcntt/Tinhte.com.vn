@@ -14,8 +14,21 @@ public static class AdBreakpoints
     public const string Tablet = "TABLET";
     public const string Desktop = "DESKTOP";
 
-    /// <summary>Thứ tự trả về trong <c>creatives</c>: màn hình nhỏ trước.</summary>
+    public const string Pattern = "^(MOBILE|TABLET|DESKTOP)$";
+
+    /// <summary>Thứ tự trả về trong <c>creatives</c>/<c>sizes</c>: màn hình nhỏ trước.</summary>
     public static readonly IReadOnlyList<string> All = [Mobile, Tablet, Desktop];
+
+    /// <summary>Vị trí trong <see cref="All"/>; giá trị lạ xếp cuối.</summary>
+    public static int IndexOf(string? breakpoint)
+    {
+        for (var i = 0; i < All.Count; i++)
+        {
+            if (All[i] == breakpoint) return i;
+        }
+
+        return int.MaxValue;
+    }
 }
 
 /// <summary>Schema PublicAdCreative: một banner cho một breakpoint, kích thước thật của ảnh (FE giữ chỗ, không phóng to).</summary>
@@ -113,21 +126,11 @@ public sealed partial class PublicAdSlotService(ITinhteDatabase database, SiteRe
         foreach (var code in codes)
         {
             if (!found.TryGetValue(code, out var slot)) continue;
-            var ordered = slot.Creatives.OrderBy(c => IndexOf(c.Breakpoint)).ToList();
+            var ordered = slot.Creatives.OrderBy(c => AdBreakpoints.IndexOf(c.Breakpoint)).ToList();
             items.Add(new PublicAdSlot(code, string.IsNullOrWhiteSpace(slot.Label) ? "Quảng cáo" : slot.Label, ordered));
         }
 
         return new PublicAdSlotList(items);
-    }
-
-    private static int IndexOf(string breakpoint)
-    {
-        for (var i = 0; i < AdBreakpoints.All.Count; i++)
-        {
-            if (AdBreakpoints.All[i] == breakpoint) return i;
-        }
-
-        return int.MaxValue;
     }
 
     [GeneratedRegex("^[a-z0-9_-]{2,80}$")]

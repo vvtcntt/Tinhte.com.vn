@@ -390,6 +390,21 @@ async function behaviour(sc, db) {
     INSERT INTO tt.ad_placement_sizes (placement_id, breakpoint, width, height) VALUES ('${PL}', 'WATCH', 100, 100)`, /ck_ad_placement_sizes_breakpoint/);
   await expectError(sc, db, 'A17 ưu tiên ngoài 0..100 bị chặn', `${SYNC} ${PLACEMENT()} ${BOOKING('DRAFT', 'NULL', false)} UPDATE tt.ad_bookings SET priority = 101`, /ck_ad_bookings_priority/);
 
+  // Vai trò AD_OPS (0351 + 0352, ADR-0004; ma trận quyền DRAFT chờ BA/PO)
+  const GRANT = (role) => `INSERT INTO tt.user_roles (user_id, role, reason) VALUES ('${U2}', '${role}', 'Cấp thử');`;
+  const DOWN_0351 = read(path.join(MIG_DIR, '0351_ad_ops_role.down.sql'));
+  const ROLE_CHECK = `(SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'tt.user_roles'::regclass AND conname = 'ck_user_roles_role')`;
+  await expectOk(sc, db, 'K1 cấp vai trò AD_OPS được (0351); lịch sử GRANT được ghi', `${GRANT('AD_OPS')}
+    DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM tt.user_role_history WHERE user_id = '${U2}' AND role = 'AD_OPS' AND action = 'GRANT') THEN RAISE EXCEPTION 'history'; END IF; END $$;`);
+  await expectError(sc, db, 'K2 vai trò ngoài danh mục vẫn bị chặn', GRANT('SALES'), /ck_user_roles_role/);
+  await expectValue(sc, db, 'K3 CHECK vai trò đã VALIDATED (0352) và có đủ 6 vai trò',
+    `SELECT c.convalidated AND ${ROLE_CHECK} LIKE '%''ADMIN''%''AD_OPS''%' FROM pg_constraint c WHERE c.conrelid = 'tt.user_roles'::regclass AND c.conname = 'ck_user_roles_role'`, true);
+  await expectError(sc, db, 'K4 down 0351 từ chối khi còn người giữ AD_OPS', `${GRANT('AD_OPS')} ${DOWN_0351}`, /Refusing to roll back 0351/);
+  await expectOk(sc, db, 'K5 down 0351 (không ai giữ AD_OPS) trả CHECK về 5 vai trò của 0313', `${DOWN_0351}
+    DO $$ BEGIN IF ${ROLE_CHECK} LIKE '%AD_OPS%' OR ${ROLE_CHECK} NOT LIKE '%''MODERATOR''%' THEN RAISE EXCEPTION 'old check'; END IF; END $$;
+    ${GRANT('EDITOR')}`);
+  await expectError(sc, db, 'K6 sau down 0351, AD_OPS bị chặn lại', `${DOWN_0351} ${GRANT('AD_OPS')}`, /ck_user_roles_role/);
+
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);
 }
