@@ -2,19 +2,21 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { findSite, isIndexable, originFor, parseSiteEnv } from '@tinhte/sites';
-import { AdSlot } from '../../components/home/AdSlot';
+import { AdPairSlot, AdSlot } from '../../components/home/AdSlot';
 import { SectionHeading } from '../../components/home/parts';
 import { RailControls } from '../../components/home/RailControls';
 import { LeadStory, StoryCard } from '../../components/home/Stories';
 import { VideoRail } from '../../components/home/VideoRail';
-import { HOME_AD_CODES, HOME_FEED_AD_AFTER, loadHome } from '../../lib/home';
+import { DEMO_ADS_PARAM, parseDemoAds } from '../../lib/demo-ads';
+import { loadHome } from '../../lib/home';
+import { HOME_FEED_AD_AFTER, homeAdPlan } from '../../lib/home-model';
 import { routes } from '../../lib/routes';
 
 // Trang chủ UX-PUB-01 (FR-DISC-003, WBS-027). Thiết kế: doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md
 // Phụ thuộc Host + môi trường lúc chạy → render mỗi request; dữ liệu API cache 60 giây (lib/api.ts).
 export const dynamic = 'force-dynamic';
 
-type Props = { params: Promise<{ site: string }> };
+type Props = { params: Promise<{ site: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const site = findSite((await params).site);
@@ -31,11 +33,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function HomePage({ params }: Props) {
+export default async function HomePage({ params, searchParams }: Props) {
   const site = findSite((await params).site);
   if (!site) notFound();
   const env = parseSiteEnv(process.env.TT_SITE_ENV);
-  const data = await loadHome(site);
+  // ?demo-ads chỉ có tác dụng ở local (loadHome bỏ qua ở môi trường khác).
+  const data = await loadHome(site, { demoAds: env === 'local' ? parseDemoAds((await searchParams)[DEMO_ADS_PARAM]) : null });
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -72,12 +75,14 @@ export default async function HomePage({ params }: Props) {
   );
 }
 
+// Vùng quảng cáo ①–⑥ (UX-PUB-01 Bước 3): mỗi vùng chỉ render khi có slot → cờ OFF/không banner thì trang y hệt
+// bản không quảng cáo. Mã placement và quy tắc vùng nào được hiện: lib/home-model.ts (HOME_AD_CODES, homeAdPlan).
 function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHome>>, { status: 'ok' }> }) {
-  const { home, ads, demo } = data;
+  const { home, ads, demo, demoAds } = data;
+  const plan = homeAdPlan(home, ads);
   const [lead, ...secondary] = home.featuredArticles;
   const recentHead = home.recentArticles.slice(0, HOME_FEED_AD_AFTER);
   const recentTail = home.recentArticles.slice(HOME_FEED_AD_AFTER);
-  const sidebarAd = ads[HOME_AD_CODES.sidebar];
   const empty = !lead && home.recentArticles.length === 0 && home.featuredVideos.length === 0;
 
   return (
@@ -85,6 +90,11 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
       {demo && (
         <p className="demo-banner" role="note">
           <strong>Dữ liệu mẫu</strong> — API <code>GET /home</code> chưa phản hồi. Chỉ hiện ở môi trường local.
+        </p>
+      )}
+      {demoAds && (
+        <p className="demo-banner" role="note">
+          <strong>Quảng cáo mẫu</strong> — banner giả để xem các vùng ①–⑥ (<code>?demo-ads</code>). Chỉ hiện ở môi trường local.
         </p>
       )}
 
@@ -95,16 +105,21 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
         </div>
       )}
 
+      {/* ① Màn hình đầu: không lazy-load. */}
+      <AdPairSlot pair={plan.top} eager className="ad-slot--top" />
+
       {lead && (
         <section className="home-section" aria-labelledby="tin-noi-bat">
           <SectionHeading id="tin-noi-bat" title="Tin nổi bật" />
           <div className="featured">
             <LeadStory article={lead} />
             {secondary.length > 0 && (
-              <div className="featured__side">
+              <div className={plan.heroSide ? 'featured__side featured__side--with-ad' : 'featured__side'}>
                 {secondary.map((a) => (
                   <StoryCard key={a.id} article={a} variant="compact" />
                 ))}
+                {/* ② Có banner: 3 tin phụ + 300×250 (homeFeaturedLimit), không có: 4 tin phụ. */}
+                <AdSlot slot={plan.heroSide} className="ad-slot--rail" />
               </div>
             )}
           </div>
@@ -129,6 +144,9 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
         </section>
       )}
 
+      {/* ③ Giữa Video nổi bật và Tin mới. */}
+      <AdPairSlot pair={plan.mid} className="ad-slot--mid" />
+
       {/* Tin mới rỗng (mọi bài đang ở Tin nổi bật) vẫn phải có đường sang trang danh sách. */}
       {home.recentArticles.length === 0 && !empty && (
         <p className="home-more">
@@ -149,12 +167,13 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
               </Link>
             }
           />
-          <div className={sidebarAd ? 'latest latest--with-aside' : 'latest'}>
+          <div className={plan.sidebar ? 'latest latest--with-aside' : 'latest'}>
             <div className="latest__list">
               {recentHead.map((a) => (
                 <StoryCard key={a.id} article={a} variant="row" />
               ))}
-              <AdSlot slot={ads[HOME_AD_CODES.feed]} className="ad-slot--inline" />
+              {/* ④ Sau tin mới thứ HOME_FEED_AD_AFTER. */}
+              <AdPairSlot pair={plan.feed} className="ad-slot--inline" />
               {recentTail.map((a) => (
                 <StoryCard key={a.id} article={a} variant="row" />
               ))}
@@ -164,14 +183,18 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
                 </Link>
               </p>
             </div>
-            {sidebarAd && (
+            {plan.sidebar && (
               <div className="latest__aside">
-                <AdSlot slot={sidebarAd} className="ad-slot--sticky" />
+                {/* ⑤ Chỉ ≥ 1024px, đứng yên khi cuộn. */}
+                <AdSlot slot={plan.sidebar} media="wide" className="ad-slot--rail ad-slot--sticky" />
               </div>
             )}
           </div>
         </section>
       )}
+
+      {/* ⑥ Trên footer. */}
+      <AdPairSlot pair={plan.bottom} className="ad-slot--bottom" />
     </div>
   );
 }

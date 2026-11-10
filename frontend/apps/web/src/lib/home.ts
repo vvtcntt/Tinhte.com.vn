@@ -1,47 +1,17 @@
-import { parseSiteEnv, type SiteDefinition } from '@tinhte/sites';
+import { headers } from 'next/headers';
+import { hostFor, originFor, parseSiteEnv, type SiteDefinition, type SiteEnv } from '@tinhte/sites';
 import { apiGet } from './api';
-import type { ArticleSummary, Category, CategoryList, HomePage, PublicAdSlot, PublicAdSlotList, VideoSummary } from './contracts';
+import type { Category, CategoryList, HomePage, PublicAdSlotList } from './contracts';
+import { demoAdSlots } from './demo-ads';
 import { demoCategories, demoHome } from './demo-home';
-import { safeHttpUrl } from './routes';
+import { acceptAdSlots, HOME_AD_CODE_LIST, homeFeaturedLimit, prepareHome, type HomeAdCode, type HomeAds } from './home-model';
 
-// Trang chủ (UX-PUB-01, doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md).
-
-export const HOME_LIMITS = { featured: 5, videos: 8, recent: 12 } as const;
-/** Mã placement đề xuất — WBS-131 chốt. */
-export const HOME_AD_CODES = { feed: 'home_feed', sidebar: 'home_sidebar' } as const;
-/** Slot home_feed chèn sau bài thứ N của Tin mới (đề xuất, PO duyệt). Số chẵn để khớp lưới 2 cột desktop. */
-export const HOME_FEED_AD_AFTER = 6;
-
-type WithKind = { contentKind?: unknown; sponsorLabel?: string | null };
-
-/** Fail-closed: chỉ giữ item có contentKind hợp lệ; SPONSORED bắt buộc có nhãn (AIR-011). */
-export function isDisplayable(item: WithKind): boolean {
-  if (item.contentKind === 'EDITORIAL') return true;
-  if (item.contentKind === 'SPONSORED') return typeof item.sponsorLabel === 'string' && item.sponsorLabel.trim().length > 0;
-  return false;
-}
-
-/** Lọc, loại trùng (Tin mới không lặp Tin nổi bật), cắt theo giới hạn. */
-export function prepareHome(raw: Partial<HomePage>): HomePage {
-  const clean = <T extends WithKind & { id: string }>(items: T[] | undefined, limit: number, skip = new Set<string>()) => {
-    const out: T[] = [];
-    for (const item of items ?? []) {
-      if (out.length >= limit) break;
-      if (!item?.id || skip.has(item.id) || !isDisplayable(item)) continue;
-      skip.add(item.id);
-      out.push(item);
-    }
-    return out;
-  };
-  const seen = new Set<string>();
-  const featuredArticles = clean<ArticleSummary>(raw.featuredArticles, HOME_LIMITS.featured, seen);
-  const recentArticles = clean<ArticleSummary>(raw.recentArticles, HOME_LIMITS.recent, seen);
-  const featuredVideos = clean<VideoSummary>(raw.featuredVideos, HOME_LIMITS.videos);
-  return { featuredArticles, recentArticles, featuredVideos };
-}
+// Trang chủ (UX-PUB-01, doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md). Phần thuần (lọc, mã quảng cáo, vùng nào hiện)
+// ở home-model.ts; file này chỉ gọi API.
+export { HOME_LIMITS, isDisplayable, prepareHome } from './home-model';
 
 export type HomeData =
-  | { status: 'ok'; home: HomePage; ads: Record<string, PublicAdSlot>; demo: boolean }
+  | { status: 'ok'; home: HomePage; ads: HomeAds; demo: boolean; demoAds: boolean }
   | { status: 'error' };
 
 /** Chuyên mục cho thanh điều hướng. Lỗi/rỗng → ẩn nav (local: dùng danh sách mẫu). */
@@ -54,27 +24,32 @@ export async function loadNavCategories(site: SiteDefinition): Promise<Category[
   }
 }
 
-export async function loadHome(site: SiteDefinition): Promise<HomeData> {
+/** `demoAds`: mã banner mẫu từ `?demo-ads=` — chỉ có tác dụng ở môi trường local. */
+export async function loadHome(site: SiteDefinition, { demoAds = null }: { demoAds?: HomeAdCode[] | null } = {}): Promise<HomeData> {
   const env = parseSiteEnv(process.env.TT_SITE_ENV);
   const [home, ads] = await Promise.allSettled([
     apiGet<HomePage>(site, '/home'),
-    apiGet<PublicAdSlotList>(site, `/ads/placements?placementCodes=${Object.values(HOME_AD_CODES).join(',')}`),
+    // Lỗi hoặc cờ ads.display_slots OFF (danh sách rỗng) → không slot nào → không khung trống (FR-ADS-002).
+    apiGet<PublicAdSlotList>(site, `/ads/placements?placementCodes=${HOME_AD_CODE_LIST.join(',')}`),
   ]);
 
-  const slots: Record<string, PublicAdSlot> = {};
-  if (ads.status === 'fulfilled') {
-    for (const slot of ads.value.items) {
-      // Creative/target phải là URL an toàn; target chỉ https (AdPlacement.targetUrl pattern).
-      if (!safeHttpUrl(slot.creativeUrl) || (slot.targetUrl && !safeHttpUrl(slot.targetUrl, { httpsOnly: true }))) continue;
-      if (!(slot.width > 0 && slot.height > 0)) continue;
-      slots[slot.code] = slot;
-    }
-  }
+  let slots = acceptAdSlots(ads.status === 'fulfilled' ? ads.value.items : []);
+  const demoOrigin = env === 'local' && demoAds ? await requestOrigin(site, env) : null;
+  if (demoOrigin && demoAds) slots = acceptAdSlots(demoAdSlots(demoOrigin, demoAds));
+  const usingDemoAds = demoOrigin !== null;
+  const prepare = (raw: Partial<HomePage>) => prepareHome(raw, { featured: homeFeaturedLimit(slots) });
 
-  if (home.status === 'fulfilled') return { status: 'ok', home: prepareHome(home.value), ads: slots, demo: false };
+  if (home.status === 'fulfilled') return { status: 'ok', home: prepare(home.value), ads: slots, demo: false, demoAds: usingDemoAds };
   // Chỉ máy dev: API chưa có /home thì dựng giao diện bằng dữ liệu mẫu, có dải cảnh báo.
   if (env === 'local') {
-    return { status: 'ok', home: prepareHome(demoHome()), ads: slots, demo: true };
+    return { status: 'ok', home: prepare(demoHome()), ads: slots, demo: true, demoAds: usingDemoAds };
   }
   return { status: 'error' };
+}
+
+/** Origin trình duyệt đang dùng (kể cả cổng dev), chỉ khi Host đúng là host của site trong Registry (+ cổng số). */
+async function requestOrigin(site: SiteDefinition, env: SiteEnv): Promise<string | null> {
+  const [name, port, ...rest] = ((await headers()).get('host') ?? '').toLowerCase().split(':');
+  if (rest.length > 0 || name !== hostFor(site, env) || (port !== undefined && !/^\d{1,5}$/.test(port))) return null;
+  return `${new URL(originFor(site, env)).protocol}//${name}${port ? `:${port}` : ''}`;
 }

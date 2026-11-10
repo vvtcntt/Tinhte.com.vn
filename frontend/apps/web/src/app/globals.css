@@ -307,6 +307,10 @@ main:focus { outline: none; }
 
 @media (min-width: 640px) and (max-width: 1023px) {
   .featured__side { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--sp-5); }
+  /* Có banner ②: 3 tin phụ xếp dọc bên trái, banner 300px bên phải — hai cột cao gần bằng nhau. */
+  .featured__side--with-ad { grid-template-columns: minmax(0, 1fr) var(--rail-w); }
+  .featured__side--with-ad > .story { grid-column: 1; }
+  .featured__side--with-ad > .ad-slot { grid-column: 2; grid-row: 1 / span 3; align-self: start; }
 }
 @media (min-width: 768px) {
   .lead-story__title { font-size: var(--fs-xl); }
@@ -317,8 +321,9 @@ main:focus { outline: none; }
   .featured { grid-template-columns: minmax(0, 1fr) var(--rail-w); gap: var(--sp-6); }
   .lead-story__title { font-size: var(--fs-2xl); line-height: 1.2; }
   .featured__side > .story:first-child { border-top: 0; padding-top: 0; }
-  .featured__side > .story:first-child .card-link { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
-  .featured__side > .story:first-child .story__title { font-size: var(--fs-md); line-height: 1.35; }
+  /* Có banner ② (300×250 ở cuối cột) thì cả 3 tin phụ đều dạng ảnh nhỏ để cột không cao quá bài chính. */
+  .featured__side:not(.featured__side--with-ad) > .story:first-child .card-link { grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); }
+  .featured__side:not(.featured__side--with-ad) > .story:first-child .story__title { font-size: var(--fs-md); line-height: 1.35; }
   .featured__side .story--compact .card-link { grid-template-columns: 104px minmax(0, 1fr); }
 }
 
@@ -407,17 +412,40 @@ main:focus { outline: none; }
   .latest:not(.latest--with-aside) .story--row .card-link { grid-template-columns: 180px minmax(0, 1fr); gap: var(--sp-4); }
 }
 
-/* ---------- Quảng cáo: khung xám có nhãn, khác hẳn thẻ bài (không hộp) ---------- */
+/* ---------- Quảng cáo (vùng ①–⑥, UX-PUB-01 Bước 3): khung nền xám có nhãn, khác hẳn thẻ bài (không hộp) ---------- */
 .ad-slot {
   padding: var(--sp-2); border-radius: var(--radius);
   background: var(--surface-2);
 }
 .ad-slot__label {
-  display: block; margin-bottom: 6px;
-  font-size: 11px; font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  display: block; margin-bottom: var(--sp-1);
+  font-size: var(--fs-2xs); line-height: 1.5; font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
 }
+/* Creative giữ đúng cỡ (max-width = width từ API, đặt inline), chỉ thu nhỏ khi khung hẹp hơn; căn giữa khung. */
+.ad-slot__media { display: block; margin: 0 auto; }
+.ad-slot__media picture { display: block; }
 .ad-slot img { width: 100%; height: auto; border-radius: var(--radius-sm); }
+
+/* Hiện theo màn hình (AdSlot `media`): desktop/mobile bù nhau ở mốc 768px; `wide` (⑤) từ 1024px. */
+.ad-slot--desktop, .ad-slot--wide { display: none; }
+@media (min-width: 768px) {
+  .ad-slot--desktop { display: block; }
+  .ad-slot--mobile { display: none; }
+}
+@media (min-width: 1024px) {
+  .ad-slot--wide { display: block; }
+}
+
+/* Vị trí: ① trên Tin nổi bật, ③ giữa Video và Tin mới, ⑥ trên footer — cách vùng kề bằng khoảng cách giữa các vùng. */
+.ad-slot--top { margin-bottom: var(--sp-5); }
+.ad-slot--mid, .ad-slot--bottom { margin-top: var(--sp-7); }
 .ad-slot--sticky { position: sticky; top: calc(var(--header-h) + var(--sp-5)); }
+/* Cột 300px (②⑤): bỏ lề ngang để banner 300px hiện đúng cỡ thay vì bị thu nhỏ. */
+@media (min-width: 640px) {
+  .ad-slot--rail { padding: var(--sp-2) 0 0; overflow: hidden; }
+  .ad-slot--rail .ad-slot__label { padding: 0 var(--sp-2); }
+  .ad-slot--rail img { border-radius: 0; }
+}
 
 /* ---------- Footer ---------- */
 .site-footer { margin-top: var(--sp-7); background: var(--footer-bg); border-top: 1px solid var(--border); font-size: var(--fs-sm); }

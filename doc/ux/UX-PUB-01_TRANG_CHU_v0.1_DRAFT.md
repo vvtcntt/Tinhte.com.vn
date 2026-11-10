@@ -2,6 +2,7 @@
 
 **Trạng thái:** DRAFT, chờ UX/PO duyệt (WBS-004 khóa 18 màn hình). Ngày 09/11/2026.
 **Cập nhật 10/11/2026 — giao diện đợt 1:** font Be Vietnam Pro + token chữ/khoảng cách, bỏ hộp thẻ, cột phải 300px, logo SVG có bản tối, menu "Thêm", nút ‹ › cho dải video, footer nhiều cột, luôn có đường sang danh sách tin.
+**Cập nhật 10/11/2026 — đợt 2, vùng quảng cáo:** dựng sẵn 6 vùng banner ①–⑥ phía frontend (Bước 3 "Vùng quảng cáo"). Khi backend có `GET /ads/placements` và CMS tạo placement, banner tự hiện, không cần deploy. Không có banner thì trang y hệt đợt 1. Mã placement vẫn là đề xuất, chờ WBS-131 chốt.
 **Truy vết:** `FR-DISC-003` (vùng tin mới, tin nổi bật, video nổi bật) · `WBS-027` (SSR, responsive, đổi block không cần deploy) · `FR-ID-001` (khách đọc không cần tài khoản) · `FR-DISC-004/005`, `FR-VID-010` (không lộ nội dung đã gỡ) · `FR-ADS-001/002`, `FR-NEWS-008`, `WBS-133` (nhãn tài trợ, 1–2 slot tĩnh, không CLS) · `NFR-SEO-001`, `WBS-052`.
 **Hợp đồng:** `GET /home` → `HomePage`, `GET /categories`, `GET /ads/placements` (OpenAPI v0.3 DRAFT).
 **Code:** `frontend/apps/web/src/app/[site]/page.tsx`, `frontend/apps/web/src/components/home/*`, `frontend/apps/web/src/lib/*`.
@@ -26,16 +27,20 @@ Ràng buộc từ tài liệu:
 
 ## Bước 2 — Kiến trúc thông tin
 
-Thứ tự vùng, từ trên xuống:
+Thứ tự vùng, từ trên xuống (①–⑥ là vùng quảng cáo, chỉ hiện khi có banner — xem Bước 3):
 
 1. **Header**: logo → `/`; thanh chuyên mục (`GET /categories`, mục đang mở có `aria-current="page"`); link **Shorts**; nút **Tìm kiếm** (UX-PUB-07). Desktop hiện 6 chuyên mục đầu, phần còn lại vào menu **Thêm**; mobile cuộn ngang toàn bộ. Không có nút đăng nhập khi `memberLoginEnabled = false`.
+   - ① `home_top` / `home_top_mobile`: dải banner ngay dưới header.
 2. **Tin nổi bật** (`featuredArticles`, tối đa 5): 1 bài chính lớn + 4 bài phụ.
+   - ② `home_hero_side`: có banner thì cột phải còn 3 bài phụ + banner 300×250; tin nổi bật thứ 5 chuyển xuống Tin mới.
 3. **Video nổi bật** (`featuredVideos`, tối đa 8): dải thẻ dọc 9:16, cuộn ngang; từ 768px có nút ‹ › ở tiêu đề vùng (chỉ hiện khi dải tràn).
+   - ③ `home_mid` / `home_mid_mobile`: giữa Video nổi bật và Tin mới.
 4. **Tin mới** (`recentArticles`, tối đa 12, loại trùng với Tin nổi bật) + cột phụ.
-   - Slot quảng cáo `home_feed` chèn sau bài thứ 6 (desktop + mobile; số chẵn để khớp lưới 2 cột).
-   - Cột phụ desktop: slot `home_sidebar` (dính khi cuộn).
+   - ④ `home_feed` / `home_feed_mobile` chèn sau bài thứ 6 (số chẵn để khớp lưới 2 cột).
+   - ⑤ cột phụ desktop: `home_sidebar` (dính khi cuộn).
    - Tiêu đề vùng có link **Xem tất cả**; cuối danh sách: nút **Xem thêm tin mới** → trang danh sách có phân trang (`GET /articles`, cursor).
    - Tin mới rỗng (mọi bài đang nằm ở Tin nổi bật): vẫn hiện nút **Xem tất cả tin** để trang chủ luôn có đường sang danh sách.
+   - ⑥ `home_bottom` / `home_bottom_mobile`: dải banner cuối nội dung, trên footer.
 5. **Footer**: logo + mô tả ngắn; cột Chuyên mục, Khám phá (Tin mới, Shorts, Tìm kiếm), Thông tin (link pháp lý UX-PUB-09); dòng bản quyền. Khu giấy phép để trống tới khi Legal cấp.
 
 Lý do thứ tự: tin nổi bật do biên tập chọn nên đứng đầu; video đặt ngay sau để Shorts (mảng mới) được thấy mà không chen giữa luồng đọc; tin mới là phần dài nhất nên ở cuối, có cột phụ cho quảng cáo.
@@ -45,59 +50,134 @@ Lý do thứ tự: tin nổi bật do biên tập chọn nên đứng đầu; vi
 Container tối đa 1200px, lề 16px (mobile) / 24px (≥ 768px).
 
 ```
-DESKTOP ≥ 1024px
-┌──────────────────────────────────────────────────────────────┐
-│ [Logo]  Chuyên mục 1 · 2 · 3 · 4 · 5 · 6  Thêm ▾  Shorts [🔍]│
-├──────────────────────────────────────────────────────────────┤
-│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-│ Tin nổi bật                                                   │
-│ ┌─────────────────────────────────────┐ ┌───────── 300px ┐   │
-│ │  ảnh 16:9                           │ │ [ảnh 16:9]      │   │
-│ │                                     │ │ tiêu đề phụ 1   │   │
-│ │                                     │ │ ─────────────── │   │
-│ │  TIÊU ĐỀ BÀI CHÍNH (36px)           │ │ [ảnh] phụ 2     │   │
-│ │  sapo · thời gian                   │ │ [ảnh] phụ 3     │   │
-│ │                                     │ │ [ảnh] phụ 4     │   │
-│ └─────────────────────────────────────┘ └─────────────────┘   │
-│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-│ Video nổi bật                              [‹][›] Xem Shorts →│
-│ [9:16][9:16][9:16][9:16][9:16][9:16] → cuộn ngang            │
-│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-│ Tin mới                                        Xem tất cả →  │
-│ ┌──────────────────────────────────────┐ ┌──────────────┐    │
-│ │ [ảnh 16:9] tiêu đề · sapo · thời gian│ │ Quảng cáo    │    │
-│ │ … 6 bài                              │ │ home_sidebar │    │
-│ │ ┌ Quảng cáo · home_feed ──────────┐  │ │ (sticky)     │    │
-│ │ … 6 bài                              │ └──────────────┘    │
-│ │        [ Xem thêm tin mới ]          │                     │
-│ └──────────────────────────────────────┘                     │
-├──────────────────────────────────────────────────────────────┤
-│ Footer: logo · Giới thiệu · Điều khoản · Quyền riêng tư · LH │
-└──────────────────────────────────────────────────────────────┘
+DESKTOP ≥ 1024px  (①–⑥ chỉ có khi API trả banner)
+┌──────────────────────────────────────────────────────────────────┐
+│ [Logo]  Chuyên mục 1 · 2 · 3 · 4 · 5 · 6  Thêm ▾  Shorts [Tìm]   │
+├──────────────────────────────────────────────────────────────────┤
+│ ┌ QUẢNG CÁO ───────────────────────────────────────────────────┐ │
+│ │ ① home_top 970×90, căn giữa khung, không lazy-load           │ │
+│ └──────────────────────────────────────────────────────────────┘ │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│ Tin nổi bật                                                      │
+│ ┌─────────────────────────────────────┐ ┌──── 300px ────┐        │
+│ │  ảnh 16:9                           │ │ [ảnh] phụ 1   │        │
+│ │                                     │ │ [ảnh] phụ 2   │        │
+│ │                                     │ │ [ảnh] phụ 3   │        │
+│ │  TIÊU ĐỀ BÀI CHÍNH (36px)           │ │┌QUẢNG CÁO────┐│        │
+│ │  sapo · thời gian                   │ ││② hero_side  ││        │
+│ │                                     │ ││   300×250   ││        │
+│ └─────────────────────────────────────┘ └┴─────────────┴┘        │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│ Video nổi bật                             [‹][›] Xem Shorts →    │
+│ [9:16][9:16][9:16][9:16][9:16][9:16] → cuộn ngang                │
+│ ┌ QUẢNG CÁO ───────────────────────────────────────────────────┐ │
+│ │ ③ home_mid 970×250                                           │ │
+│ └──────────────────────────────────────────────────────────────┘ │
+│ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+│ Tin mới                                        Xem tất cả →      │
+│ ┌──────────────────────────────────────┐ ┌──────────────┐        │
+│ │ [ảnh 16:9] tiêu đề · sapo · thời gian│ │ QUẢNG CÁO    │        │
+│ │ … 6 bài                              │ │ ⑤ home_      │        │
+│ │ ┌ QUẢNG CÁO ──────────────────────┐  │ │   sidebar    │        │
+│ │ │ ④ home_feed 728×90              │  │ │   300×600    │        │
+│ │ └─────────────────────────────────┘  │ │ (dính khi    │        │
+│ │ … 6 bài                              │ │  cuộn)       │        │
+│ │        [ Xem thêm tin mới ]          │ └──────────────┘        │
+│ └──────────────────────────────────────┘                         │
+│ ┌ QUẢNG CÁO ───────────────────────────────────────────────────┐ │
+│ │ ⑥ home_bottom 970×90                                         │ │
+│ └──────────────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────────────┤
+│ Footer: logo · Chuyên mục · Khám phá · Thông tin · ©             │
+└──────────────────────────────────────────────────────────────────┘
 
 MOBILE < 768px
-┌────────────────────────┐
-│ [Logo]          [🔍]   │
-│ ‹chip› ‹chip› ‹chip› → │  chuyên mục cuộn ngang
-├────────────────────────┤
-│ ảnh 16:9               │  bài chính
-│ TIÊU ĐỀ                │
-│ thời gian              │
-│ [ảnh] phụ 1            │  4 bài phụ dạng danh sách
-│ …                      │
-│ VIDEO NỔI BẬT          │
-│ [9:16][9:16][9:…  →    │  scroll-snap
-│ TIN MỚI                │
-│ [ảnh] tiêu đề          │
-│ … (quảng cáo sau bài 6)│
-│ [ Xem thêm tin mới ]   │
-│ Footer                 │
-└────────────────────────┘
+┌──────────────────────────┐
+│ [Logo]     Shorts [Tìm]  │
+│ ‹chip› ‹chip› ‹chip› →   │  chuyên mục cuộn ngang
+├──────────────────────────┤
+│ ┌QUẢNG CÁO─────────────┐ │
+│ │① home_top_mobile     │ │  320×100, không lazy-load
+│ └──────────────────────┘ │
+│ ảnh 16:9                 │  bài chính
+│ TIÊU ĐỀ · thời gian      │
+│ [ảnh] phụ 1 … 3 (4)      │  3 bài phụ khi có ②, 4 khi không
+│ ┌QUẢNG CÁO─────────────┐ │
+│ │② home_hero_side      │ │  300×250 (cùng mã với desktop)
+│ └──────────────────────┘ │
+│ VIDEO NỔI BẬT            │
+│ [9:16][9:16][9:…  →      │  scroll-snap
+│ ┌QUẢNG CÁO─────────────┐ │
+│ │③ home_mid_mobile     │ │  300×250
+│ └──────────────────────┘ │
+│ TIN MỚI                  │
+│ [ảnh] tiêu đề × 6        │
+│ ┌QUẢNG CÁO─────────────┐ │
+│ │④ home_feed_mobile    │ │  300×250
+│ └──────────────────────┘ │
+│ [ảnh] tiêu đề × 6        │
+│ [ Xem thêm tin mới ]     │
+│ ┌QUẢNG CÁO─────────────┐ │
+│ │⑥ home_bottom_mobile  │ │  320×100
+│ └──────────────────────┘ │
+│ Footer                   │
+└──────────────────────────┘
+⑤ home_sidebar không có trên mobile/tablet (< 1024px).
 ```
 
-Cột phải desktop rộng cố định **300px** ở mọi vùng (khớp banner 300×250 / 300×600). Ở Tin nổi bật, tin phụ đầu tiên hiện ảnh lớn phía trên tiêu đề để cột phải cao gần bằng bài chính.
-Desktop không có slot `home_sidebar` (cờ quảng cáo OFF — mặc định production): Tin mới chia **lưới 2 cột** thay vì để trống cột phải.
-Tablet 768–1023px: bài chính trải hết chiều ngang, 4 tin phụ xếp lưới 2 cột bên dưới; Tin mới một cột, slot `home_sidebar` ẩn.
+Cột phải desktop rộng cố định **300px** ở mọi vùng (khớp banner 300×250 / 300×600). Ở Tin nổi bật, không có ② thì tin phụ đầu tiên hiện ảnh lớn phía trên tiêu đề để cột phải cao gần bằng bài chính; có ② thì cả 3 tin phụ dạng ảnh nhỏ, banner ở cuối cột (đo ở 1440px với dữ liệu mẫu: hai cột cao bằng nhau, 682px).
+Desktop không có slot ⑤ `home_sidebar` (cờ quảng cáo OFF — mặc định production): Tin mới chia **lưới 2 cột** thay vì để trống cột phải.
+Tablet 768–1023px: bài chính trải hết chiều ngang, 4 tin phụ xếp lưới 2 cột bên dưới (có ②: 3 tin phụ xếp dọc bên trái, banner 300px bên phải); Tin mới một cột, ⑤ ẩn; ① ③ ④ ⑥ dùng banner desktop thu nhỏ vừa khung.
+
+### Vùng quảng cáo ①–⑥ (đợt 2)
+
+Mã placement là **đề xuất, chờ WBS-131 (PO + Commercial + Legal) chốt** — "Điểm còn mở" số 3. Nguồn trong code: `HOME_AD_CODES`, `HOME_AD_SIZES` ở `frontend/apps/web/src/lib/home-model.ts`.
+Hợp đồng hiện tại cho **mỗi mã một kích thước**, nên vùng nào khác kích thước giữa desktop và mobile thì có hai mã (hậu tố `_mobile`). Mã không hậu tố hiện từ **768px**, mã `_mobile` hiện dưới 768px.
+
+| # | Mã (đề xuất) | Vị trí | ≥ 768px (desktop, tablet) | < 768px (mobile) | Tải ảnh |
+|---|---|---|---|---|---|
+| ① | `home_top` · `home_top_mobile` | dưới header, trên Tin nổi bật | 970×90 | 320×100 | **ngay** (màn hình đầu, không lazy; không `fetchpriority=high` để không tranh với ảnh LCP) |
+| ② | `home_hero_side` (một mã) | cuối cột phải Tin nổi bật | 300×250 | 300×250, sau các tin phụ | lazy |
+| ③ | `home_mid` · `home_mid_mobile` | giữa Video nổi bật và Tin mới | 970×250 | 300×250 | lazy |
+| ④ | `home_feed` · `home_feed_mobile` | sau tin mới thứ 6 | 728×90 | 300×250 | lazy |
+| ⑤ | `home_sidebar` | cột phải Tin mới, dính khi cuộn | 300×600, **chỉ ≥ 1024px** | không có | lazy |
+| ⑥ | `home_bottom` · `home_bottom_mobile` | cuối nội dung, trên footer | 970×90 | 320×100 | lazy |
+
+Mười mã = đúng mức tối đa `placementCodes` (`maxItems: 10`) của một lần gọi `GET /ads/placements`; thêm vùng nữa thì phải gọi hai lần hoặc sửa spec (test `home-model.test.ts` chặn khi vượt).
+Kích thước ở bảng là đề xuất khi tạo placement. FE không ép: khung giữ chỗ theo `width/height` API trả, nên ① chạy chiến dịch lớn 970×250 chỉ cần sửa kích thước placement trong CMS, không cần deploy (khi đó bài chính bị đẩy xuống thêm ~160px — Commercial cân nhắc).
+
+**Hiển thị**
+- Khung nền `--surface-2` bo góc, nhãn **QUẢNG CÁO** (chữ `label` do API trả; rỗng thì dùng "Quảng cáo") luôn ở trên creative. Thẻ bài không có nền/khung nên không nhầm quảng cáo với tin.
+- Creative hiện đúng cỡ (không phóng to), căn giữa khung, chỉ thu nhỏ khi khung hẹp hơn. Ở cột 300px (②⑤) khung bỏ lề ngang để banner 300px không bị thu còn 284px.
+- Link creative: `target="_blank" rel="sponsored noopener"`, chỉ https. Không popup, không autoplay, không âm thanh.
+- Khoảng cách dùng token sẵn có: ① cách Tin nổi bật `--sp-5`; ③ ⑥ cách vùng kề `--sp-7` (bằng khoảng cách giữa các vùng); ④ theo nhịp `--sp-4` của danh sách.
+
+**Không tải cả hai ảnh, không CLS**
+- Mỗi bản desktop/mobile là một `<aside>` riêng, ẩn/hiện bằng CSS theo mốc 768px (⑤: 1024px). Hai nửa viết bằng `min-width` và `not all and (min-width)` nên không có độ rộng nào hiện cả hai hay ẩn cả hai.
+- Ảnh nằm trong `<picture>` có `<source media="(khoảng bị ẩn)">` trỏ GIF 1×1 `data:` → ở màn hình không hiện, trình duyệt chọn GIF và **không tải creative**, kể cả ① không lazy. Đã kiểm trên trình duyệt: 390px chỉ tải bản `_mobile` + `home_hero_side`; 820/1440px không tải bản `_mobile`; dưới 1024px không tải ⑤.
+- `width`/`height` + `aspect-ratio` có ngay từ SSR → khung giữ chỗ trước khi ảnh tải.
+
+**Quy tắc vùng nào được hiện** (`homeAdPlan`, có test)
+
+| Điều kiện | Kết quả |
+|---|---|
+| API không trả slot của mã đó (cờ `ads.display_slots` OFF, chưa tạo placement, hết lịch, API lỗi, URL không an toàn) | Không render gì — không khung, không khoảng trống. |
+| Chỉ có bản desktop hoặc chỉ bản mobile của một vùng | Màn hình còn lại không có gì ở vùng đó. |
+| Trang không có nội dung (khối "Chưa có bài viết") | Không quảng cáo nào. |
+| ② có banner | Tin nổi bật còn 4 bài (1 chính + 3 phụ); bài thứ 5 chuyển xuống Tin mới đúng vị trí theo thời gian xuất bản (cũ hơn cả 12 bài thì chỉ còn ở trang danh sách). |
+| ② có banner nhưng không có tin phụ nào | Không hiện ② (cột phải không chỉ có quảng cáo). |
+| ③: Tin mới dưới 10 bài (`HOME_MID_AD_MIN_RECENT`) | Bỏ ③ để giữ mật độ mobile ≤ ~30%. |
+| ③: không có Video nổi bật mà có ② | Bỏ ③ — hai banner sẽ đứng sát nhau. Không có ② thì ③ nằm giữa Tin nổi bật và Tin mới. |
+| ④: Tin mới ≤ 6 bài | Bỏ ④ (banner phải nằm giữa các tin, không ở cuối danh sách). |
+| ⑤: Tin mới rỗng | Bỏ ⑤ (đi cùng vùng Tin mới). |
+
+**Mật độ quảng cáo trên mobile** (đo ở 390px, dữ liệu mẫu, tổng chiều cao khung quảng cáo / chiều cao `<main>`): đủ 5 vùng với 11 tin mới **27,8%**; với 7 tin mới và còn ③ thì 31,2% → sinh ra quy tắc ③ cần ≥ 10 tin mới (7 tin không ③: 25,7%). Backend trả đủ 12 tin mới thì ③ luôn hiện.
+**Ảnh LCP:** ① đẩy bài chính xuống ~150px (desktop) / ~160px (mobile); ảnh bài chính vẫn nằm trọn trong màn hình đầu ở 1440×900 và 390×844.
+
+**Trạng thái "không có banner"** — mặc định production vì cờ `ads.display_slots` OFF và backend chưa có `GET /ads/placements`: trang **y hệt đợt 1** (không khung, không khoảng trống, 4 tin phụ, Tin mới lưới 2 cột ở desktop). Đã so: không có `.ad-slot` nào trong HTML.
+
+**Xem thử trên máy dev:** `/?demo-ads=1` (hoặc liệt kê mã: `/?demo-ads=home_top,home_mid`) thay slot bằng banner SVG mẫu ghi rõ vùng/mã/kích thước, kèm dải cảnh báo "Quảng cáo mẫu". Chỉ có tác dụng khi `TT_SITE_ENV=local`; route ảnh `/demo-ads/{mã}.svg` trả 404 ở mọi môi trường khác (`lib/demo-ads.ts`).
+**Không làm ở đợt này:** skin hai bên trang, banner dính đáy màn hình mobile (P1).
 
 ## Bước 4 — Hệ thống thị giác (tạm, chờ WBS-016)
 
@@ -142,7 +222,8 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 | `StoryCard` (`compact` / `row`) | Ảnh nhỏ, tiêu đề, thời gian, (sapo ở `row`) | Ảnh `loading=lazy`. |
 | `VideoCard` | Poster 9:16, badge "▶ m:ss" góc dưới trái, tiêu đề | Không autoplay trên trang chủ (FR-VID-011/012). |
 | `SponsorBadge` | Chữ `sponsorLabel` do backend trả | Không có props để ẩn. |
-| `AdSlot` | Chữ "Quảng cáo" + ảnh creative, `rel="sponsored noopener"` | Chỉ render khi có slot; `aspect-ratio` theo width/height. |
+| `AdSlot` | Nhãn (`label`, mặc định "Quảng cáo") + ảnh creative, `rel="sponsored noopener"` | Chỉ render khi có slot; `width/height` + `aspect-ratio` từ SSR. `media`: `all` / `desktop` (≥ 768px) / `mobile` (< 768px) / `wide` (≥ 1024px) — ở màn hình bị ẩn không tải creative. `eager` cho ①. |
+| `AdPairSlot` | Cặp bản desktop + mobile của một vùng (①③④⑥) | Hai mã riêng vì mỗi mã chỉ một kích thước. |
 | `RelativeTime` | "5 phút trước" / "hôm qua" / ngày | Luôn kèm `<time datetime>`. |
 | `Thumb` (không ảnh) | Nền `--surface-2` + biểu tượng logo mờ | Dùng khi `thumbnailUrl`/`posterUrl` null. |
 
@@ -156,7 +237,10 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 | `/home` lỗi (staging/prod) | Khối lỗi kèm nút "Tải lại"; header/footer vẫn hiện. |
 | `/home` lỗi (môi trường `local`) | Dữ liệu mẫu + dải cảnh báo "Dữ liệu mẫu" để dựng giao diện khi API chưa có. Không bao giờ dùng ở staging/production. |
 | `/categories` lỗi/rỗng | Ẩn nav chuyên mục và cột Chuyên mục ở footer, giữ Shorts + Tìm kiếm. |
-| `/ads/placements` lỗi hoặc cờ OFF | Không có slot, không khung trống. |
+| Không có banner nào (`/ads/placements` lỗi, cờ `ads.display_slots` OFF, chưa tạo placement) | Không có slot, không khung trống — trang y hệt bản không quảng cáo (đợt 1). |
+| Có banner ở một số vùng | Chỉ các vùng đó hiện; quy tắc vùng nào được hiện ở Bước 3 "Vùng quảng cáo". |
+| Slot có URL creative/target không an toàn, kích thước ≤ 0 | Bỏ slot đó (fail-closed). |
+| `?demo-ads` (chỉ `local`) | Banner mẫu + dải cảnh báo "Quảng cáo mẫu". Ở staging/production tham số bị bỏ qua. |
 | Ảnh lỗi/null | Thumb nền trung tính + biểu tượng logo mờ, bố cục giữ nguyên. |
 | Item `SPONSORED` thiếu nhãn / `contentKind` lạ | Bỏ item (fail-closed). |
 
@@ -170,8 +254,18 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 
 1. **Block cấu hình qua CMS (WBS-027).** Đã có phần ghim **Tin nổi bật** theo site: `PUT /admin/home/{siteKey}/featured-articles`, migration 0322; thiếu thì bù bằng bài mới nhất. Bố cục vẫn là 3 vùng cố định. Nếu PO cần thêm/bớt/sắp xếp cả block thì phải sửa spec v0.3 trước. Màn hình CMS để ghim bài chưa làm.
 2. **Đường dẫn công khai** bài/video/chuyên mục chưa chốt (AIR-026 OPEN). Code gom ở `src/lib/routes.ts`: `/articles/{slug}`, `/shorts/{videoId}`, `/categories/{slug}`, `/search`.
-3. **Mã placement quảng cáo** `home_feed`, `home_sidebar` và vị trí "sau bài thứ 6" là đề xuất; WBS-131 (PO + Commercial + Legal) chốt.
+3. **Mã placement quảng cáo — chờ WBS-131 (PO + Commercial + Legal) chốt.** Mười mã đề xuất (`home_top`, `home_top_mobile`, `home_hero_side`, `home_mid`, `home_mid_mobile`, `home_feed`, `home_feed_mobile`, `home_sidebar`, `home_bottom`, `home_bottom_mobile`), kích thước, vị trí "sau bài thứ 6", quy tắc ②/③/④ (Bước 3) và việc chuyển tin nổi bật thứ 5 xuống Tin mới khi có ② đều là đề xuất. Đổi mã: chỉ sửa `HOME_AD_CODES` (`frontend/apps/web/src/lib/home-model.ts`). Lưu ý: `home_feed` trước đây dùng cho cả mobile, nay chỉ ≥ 768px; mobile là `home_feed_mobile`.
+   **Phạm vi:** WBS-133 (P0-ADS) chỉ cam kết "nhãn tài trợ + 1–2 slot tĩnh desktop/mobile". FE dựng sẵn 6 vùng nhưng vùng nào hiện là do placement nào được tạo và duyệt. Mở quá 2 vùng cần PO xác nhận phạm vi (phần vượt có thể thuộc WBS-085, P1). Đợt 2 không cộng effort.
 4. **Số lượng mỗi vùng** (5 / 8 / 12) là mặc định FE; nên để backend quyết bằng cấu hình biên tập.
 5. **Tên chuyên mục trên thẻ bài**: `ArticleSummary` chưa có `categorySlug/categoryName`. Muốn hiện chuyên mục trên thẻ thì phải thêm vào hợp đồng.
 6. **Backend:** đã có `GET /home` và `GET /categories`. `featuredVideos` trả rỗng tới khi có feed video công khai (WBS-041/046).
-7. **Analytics impression** (FR-ANL-001/002) chưa gắn.
+7. **Analytics impression** (FR-ANL-001/002) chưa gắn — kể cả impression/click của banner.
+8. **Khoảng trống hợp đồng/DB quảng cáo — để đợt 3, cần duyệt (contract-first, sửa spec v0.3 trước):**
+   - `tt.ad_placements` (migration 0302) **chưa có `site_key`** và `code` UNIQUE toàn hệ thống → không thể có banner riêng theo site (ADR-0001). Cần `site_key` + unique `(site_key, code)`, và `GET /ads/placements` lọc theo site của request.
+   - **Mỗi code chỉ một banner** (một hàng) → không xoay vòng nhiều creative, không lên lịch nối tiếp nhiều chiến dịch cho cùng vị trí. Nếu cần: tách bảng vị trí (placement) và bảng creative/booking.
+   - **Mỗi code chỉ một width/height** → desktop/mobile phải tách mã (nay 10 mã, chạm `maxItems: 10` của `placementCodes`). Hướng sửa: một vị trí có nhiều biến thể theo breakpoint (ví dụ `variants[{ minWidth, creativeUrl, width, height }]`), hoặc nâng `maxItems`.
+   - ① 970×250 cho chiến dịch lớn: hợp đồng hiện tại chỉ làm được bằng cách sửa kích thước placement; nếu cần chạy song song hai cỡ thì cần biến thể như trên.
+   - ④ "dạng tin" (native): `PublicAdSlot` chỉ có ảnh. Bài tài trợ dạng tin hiện đi qua `contentKind: SPONSORED` trong `recentArticles`; muốn native ad riêng thì phải thêm kiểu creative vào hợp đồng.
+   - **CSP**: `img-src` chỉ cho `'self' data:` + origin media (đang Report-Only). Creative phải nằm trên origin media của Tinhte, hoặc thêm origin ad server vào CSP khi chuyển sang enforce (WBS-071).
+   - **Backend chưa có** `GET /ads/placements` và `/admin/ad-placements`; **CMS chưa có** màn quản lý quảng cáo. Khi có, banner tự hiện ở các vùng trên, không cần deploy web.
+   - Mật độ/khoảng cách quảng cáo hiện do FE tự giữ (`homeAdPlan`); nếu Commercial cần đổi vị trí mà không deploy thì phải có cấu hình bố cục từ backend (liên quan điểm 1).
