@@ -256,6 +256,14 @@ main:focus { outline: none; }
   font-size: var(--fs-2xs); font-weight: var(--fw-bold); letter-spacing: 0.01em;
   background: var(--sponsor-bg); color: var(--sponsor-text);
 }
+/* Dòng trên tiêu đề thẻ: chuyên mục (chữ nhỏ, màu phụ — không dùng --brand vì không phải link riêng; không viết hoa để khác nhãn
+   QUẢNG CÁO) + nhãn tài trợ. Tên dài bị cắt một dòng. */
+.story-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); margin-bottom: 6px; min-width: 0; }
+.story-kicker .sponsor-badge { margin-bottom: 0; }
+.story-kicker__category {
+  max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: var(--fs-2xs); line-height: 1.5; font-weight: var(--fw-bold); letter-spacing: 0.01em; color: var(--muted);
+}
 
 .thumb { position: relative; overflow: hidden; border-radius: var(--radius-sm); background: var(--surface-2); }
 .thumb--16x9 { aspect-ratio: 16 / 9; }

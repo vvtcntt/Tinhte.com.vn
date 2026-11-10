@@ -221,8 +221,9 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 | `Logo` / `LogoMark` | Logo SVG nội tuyến, màu theo token | Bản vector dựng lại từ `assets/logo.png` (PNG vẫn dùng cho JSON-LD). Thay bằng SVG gốc khi có bộ nhận diện (WBS-016). |
 | `SiteNav` | Chuyên mục, `aria-current`, menu **Thêm** (`<details>`) | Render đủ ở server; JS chỉ đóng menu khi bấm ra ngoài / Esc / chuyển trang. |
 | `RailControls` | Nút ‹ › cho dải video | Chỉ hiện khi đã có JS và dải tràn; tôn trọng `prefers-reduced-motion`. |
-| `LeadStory` | Ảnh 16:9, tiêu đề H2, sapo, thời gian, nhãn tài trợ | Ảnh `fetchpriority=high` (LCP). |
-| `StoryCard` (`compact` / `row`) | Ảnh nhỏ, tiêu đề, thời gian, (sapo ở `row`) | Ảnh `loading=lazy`. |
+| `LeadStory` | Ảnh 16:9, chuyên mục + nhãn tài trợ, tiêu đề H2, sapo, thời gian | Ảnh `fetchpriority=high` (LCP). |
+| `StoryCard` (`compact` / `row`) | Ảnh nhỏ, chuyên mục + nhãn tài trợ, tiêu đề, thời gian, (sapo ở `row`) | Ảnh `loading=lazy`. `showCategory={false}` ở trang chuyên mục. |
+| `StoryKicker` | Dòng nhỏ trên tiêu đề: tên chuyên mục (`--fs-2xs`, đậm, màu `--muted`, cắt một dòng — không dùng `--brand` vì không phải link riêng, không viết hoa để khác nhãn QUẢNG CÁO) + `SponsorBadge` | Không có chuyên mục và không tài trợ → không render. |
 | `VideoCard` | Poster 9:16, badge "▶ m:ss" góc dưới trái, tiêu đề | Không autoplay trên trang chủ (FR-VID-011/012). |
 | `SponsorBadge` | Chữ `sponsorLabel` do backend trả | Không có props để ẩn. |
 | `AdSlot` | Một khung: nhãn (`label`, mặc định "Quảng cáo") + một banner, `rel="sponsored noopener"` | `width/height` + `aspect-ratio` của banner từ SSR. Hiện ở các breakpoint của banner (`ad-slot--no-*` ẩn phần còn lại, ở đó không tải creative). `eager` cho ①. |
@@ -260,7 +261,7 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 3. **Mã placement quảng cáo — chờ WBS-131 (PO + Commercial + Legal) chốt.** Mười mã đề xuất (`home_top`, `home_top_mobile`, `home_hero_side`, `home_mid`, `home_mid_mobile`, `home_feed`, `home_feed_mobile`, `home_sidebar`, `home_bottom`, `home_bottom_mobile`), kích thước, vị trí "sau bài thứ 6", quy tắc ②/③/④ (Bước 3) và việc chuyển tin nổi bật thứ 5 xuống Tin mới khi có ② đều là đề xuất. Đổi mã: chỉ sửa `HOME_AD_CODES` (`frontend/apps/web/src/lib/home-model.ts`). Lưu ý: `home_feed` trước đây dùng cho cả mobile, nay chỉ ≥ 768px; mobile là `home_feed_mobile`.
    **Phạm vi:** WBS-133 (P0-ADS) chỉ cam kết "nhãn tài trợ + 1–2 slot tĩnh desktop/mobile". FE dựng sẵn 6 vùng nhưng vùng nào hiện là do placement nào được tạo và duyệt. Mở quá 2 vùng cần PO xác nhận phạm vi (phần vượt có thể thuộc WBS-085, P1). Đợt 2 không cộng effort.
 4. **Số lượng mỗi vùng** (5 / 8 / 12) là mặc định FE; nên để backend quyết bằng cấu hình biên tập.
-5. **Tên chuyên mục trên thẻ bài**: `ArticleSummary` chưa có `categorySlug/categoryName`. Muốn hiện chuyên mục trên thẻ thì phải thêm vào hợp đồng.
+5. **Tên chuyên mục trên thẻ bài — đợt 3 đã làm (DRAFT, chờ PO/UX duyệt):** `ArticleSummary.category` (`{id, slug, name}` hoặc `null`, changelog §17); `GET /home` đã trả. Thẻ hiện tên chuyên mục nhỏ phía trên tiêu đề, cùng dòng với nhãn tài trợ (`StoryKicker`). Tên chuyên mục **không phải link** vì cả thẻ đã là một link (link lồng nhau không hợp lệ). Cần UX quyết: có muốn tách thành link riêng tới trang chuyên mục (phải đổi cấu trúc thẻ) không; trang của chính chuyên mục đó dùng `showCategory={false}` để không lặp nhãn.
 6. **Backend:** đã có `GET /home` và `GET /categories`. `featuredVideos` trả rỗng tới khi có feed video công khai (WBS-041/046).
 7. **Analytics impression** (FR-ANL-001/002) chưa gắn — kể cả impression/click của banner.
 8. **Hợp đồng/DB quảng cáo — đợt 3 đã soạn bản nháp, chờ duyệt** (OpenAPI v0.3 changelog §16, migration `0350_ad_site_bookings`, `db/README.md`):

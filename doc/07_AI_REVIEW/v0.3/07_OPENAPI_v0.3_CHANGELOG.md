@@ -305,3 +305,11 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
 - Test tĩnh: T29 kiểm kích thước qua `AdPlacement.sizes[]` + `PublicAdCreative`; T30 thêm 12 trường hợp (vị trí thiếu site/kích thước/breakpoint lạ, link `javascript:`, banner thiếu alt, ưu tiên > 100, slot không banner, slot kiểu cũ); T10 nhận thêm `PAUSED`/`EXPIRED`/`PUBLIC` là giá trị enum, không phải mã lỗi.
 - **Migration `0350_ad_site_bookings`** (xem `db/README.md`). **Backend:** `GET /api/v1/ads/placements` (module Ads). **Chưa làm:** API quản trị vị trí/đặt chỗ và màn hình CMS — chờ duyệt quyền `ads.manage`/`ads.approve` trong `config/rbac/rbac.json`.
 - Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`).
+
+## 17. Đợt 3 trang chủ — chuyên mục trên thẻ bài (UX-PUB-01, FR-DISC-003, 2026-11-10)
+
+- **DRAFT, chờ PO/UX duyệt.** `ArticleSummary` thêm `category` (không bắt buộc, có thể `null`): `CategoryRef` = `{id, slug, name}` (schema mới). Giá trị là chuyên mục của bài theo bản đã xuất bản (`tt.articles.category_id`, cùng cột mà danh sách theo chuyên mục lọc), chỉ khi chuyên mục đang bật và cùng site với bài; ngược lại `null`.
+- Không phá vỡ tương thích: trường mới tùy chọn, client cũ bỏ qua. Ảnh hưởng mọi nơi dùng `ArticleSummary` (`getHome`, danh sách bài, `Article` kế thừa).
+- **Backend đã trả `category` ở `GET /home`.** Chưa trả ở `getPublicArticle` (vẫn có `categorySlug`) và ở danh sách bài đang làm trên nhánh khác — chỉ cần thêm cột/JOIN `PublicArticleCategorySql` khi gộp.
+- Không đổi đường dẫn, mã lỗi, cờ hay migration (dùng cột `category_id`, `site_key`, `is_enabled` sẵn có).
+- Test tĩnh T30 thêm 3 trường hợp (`category` đủ trường, `null`, thiếu `name`). Kiểm lại: 34/34 PASS.

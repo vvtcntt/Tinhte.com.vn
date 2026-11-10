@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { ContentKind } from '../../lib/contracts';
+import type { ArticleSummary, ContentKind } from '../../lib/contracts';
 import { fullDateTime, relativeTime } from '../../lib/format';
 import { safeHttpUrl } from '../../lib/routes';
 import { LogoMark } from '../Logo';
@@ -8,6 +8,21 @@ import { LogoMark } from '../Logo';
 export function SponsorBadge({ kind, label }: { kind: ContentKind; label?: string | null }) {
   if (kind !== 'SPONSORED') return null;
   return <span className="sponsor-badge">{label}</span>;
+}
+
+/**
+ * Dòng nhỏ phía trên tiêu đề thẻ bài: tên chuyên mục (chữ thường, KHÔNG phải link — cả thẻ đã là một link, link lồng nhau không hợp lệ)
+ * và nhãn tài trợ (luôn hiện khi SPONSORED, không có props để ẩn). Không có gì để hiện → không render.
+ */
+export function StoryKicker({ article, showCategory = true }: { article: ArticleSummary; showCategory?: boolean }) {
+  const category = showCategory ? article.category?.name?.trim() : '';
+  if (!category && article.contentKind !== 'SPONSORED') return null;
+  return (
+    <p className="story-kicker">
+      {category && <span className="story-kicker__category">{category}</span>}
+      <SponsorBadge kind={article.contentKind} label={article.sponsorLabel} />
+    </p>
+  );
 }
 
 export function TimeAgo({ iso }: { iso: string }) {

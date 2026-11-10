@@ -389,6 +389,13 @@ class SchemaBehaviour(unittest.TestCase):
             ("ModerationActionRequest", {"action": "LOCK", "reason": "spam lặp"}, True),
             ("Problem", {"type": "about:blank", "title": "x", "status": 403, "code": "COMMENT_DISABLED", "traceId": "t"}, False),
         ]
+        if "CategoryRef" in COMP["schemas"]:  # đợt 3: chuyên mục trên thẻ bài, có thể null
+            cat = {"id": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "slug": "dien-thoai", "name": "Điện thoại"}
+            cases += [
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": cat}, True),
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": None}, True),
+                ("ArticleSummary", {**art, "contentKind": "EDITORIAL", "category": {"slug": "dien-thoai"}}, False),
+            ]
         if "AdBookingCreate" in COMP["schemas"]:  # đợt 3: vị trí theo site, banner nằm ở đặt chỗ, nhiều kích thước
             size = {"breakpoint": "DESKTOP", "width": 970, "height": 90}
             place = {"siteKey": "www", "code": "home_top", "label": "Quảng cáo", "sizes": [size]}

@@ -7739,8 +7739,29 @@ components:
           - string
           - 'null'
           description: Display label, e.g. 'Nội dung tài trợ' (text approved by Legal)
+        category:
+          oneOf:
+          - $ref: '#/components/schemas/CategoryRef'
+          - type: 'null'
+          description: 'DRAFT v0.3 (đợt 3 trang chủ): category of the article as last published (tt.articles.category_id), only when it is
+            enabled and belongs to the same site; otherwise null. Optional: clients must render the card without it.'
       allOf:
       - $ref: '#/components/schemas/SponsoredLabelRule'
+    CategoryRef:
+      type: object
+      description: Minimal public category reference for cards; link with /categories/{slug} on the same site.
+      required:
+      - id
+      - slug
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
     Article:
       allOf:
       - $ref: '#/components/schemas/ArticleSummary'

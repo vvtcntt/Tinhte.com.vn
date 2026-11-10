@@ -3,6 +3,13 @@
 
 export type ContentKind = 'EDITORIAL' | 'SPONSORED';
 
+/** CategoryRef (DRAFT đợt 3): chuyên mục tối thiểu trên thẻ bài. */
+export interface CategoryRef {
+  id: string;
+  slug: string;
+  name: string;
+}
+
 export interface ArticleSummary {
   id: string;
   slug: string;
@@ -12,6 +19,8 @@ export interface ArticleSummary {
   thumbnailUrl?: string | null;
   contentKind: ContentKind;
   sponsorLabel?: string | null;
+  /** DRAFT đợt 3: chuyên mục theo bản đã xuất bản; null/thiếu → thẻ không có nhãn chuyên mục. */
+  category?: CategoryRef | null;
 }
 
 export interface VideoSummary {

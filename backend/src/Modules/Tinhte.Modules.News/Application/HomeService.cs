@@ -17,7 +17,14 @@ public sealed record PublicArticleSummary(
     DateTimeOffset PublishedAt,
     string? ThumbnailUrl,
     string ContentKind,
-    string? SponsorLabel);
+    string? SponsorLabel)
+{
+    /// <summary>ArticleSummary.category (DRAFT đợt 3): init-only để nơi khác dựng thẻ bài không phải đổi chữ ký; null = không hiện.</summary>
+    public PublicCategoryRef? Category { get; init; }
+}
+
+/// <summary>Schema CategoryRef (chuyên mục tối thiểu trên thẻ bài).</summary>
+public sealed record PublicCategoryRef(Guid Id, string Slug, string Name);
 
 /// <summary>Schema HomePage. featuredVideos: thuộc module video (WBS-041/046) — tạm rỗng tới khi có feed video công khai.</summary>
 public sealed record HomePage(
@@ -35,8 +42,8 @@ public sealed class HomeService(ITinhteDatabase database, IOptions<NewsOptions> 
     public const int FeaturedLimit = 5;
     public const int RecentLimit = 12;
 
-    private const string Columns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind";
-    private const string Join = "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id";
+    private const string Columns = "a.id, a.slug, r.title, r.summary, a.published_at, r.content_kind, " + PublicArticleCategorySql.Columns;
+    private const string Join = "JOIN tt.article_revisions r ON r.id = a.public_revision_id AND r.article_id = a.id " + PublicArticleCategorySql.Join;
 
     private const string PickedSql = $"""
         SELECT {Columns}
@@ -92,6 +99,6 @@ public sealed class HomeService(ITinhteDatabase database, IOptions<NewsOptions> 
             PublishedAt: ArticleSql.Time(r, 4),
             ThumbnailUrl: null,                 // ảnh đại diện: thuộc WBS media
             ContentKind: kind,
-            SponsorLabel: kind == ContentKinds.Sponsored ? label : null);
+            SponsorLabel: kind == ContentKinds.Sponsored ? label : null) { Category = PublicArticleCategorySql.Read(r, 6) };
     }
 }

@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import type { AdView } from '../src/lib/ads.ts';
 import type { AdBreakpoint, ArticleSummary, HomePage, PublicAdSlot, VideoSummary } from '../src/lib/contracts.ts';
 import { demoAdSlots, demoAdSvg, parseDemoAds } from '../src/lib/demo-ads.ts';
+import { demoCategories, demoHome } from '../src/lib/demo-home.ts';
 import {
   acceptAdSlots, HOME_AD_BREAKPOINTS, HOME_AD_CODE_LIST, HOME_AD_CODES, HOME_AD_SIZES, HOME_FEED_AD_AFTER, HOME_LIMITS, HOME_MID_AD_MIN_RECENT,
   homeAdPlan, homeFeaturedLimit, PLACEMENT_CODES_MAX, prepareHome, type HomeAds,
@@ -179,4 +180,16 @@ test('demo-ads: chỉ nhận mã trang chủ, slot mẫu qua được acceptAdSl
   assert.match(demoAdSvg('home_top.svg') ?? '', /width="970" height="90"/);
   assert.equal(demoAdSvg('home_top.png'), null);
   assert.equal(demoAdSvg('../etc.svg'), null);
+});
+
+test('chuyên mục trên thẻ (đợt 3): prepareHome giữ nguyên category; bài mẫu chỉ dùng chuyên mục mẫu, có bài không chuyên mục', () => {
+  const cat = { id: 'c1', slug: 'dien-thoai', name: 'Điện thoại' };
+  const out = prepareHome({ featuredArticles: [article(1, 0, { category: cat })], recentArticles: [article(2, 5, { category: null })], featuredVideos: [] });
+  assert.deepEqual(out.featuredArticles[0]?.category, cat);
+  assert.equal(out.recentArticles[0]?.category, null);
+  const demo = demoHome(Date.UTC(2026, 10, 10));
+  const all = [...demo.featuredArticles, ...demo.recentArticles];
+  const known = new Set(demoCategories.map((c) => c.slug));
+  assert.ok(all.every((a) => a.category === null || known.has(a.category!.slug)));
+  assert.ok(all.some((a) => a.category === null) && all.some((a) => a.category !== null));
 });
