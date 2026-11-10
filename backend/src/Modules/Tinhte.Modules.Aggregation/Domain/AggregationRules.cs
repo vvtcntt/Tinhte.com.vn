@@ -38,8 +38,12 @@ public static class UsageModes
 public static class FeedFormats
 {
     public const string Auto = "AUTO";
+    public const string Rss2 = "RSS2";
+    public const string Rss1 = "RSS1";
+    public const string Atom = "ATOM";
+    public const string JsonFeed = "JSONFEED";
 
-    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Auto, "RSS2", "RSS1", "ATOM", "JSONFEED" };
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal) { Auto, Rss2, Rss1, Atom, JsonFeed };
 }
 
 /// <summary>AggregationFeedHealth. DISABLED không lưu ở DB: suy ra từ <c>is_enabled = false</c>.</summary>

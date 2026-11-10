@@ -139,6 +139,15 @@ internal static class AggregationSql
     public static NpgsqlCommand WithJsonb(this NpgsqlCommand command, string name, string? value) =>
         command.With(name, NpgsqlDbType.Jsonb, value);
 
+    public static NpgsqlCommand WithTime(this NpgsqlCommand command, string name, DateTimeOffset? value) =>
+        command.With(name, NpgsqlDbType.TimestampTz, value?.ToUniversalTime());
+
+    public static NpgsqlCommand WithSmallInt(this NpgsqlCommand command, string name, int? value) =>
+        command.With(name, NpgsqlDbType.Smallint, value is { } v ? (short)Math.Clamp(v, short.MinValue, short.MaxValue) : null);
+
+    public static NpgsqlCommand WithDecimal(this NpgsqlCommand command, string name, decimal? value) =>
+        command.With(name, NpgsqlDbType.Numeric, value);
+
     private static NpgsqlCommand With(this NpgsqlCommand command, string name, NpgsqlDbType type, object? value)
     {
         command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value ?? DBNull.Value });

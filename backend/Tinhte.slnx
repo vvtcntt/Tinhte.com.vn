@@ -3,6 +3,7 @@
     <Project Path="src/Tinhte.Api/Tinhte.Api.csproj" />
     <Project Path="src/Tinhte.DbMigrator/Tinhte.DbMigrator.csproj" />
     <Project Path="src/Tinhte.Platform/Tinhte.Platform.csproj" />
+    <Project Path="src/Tinhte.Worker/Tinhte.Worker.csproj" />
   </Folder>
   <Folder Name="/src/Modules/">
     <Project Path="src/Modules/Tinhte.Modules.Ads/Tinhte.Modules.Ads.csproj" />

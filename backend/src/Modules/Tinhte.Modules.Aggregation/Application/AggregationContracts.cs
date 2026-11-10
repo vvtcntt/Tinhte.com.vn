@@ -119,3 +119,80 @@ public sealed record AggregationSourceFilter(IReadOnlyList<string> Statuses, str
 
 /// <summary>Vị trí cursor: sắp theo tên nguồn rồi id.</summary>
 public sealed record AggregationSourcePosition(string Name, Guid Id);
+
+// ---------------------------------------------------------------- lát 2: thử feed, luật chuyên mục, mục tin (FR-AGG-002…004)
+
+/// <summary>AggregationFeedTestRequest.</summary>
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+public sealed record AggregationFeedTestRequest(
+    [Required] string? Url,
+    string? Format);
+
+/// <summary>AggregationFeedTestItem.</summary>
+public sealed record AggregationFeedTestItem(string Title, string Url, DateTimeOffset? PublishedAt, bool TimeReliable);
+
+/// <summary>AggregationFeedTestResult: lỗi của nguồn là dữ liệu (<c>failure</c>), không phải Problem.</summary>
+public sealed record AggregationFeedTestResult(
+    bool Ok,
+    int? HttpStatus,
+    string? DetectedFormat,
+    string? FeedTitle,
+    bool RobotsAllowed,
+    int ItemCount,
+    IReadOnlyList<AggregationFeedTestItem> SampleItems,
+    string? Failure,
+    long DurationMs);
+
+/// <summary>AggregationCategoryRule. Chuyên mục chưa có luật: danh sách rỗng, rowVersion 1, updatedBy/updatedAt null.</summary>
+public sealed record AggregationCategoryRule(
+    Guid CategoryId,
+    string SiteKey,
+    string CategoryName,
+    IReadOnlyList<string> IncludeKeywords,
+    IReadOnlyList<string> ExcludeKeywords,
+    IReadOnlyList<string> EntityKeywords,
+    Guid? UpdatedBy,
+    DateTimeOffset? UpdatedAt,
+    long RowVersion);
+
+/// <summary>AggregationCategoryRuleList.</summary>
+public sealed record AggregationCategoryRuleList(IReadOnlyList<AggregationCategoryRule> Items);
+
+/// <summary>AggregationItem — văn bản thuần, không bao giờ trả HTML của nguồn.</summary>
+public sealed record AggregationItem(
+    Guid Id,
+    Guid SourceId,
+    string SourceName,
+    Guid FeedId,
+    string Title,
+    string Url,
+    string? Summary,
+    string? Author,
+    DateTimeOffset? PublishedAt,
+    DateTimeOffset FirstSeenAt,
+    bool TimeReliable,
+    string? Language,
+    IReadOnlyList<string> FeedCategories,
+    string Status,
+    Guid? CategoryId,
+    decimal? Confidence,
+    bool NeedsReview,
+    bool Sensitive,
+    int Version,
+    Guid? ClusterId);
+
+/// <summary>Bộ lọc listAdminAggregationItems (đã chuẩn hóa: khoảng thời gian UTC tính theo múi giờ tòa soạn).</summary>
+public sealed record AggregationItemFilter(
+    string SiteKey,
+    DateTimeOffset From,
+    DateTimeOffset? To,
+    Guid? SourceId,
+    Guid? CategoryId,
+    IReadOnlyList<string> Statuses,
+    string? Q)
+{
+    public string ScopeKey() => string.Join('|', SiteKey, From.UtcTicks, To?.UtcTicks, SourceId, CategoryId, string.Join(',', Statuses), Q);
+}
+
+/// <summary>Vị trí cursor mục tin: mới thấy trước (first_seen_at giảm dần, id giảm dần).</summary>
+public sealed record AggregationItemPosition(DateTimeOffset FirstSeenAt, Guid Id);

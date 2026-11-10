@@ -1,0 +1,28 @@
+{
+  "$comment": "DRAFT — FILE MẪU, chưa được Legal/Ban biên tập duyệt (BA-01 BR-34, ADR-0008 §7). Đổi bằng pull request có review của Legal hoặc Ban biên tập; không có API sửa ở GĐ1. Khóa '*' áp cho mọi site; thêm khóa theo site_key của Site Registry. Từ khóa khớp nguyên cụm từ, không phân biệt hoa thường, GIỮ dấu tiếng Việt. Mục khớp được gắn sensitive = true (không được dùng cho soạn nháp AI ở GĐ2).",
+  "version": 1,
+  "sites": {
+    "*": [
+      {
+        "topic": "politics",
+        "keywords": ["bầu cử", "đảng phái", "chính trị", "biểu tình", "election", "politics", "protest"]
+      },
+      {
+        "topic": "national-security",
+        "keywords": ["an ninh quốc gia", "khủng bố", "quân sự", "terrorism", "terrorist", "national security", "military"]
+      },
+      {
+        "topic": "religion",
+        "keywords": ["tôn giáo", "tín ngưỡng", "religion", "religious"]
+      },
+      {
+        "topic": "unverified-rumour",
+        "keywords": ["tin đồn", "chưa kiểm chứng", "chưa được xác nhận", "rumor", "rumour", "unconfirmed report"]
+      },
+      {
+        "topic": "loss-of-life",
+        "keywords": ["tử vong", "thiệt mạng", "tử nạn", "thương vong", "fatal", "fatalities", "killed", "death toll"]
+      }
+    ]
+  }
+}

@@ -9,7 +9,7 @@ namespace Tinhte.Modules.Aggregation.Application;
 /// <summary>
 /// Feed của nguồn (FR-AGG-001/002). Thêm feed hoặc đổi URL ⇒ hồ sơ nguồn phải duyệt lại (BR-01): xóa người duyệt hiện hành,
 /// ENABLED/DEGRADED → PROPOSED (PAUSED giữ PAUSED nhưng không resume được tới khi duyệt lại). Feed không xóa, chỉ tắt.
-/// Lịch thu thập: <c>next_fetch_at</c> = now() khi bật/đổi URL, NULL khi tắt; worker (lát sau) chỉ lấy feed của nguồn ENABLED/DEGRADED.
+/// Lịch thu thập: <c>next_fetch_at</c> = now() khi bật/đổi URL, NULL khi tắt; worker (Tinhte.Worker) chỉ lấy feed của nguồn ENABLED/DEGRADED.
 /// </summary>
 public sealed partial class AggregationSourceService
 {
@@ -107,6 +107,7 @@ public sealed partial class AggregationSourceService
                        health = CASE WHEN @url_changed THEN 'NEVER_FETCHED' ELSE health END,
                        consecutive_failures = CASE WHEN @url_changed THEN 0 ELSE consecutive_failures END,
                        last_failure = CASE WHEN @url_changed THEN NULL ELSE last_failure END,
+                       failing_since = CASE WHEN @url_changed THEN NULL ELSE failing_since END,
                        lease_until = CASE WHEN @url_changed THEN NULL ELSE lease_until END,
                        next_fetch_at = CASE WHEN NOT COALESCE(@enabled, is_enabled) THEN NULL
                                             WHEN @url_changed OR next_fetch_at IS NULL THEN now()

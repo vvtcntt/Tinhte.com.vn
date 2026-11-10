@@ -417,6 +417,20 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'AG24 down 0341 từ chối khi đã có lịch sử nguồn', `${AGG} ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))}`, /Refusing to roll back 0341/);
   await expectError(sc, db, 'AG25 down 0340 từ chối khi đã có giấy phép', `INSERT INTO tt.licenses (code, name, usage_scope) VALUES ('LIC-X', 'X', 'Y');
     ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))} ${read(path.join(MIG_DIR, '0340_content_sources_licenses.down.sql'))}`, /Refusing to roll back 0340/);
+  // Bộ thu thập (0342): row_version của feed chỉ đổi khi CMS sửa; failing_since; down tạo lại trigger cũ.
+  const FEED_RV = `SELECT row_version FROM tt.agg_feeds WHERE id = '${id('fe1')}'`;
+  await expectOk(sc, db, 'AG26 worker cập nhật lease/ETag/sức khỏe/failing_since không đổi row_version; CMS đổi lịch thì tăng', `${AGG} ${FEED()}
+    UPDATE tt.agg_feeds SET lease_until = now() + interval '2 minutes', health = 'DEGRADED', consecutive_failures = 1, last_failure = 'TIMEOUT',
+      failing_since = now(), etag = 'W/"x"', next_fetch_at = now() + interval '30 minutes';
+    DO $$ BEGIN IF (${FEED_RV}) <> 1 THEN RAISE EXCEPTION 'worker bumped row_version'; END IF; END $$;
+    UPDATE tt.agg_feeds SET schedule_minutes = 30;
+    DO $$ BEGIN IF (${FEED_RV}) <> 2 THEN RAISE EXCEPTION 'cms did not bump row_version'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG27 down 0342 tạo lại trigger tăng row_version ở mọi UPDATE', `${AGG} ${FEED()}
+    ${read(path.join(MIG_DIR, '0342_aggregation_collector.down.sql'))}
+    UPDATE tt.agg_feeds SET lease_until = now();
+    DO $$ BEGIN IF (${FEED_RV}) <> 2 OR to_regclass('tt.ix_agg_items_site_recent') IS NOT NULL
+      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'tt' AND table_name = 'agg_feeds' AND column_name = 'failing_since')
+      THEN RAISE EXCEPTION 'down 0342'; END IF; END $$;`);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);

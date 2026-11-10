@@ -6188,6 +6188,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-004
       x-scope: P2
@@ -6197,6 +6199,7 @@ paths:
       - UNAUTHENTICATED
       - FEATURE_DISABLED
       - FORBIDDEN
+      - NOT_FOUND
   /admin/aggregation/category-rules/{categoryId}:
     patch:
       tags:
@@ -6296,6 +6299,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-003
       x-scope: P2
@@ -6306,6 +6311,7 @@ paths:
       - UNAUTHENTICATED
       - FEATURE_DISABLED
       - FORBIDDEN
+      - NOT_FOUND
   /admin/aggregation/clusters:
     get:
       tags:
@@ -6338,6 +6344,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-005
       x-scope: P2
@@ -6348,6 +6356,7 @@ paths:
       - UNAUTHENTICATED
       - FEATURE_DISABLED
       - FORBIDDEN
+      - NOT_FOUND
   /admin/aggregation/clusters/{clusterId}:
     get:
       tags:
@@ -6854,6 +6863,8 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-002
       - FR-AGG-005
@@ -6864,6 +6875,7 @@ paths:
       - UNAUTHENTICATED
       - FEATURE_DISABLED
       - FORBIDDEN
+      - NOT_FOUND
 components:
   securitySchemes:
     cmsSession:
@@ -7359,7 +7371,7 @@ components:
       schema:
         type: string
         pattern: ^[a-z][a-z0-9-]{0,30}$
-      description: Public-web site key from the Site Registry (404 otherwise).
+      description: Public-web site key from the Site Registry (404 NOT_FOUND otherwise; malformed or missing → 400 BAD_REQUEST).
     AggregationDate:
       name: date
       in: query

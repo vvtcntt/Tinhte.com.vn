@@ -589,7 +589,7 @@ public sealed class AggregationDbTests(MigratedDatabaseFixture db, WebApplicatio
         var (_, approvedEtag) = await ApproveAsync(cms, sourceId, sourceEtag);
         await ExecAsync($"UPDATE tt.agg_feeds SET health = 'FAILING', consecutive_failures = 4, last_failure = 'TIMEOUT', etag = 'W/\"abc\"' WHERE id = '{feedId}'");
         var (moved, _) = await SendAsync(cms, Req(HttpMethod.Patch, $"/feeds/{feedId}", _editor,
-            json: $$"""{"url":"https://news.example.org/moi-{{sourceId:N}}","isEnabled":true}""", ifMatch: "W/\"3\""));
+            json: $$"""{"url":"https://news.example.org/moi-{{sourceId:N}}","isEnabled":true}""", ifMatch: "W/\"2\""));   // 0342: cập nhật kiểu worker không đổi row_version
         Assert.Equal("NEVER_FETCHED", moved.GetProperty("health").GetString());
         Assert.Equal(0, moved.GetProperty("consecutiveFailures").GetInt32());
         Assert.Equal(JsonValueKind.Null, moved.GetProperty("lastFailure").ValueKind);
