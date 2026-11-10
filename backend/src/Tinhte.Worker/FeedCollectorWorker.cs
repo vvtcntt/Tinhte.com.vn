@@ -54,6 +54,7 @@ public sealed partial class FeedCollectorWorker(
                 if (DateTimeOffset.UtcNow >= nextHousekeeping)
                 {
                     await operations.PurgeFetchLogAsync(stoppingToken);
+                    await operations.PurgeUnclusteredItemsAsync(stoppingToken);
                     nextHousekeeping = DateTimeOffset.UtcNow + options.MaintenanceInterval;
                 }
             }

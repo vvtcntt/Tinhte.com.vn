@@ -11,8 +11,13 @@ public sealed record ClassificationThresholds(decimal AutoAssign, decimal Review
     public static ClassificationThresholds Default { get; } = new(0.80m, 0.50m);
 }
 
-/// <summary>Kết quả phân loại một mục (cột site_key, category_id, category_confidence, needs_review, sensitive, status của tt.agg_items).</summary>
-public sealed record Classification(string SiteKey, Guid? CategoryId, decimal? Confidence, bool NeedsReview, bool Sensitive, string Status);
+/// <summary>
+/// Kết quả phân loại một mục (cột site_key, category_id, category_confidence, needs_review, sensitive, status, category_ids của tt.agg_items).
+/// <c>CategoryIds</c>: chuyên mục chính (đứng đầu) + mọi chuyên mục khác cùng site đủ ngưỡng xem (ánh xạ category của feed hoặc từ khóa) —
+/// gom cụm chỉ so mục có chung chuyên mục (BA-01 P-02). Rỗng khi không thuộc chuyên mục nào.
+/// </summary>
+public sealed record Classification(string SiteKey, Guid? CategoryId, decimal? Confidence, bool NeedsReview, bool Sensitive, string Status,
+    IReadOnlyList<Guid> CategoryIds);
 
 /// <summary>
 /// Phân loại không dùng AI (ADR-0008 §7, BR-30 tầng 1–2, BR-31, BR-34):
@@ -61,32 +66,38 @@ public sealed class ItemClassifier
         decimal? confidence = null;
         var tie = false;
 
+        var mappedAll = new List<(Guid CategoryId, string SiteKey)>();
         foreach (var feedCategory in item.FeedCategories)
         {
             if (_mapping.TryGetValue(feedCategory.Trim(), out var mapped))
             {
-                (category, site, confidence) = (mapped.CategoryId, mapped.SiteKey, 1.0m);
-                break;
+                if (category is null) (category, site, confidence) = (mapped.CategoryId, mapped.SiteKey, 1.0m);
+                mappedAll.Add(mapped);
             }
+        }
+
+        var keywordMatches = new List<(Guid CategoryId, string SiteKey, decimal Confidence)>();
+        foreach (var rule in _rules)
+        {
+            if (rule.Exclude.Any(k => HasWord(all, k))) continue;
+            var score = 0;
+            foreach (var keyword in rule.Include.Concat(rule.Entities).Distinct(StringComparer.Ordinal))
+            {
+                if (HasWord(title, keyword)) score += 2;
+                else if (HasWord(all, keyword)) score += 1;
+            }
+
+            if (score == 0) continue;
+            keywordMatches.Add((rule.CategoryId, rule.SiteKey, Math.Min(0.95m, 0.4m + (0.15m * score))));
         }
 
         if (category is null)
         {
-            foreach (var rule in _rules)
+            foreach (var (ruleCategory, ruleSite, c) in keywordMatches)
             {
-                if (rule.Exclude.Any(k => HasWord(all, k))) continue;
-                var score = 0;
-                foreach (var keyword in rule.Include.Concat(rule.Entities).Distinct(StringComparer.Ordinal))
-                {
-                    if (HasWord(title, keyword)) score += 2;
-                    else if (HasWord(all, keyword)) score += 1;
-                }
-
-                if (score == 0) continue;
-                var c = Math.Min(0.95m, 0.4m + (0.15m * score));
                 if (confidence is null || c > confidence)
                 {
-                    (category, site, confidence, tie) = (rule.CategoryId, rule.SiteKey, c, false);
+                    (category, site, confidence, tie) = (ruleCategory, ruleSite, c, false);
                 }
                 else if (c == confidence)
                 {
@@ -99,10 +110,15 @@ public sealed class ItemClassifier
         if (category is null || site is null || confidence < thresholds.Review)
         {
             var fallback = _siteKeys[0];
-            return new Classification(fallback, null, confidence, false, _sensitive.Matches(fallback, all), OutOfScope);
+            return new Classification(fallback, null, confidence, false, _sensitive.Matches(fallback, all), OutOfScope, []);
         }
 
-        return new Classification(site, category, confidence, tie || confidence < thresholds.AutoAssign, _sensitive.Matches(site, all), Classified);
+        // Chuyên mục phụ: cùng site với chuyên mục chính, từ ánh xạ feed hoặc từ khóa đủ ngưỡng xem.
+        List<Guid> ids = [category.Value];
+        ids.AddRange(mappedAll.Where(m => m.SiteKey == site).Select(m => m.CategoryId));
+        ids.AddRange(keywordMatches.Where(m => m.SiteKey == site && m.Confidence >= thresholds.Review).Select(m => m.CategoryId));
+        return new Classification(site, category, confidence, tie || confidence < thresholds.AutoAssign, _sensitive.Matches(site, all), Classified,
+            ids.Distinct().ToList());
     }
 
     /// <summary>Khớp nguyên từ: <paramref name="padded"/> có dạng " a b c ", <paramref name="folded"/> đã qua Fold.</summary>

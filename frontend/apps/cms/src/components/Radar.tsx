@@ -9,6 +9,8 @@ import {
   CLUSTER_STATUS_LABEL,
   CLUSTER_STATUSES,
   DEFAULT_CLUSTER_STATUSES,
+  DEFAULT_RADAR_WINDOW,
+  type RadarWindowMode,
   ago,
   allowedClusterActions,
   clusterBadges,
@@ -63,7 +65,7 @@ export function RadarPage() {
 function Radar() {
   const staff = useStaff();
   const [siteKey, setSiteKey] = useState(() => contentSites()[0]?.key ?? 'www');
-  const [windowMode, setWindowMode] = useState<'TODAY' | 'LAST_24H' | 'DATE'>('TODAY');
+  const [windowMode, setWindowMode] = useState<RadarWindowMode>(DEFAULT_RADAR_WINDOW);
   const [date, setDate] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [statuses, setStatuses] = useState<string[]>([...DEFAULT_CLUSTER_STATUSES]);

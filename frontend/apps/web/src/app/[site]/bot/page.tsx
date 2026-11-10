@@ -58,7 +58,7 @@ export default async function BotPage({ params }: Props) {
 
           <h2>Tần suất và tải</h2>
           <ul>
-            <li>Mỗi feed được đọc tối đa một lần mỗi 15 phút theo mặc định (không dưới 5 phút), và thưa hơn nếu feed khai báo <code>ttl</code> hoặc <code>sy:updatePeriod</code>.</li>
+            <li>Mỗi feed được đọc tối đa một lần mỗi 30 phút theo mặc định (không dưới 5 phút), và thưa hơn nếu feed khai báo <code>ttl</code> hoặc <code>sy:updatePeriod</code>.</li>
             <li>Bot gửi yêu cầu có điều kiện (<code>If-None-Match</code>, <code>If-Modified-Since</code>): feed không đổi thì máy chủ chỉ cần trả <code>304</code>.</li>
             <li>Khi máy chủ trả <code>429</code> hoặc <code>503</code>, bot tôn trọng <code>Retry-After</code> và giãn lịch tới tối đa 6 giờ. Mỗi lần đọc giới hạn 20 giây và 5 MB.</li>
           </ul>

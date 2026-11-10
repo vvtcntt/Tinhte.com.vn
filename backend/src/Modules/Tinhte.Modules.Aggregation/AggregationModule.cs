@@ -41,6 +41,8 @@ public sealed class AggregationModule : IModule
         services.TryAddSingleton<FeedUrlPolicy>();
         services.TryAddSingleton(sp => AggregationOptions.From(sp.GetRequiredService<IConfiguration>()));
         services.TryAddSingleton(sp => new NewsroomClock(sp.GetRequiredService<AggregationOptions>().NewsroomTimeZone));
+        // AI xác định tin trùng chủ đề (ADR-0008 §7, cờ aggregation.ai_dedup): mặc định không gọi AI; module AI đăng ký bản thật trước.
+        services.TryAddSingleton<Tinhte.Platform.Ai.ISameEventJudge, Tinhte.Platform.Ai.NoAiSameEventJudge>();
         services.TryAddSingleton(sp => BotUserAgent.FromRegistry(sp.GetRequiredService<SiteRegistry>(), sp.GetRequiredService<IConfiguration>()));
         services.TryAddSingleton(sp => new FeedFetcher(SafeFeedHttp.CreateHandler(sp.GetRequiredService<IFeedHostResolver>()),
             sp.GetRequiredService<IFeedHostResolver>(), sp.GetRequiredService<BotUserAgent>(), sp.GetRequiredService<TimeProvider>()));

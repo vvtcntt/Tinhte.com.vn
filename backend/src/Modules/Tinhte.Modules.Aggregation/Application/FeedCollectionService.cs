@@ -343,11 +343,12 @@ public sealed partial class FeedCollectionService(
         var feedUri = new Uri(lease.Url);
         var (created, updated) = (0, 0);
         var handled = new HashSet<string>(StringComparer.Ordinal);
+        var cutoff = ItemNormalizer.IntakeCutoff(now, lease.FirstFetch, options.TodayOnly, clock);
         foreach (var raw in parsed.Items)
         {
             var item = ItemNormalizer.Normalize(raw, feedUri, now);
             if (item is null || !handled.Add(item.UrlHash)) continue;
-            if (lease.FirstFetch && item.EffectiveAt < now - ItemNormalizer.FirstFetchWindow) continue;   // BR-14
+            if (item.EffectiveAt < cutoff) continue;   // P-02: chỉ tin trong ngày (hoặc BR-14 khi tắt)
 
             var (result, id) = await UpsertItemAsync(connection, tx, lease, feed, item, classifier, ct);
             if (result == ItemChange.Created) created++;
@@ -393,9 +394,9 @@ public sealed partial class FeedCollectionService(
             await using var insert = AggregationSql.Command(connection, tx, """
                 INSERT INTO tt.agg_items (content_source_id, feed_id, guid, url, url_hash, title, summary, author, feed_categories, language,
                                           published_at, time_reliable, status, site_key, category_id, category_confidence, needs_review, sensitive,
-                                          content_hash, source_updated_at)
+                                          content_hash, source_updated_at, category_ids)
                 VALUES (@source, @feed, @guid, @url, @hash, @title, @summary, @author, @categories::varchar(200)[], @language,
-                        @published, @reliable, @status, @site, @category, @confidence, @review, @sensitive, @content_hash, @updated)
+                        @published, @reliable, @status, @site, @category, @confidence, @review, @sensitive, @content_hash, @updated, @category_ids)
                 ON CONFLICT DO NOTHING
                 RETURNING id
                 """)
@@ -404,7 +405,7 @@ public sealed partial class FeedCollectionService(
                 .WithTextArray("categories", item.FeedCategories).WithText("language", feed.Language).WithTime("published", item.PublishedAt)
                 .WithBool("reliable", item.TimeReliable).WithText("status", c.Status).WithText("site", c.SiteKey).WithUuid("category", c.CategoryId)
                 .WithDecimal("confidence", c.Confidence).WithBool("review", c.NeedsReview).WithBool("sensitive", c.Sensitive)
-                .WithText("content_hash", item.ContentHash).WithTime("updated", item.SourceUpdatedAt);
+                .WithText("content_hash", item.ContentHash).WithTime("updated", item.SourceUpdatedAt).WithUuidArray("category_ids", [.. c.CategoryIds]);
             return await insert.ExecuteScalarAsync(ct) is Guid createdId ? (ItemChange.Created, createdId) : (ItemChange.None, null);
         }
 
@@ -427,6 +428,7 @@ public sealed partial class FeedCollectionService(
                    status = CASE WHEN @reclassify THEN @status ELSE status END,
                    site_key = CASE WHEN @reclassify THEN @site ELSE site_key END,
                    category_id = CASE WHEN @reclassify THEN @category ELSE category_id END,
+                   category_ids = CASE WHEN @reclassify THEN @category_ids ELSE category_ids END,
                    category_confidence = CASE WHEN @reclassify THEN @confidence ELSE category_confidence END,
                    needs_review = CASE WHEN @reclassify THEN @review ELSE needs_review END,
                    sensitive = CASE WHEN @reclassify THEN @sensitive ELSE sensitive END
@@ -435,7 +437,8 @@ public sealed partial class FeedCollectionService(
             .WithTextArray("categories", categories).WithBool("changed", changed).WithText("title", item.Title).WithText("summary", item.Summary)
             .WithText("author", item.Author).WithText("content_hash", item.ContentHash).WithTime("updated", item.SourceUpdatedAt)
             .WithBool("reclassify", reclassify).WithText("status", c.Status).WithText("site", c.SiteKey).WithUuid("category", c.CategoryId)
-            .WithDecimal("confidence", c.Confidence).WithBool("review", c.NeedsReview).WithBool("sensitive", c.Sensitive).WithUuid("id", existingId);
+            .WithDecimal("confidence", c.Confidence).WithBool("review", c.NeedsReview).WithBool("sensitive", c.Sensitive).WithUuid("id", existingId)
+            .WithUuidArray("category_ids", [.. c.CategoryIds]);
         await update.ExecuteNonQueryAsync(ct);
         return (changed ? ItemChange.Updated : ItemChange.None, existingId);
     }

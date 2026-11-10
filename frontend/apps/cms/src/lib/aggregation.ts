@@ -247,6 +247,11 @@ export const ALERT_LABEL: Record<string, string> = {
 export const FEED_FORMATS: readonly FeedFormat[] = ['AUTO', 'RSS2', 'RSS1', 'ATOM', 'JSONFEED'];
 export const CLUSTER_STATUSES: readonly ClusterStatus[] = ['OPEN', 'WATCHING', 'DISMISSED', 'COVERED', 'CLOSED'];
 export const DEFAULT_CLUSTER_STATUSES: readonly ClusterStatus[] = ['OPEN', 'WATCHING'];
+/** Chu kỳ đọc feed mặc định khi thêm feed (BA-01 P-02, chốt 10/11/2026: 30 phút; spec vẫn cho 5–1440). */
+export const DEFAULT_SCHEDULE_MINUTES = 30;
+/** Radar mở mặc định ở "Hôm nay" theo giờ tòa soạn (BA-01 P-02: chỉ lấy tin trong ngày). */
+export const DEFAULT_RADAR_WINDOW = 'TODAY' as const;
+export type RadarWindowMode = 'TODAY' | 'LAST_24H' | 'DATE';
 
 export function label(map: Record<string, string>, key: string | null | undefined): string {
   if (!key) return '—';

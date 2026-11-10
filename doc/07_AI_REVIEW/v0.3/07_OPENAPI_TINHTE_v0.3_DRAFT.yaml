@@ -206,13 +206,24 @@ x-feature-flags:
     - ai.search
     description: AI search with sources.
   - key: aggregation.radar
-    scope: P2
+    scope: P1
     productionDefault: false
     approvers:
     - PO
     legacyKeys: []
-    description: 'News radar (ADR-0008, BA-01 phase 1): source profiles, feed collection, clustering and CMS radar. No AI. Scope recorded as P2
-      until PO ranks it (BA-01 Q-AGG-06). The collector worker also stops while OFF.'
+    description: 'News radar (ADR-0008, BA-01 phase 1): source profiles, feed collection, clustering and CMS radar. Ranked P1 by the project
+      owner on 2026-11-10 (BA-01 P-01). The collector worker also stops while OFF.'
+  - key: aggregation.ai_dedup
+    scope: P2
+    productionDefault: false
+    approvers:
+    - PO
+    - Legal
+    - Security
+    legacyKeys: []
+    description: 'News radar (ADR-0008 §7, BA-01 P-02): AI check of MinHash candidate pairs, sending only titles and summaries, to decide whether
+      two items report the same event. OFF or failing falls back to MinHash clustering. No endpoints. Enable only after Legal, Security and
+      budget sign-off (BA-01 L-07, S-03, F-02).'
 x-error-catalog:
   description: 'Error codes returned in Problem.code (AIR-009). Each code maps to exactly one HTTP status. Evaluation order: 400 syntax → 401
     → 403 CSRF_INVALID → 403 FEATURE_DISABLED → 403 FORBIDDEN/ELIGIBILITY_REQUIRED/SOD_VIOLATION → 404 → 428/412 → 422 → 409 → 429 (a gateway
@@ -5854,7 +5865,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -5906,7 +5917,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -5950,7 +5961,7 @@ paths:
           $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6008,7 +6019,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6075,7 +6086,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6142,7 +6153,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6202,7 +6213,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6267,7 +6278,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-001
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6330,7 +6341,7 @@ paths:
       x-requirements:
       - FR-AGG-001
       - FR-AGG-002
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6396,7 +6407,7 @@ paths:
       x-requirements:
       - FR-AGG-001
       - FR-AGG-002
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6451,7 +6462,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-002
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6492,7 +6503,7 @@ paths:
           $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-004
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6551,7 +6562,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-004
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6603,7 +6614,7 @@ paths:
           $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-003
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6648,7 +6659,7 @@ paths:
           $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6689,7 +6700,7 @@ paths:
           $ref: '#/components/responses/NotFound'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6747,7 +6758,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6806,7 +6817,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6864,7 +6875,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6923,7 +6934,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -6988,7 +6999,7 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
       x-requirements:
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -7055,7 +7066,7 @@ paths:
       x-requirements:
       - FR-AGG-004
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -7123,7 +7134,7 @@ paths:
       x-requirements:
       - FR-AGG-004
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -7168,7 +7179,7 @@ paths:
       x-requirements:
       - FR-AGG-002
       - FR-AGG-005
-      x-scope: P2
+      x-scope: P1
       x-feature-gate: aggregation.radar
       x-error-codes:
       - BAD_REQUEST
@@ -10732,7 +10743,7 @@ components:
           type: integer
           minimum: 5
           maximum: 1440
-          default: 15
+          default: 30
         categoryMapping:
           type: array
           maxItems: 100

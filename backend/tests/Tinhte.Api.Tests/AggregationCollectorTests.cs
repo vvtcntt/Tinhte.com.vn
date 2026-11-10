@@ -319,6 +319,18 @@ public sealed class AggregationCollectorTests
     }
 
     [Fact]
+    public void Item_keeps_every_qualifying_category_of_its_site_for_clustering()   // BA-01 P-02: so trùng trong từng chuyên mục của mục
+    {
+        var both = Classifier().Classify(Item("Điện thoại iPhone và MacBook mới", null, "mobile"));
+        Assert.Equal(Mapped, both.CategoryId);
+        Assert.Equal([Mapped, Phones, Laptops], both.CategoryIds);   // chính đứng đầu; luật của site "game" không tính
+
+        Assert.Equal([Phones], Classifier().Classify(Item("iPhone 18 là điện thoại mỏng nhất")).CategoryIds);
+        Assert.Equal([Phones], Classifier().Classify(Item("iPhone 18 là điện thoại mỏng nhất", "Có nhắc tới laptop.")).CategoryIds.Take(1));
+        Assert.Empty(Classifier().Classify(Item("Thị trường tuần này")).CategoryIds);   // OUT_OF_SCOPE
+    }
+
+    [Fact]
     public void Keyword_scores_map_to_br31_thresholds()
     {
         var two = Classifier().Classify(Item("iPhone 18 là điện thoại mỏng nhất"));   // 2 từ khóa ở tiêu đề → 0,95 tự gán

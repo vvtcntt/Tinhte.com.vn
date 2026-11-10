@@ -28,6 +28,7 @@ import {
   type SourceStatus,
   type SourceSummary,
   type UsageMode,
+  DEFAULT_SCHEDULE_MINUTES,
 } from '../lib/aggregation';
 import { access, permissionLabel } from '../lib/rbac';
 import { ContentSourcePicker, LicensePicker } from './Catalog';
@@ -614,7 +615,7 @@ function FeedRow({ feed, canManage, categories, onChanged }: { feed: Aggregation
 function AddFeed({ sourceId, onAdded }: { sourceId: string; onAdded: () => Promise<void> }) {
   const [url, setUrl] = useState('');
   const [format, setFormat] = useState<FeedFormat>('AUTO');
-  const [schedule, setSchedule] = useState(15);
+  const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE_MINUTES);
   const { busy, message, setMessage, run } = useAction();
   const submit = (e: FormEvent) => {
     e.preventDefault();

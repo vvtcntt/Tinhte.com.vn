@@ -38,8 +38,15 @@ public static class ItemNormalizer
     public static readonly TimeSpan FutureTolerance = TimeSpan.FromMinutes(10);
     public static readonly TimeSpan StaleAge = TimeSpan.FromDays(30);
 
-    /// <summary>Lần đầu bật feed chỉ nhận mục trong 24 giờ gần nhất (BR-14).</summary>
+    /// <summary>Quy tắc cũ (BR-14, khi <c>Aggregation:Intake:TodayOnly = false</c>): lần đầu bật feed chỉ nhận mục trong 24 giờ gần nhất.</summary>
     public static readonly TimeSpan FirstFetchWindow = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// Mốc nhận tin: mục có thời điểm hiệu lực trước mốc bị bỏ qua (không lưu, không cập nhật). <paramref name="todayOnly"/> (mặc định, BA-01 P-02):
+    /// 00:00 hôm nay theo giờ tòa soạn, ở mọi lần đọc; ngược lại BR-14: 24 giờ trước ở lần đọc đầu, không giới hạn ở các lần sau (null).
+    /// </summary>
+    public static DateTimeOffset? IntakeCutoff(DateTimeOffset now, bool firstFetch, bool todayOnly, NewsroomClock clock) =>
+        todayOnly ? clock.DayRange(clock.Today(now)).FromUtc : firstFetch ? now - FirstFetchWindow : null;
 
     public static NormalizedItem? Normalize(RawFeedItem raw, Uri feedUri, DateTimeOffset now)
     {

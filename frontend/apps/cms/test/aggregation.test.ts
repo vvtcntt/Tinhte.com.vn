@@ -2,6 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  DEFAULT_RADAR_WINDOW,
+  DEFAULT_SCHEDULE_MINUTES,
   ago,
   allowedClusterActions,
   approvalError,
@@ -15,6 +17,11 @@ import {
   splitError,
 } from '../src/lib/aggregation.ts';
 import { SECTIONS, sectionFor } from '../src/lib/nav.ts';
+
+test('quy tắc quét chốt 10/11/2026: feed mới 30 phút, Radar mở "Hôm nay"', () => {
+  assert.equal(DEFAULT_SCHEDULE_MINUTES, 30);
+  assert.equal(DEFAULT_RADAR_WINDOW, 'TODAY');
+});
 
 test('cụm: thao tác theo trạng thái khớp vòng đời của API', () => {
   assert.deepEqual(allowedClusterActions({ status: 'OPEN', assigneeId: null }), ['watch', 'dismiss', 'claim', 'coverage', 'split', 'merge']);

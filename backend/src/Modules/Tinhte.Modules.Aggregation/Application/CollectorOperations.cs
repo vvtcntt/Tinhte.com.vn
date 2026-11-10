@@ -87,6 +87,8 @@ public static class CollectorMetrics
     public static readonly Counter<long> Alerts = Meter.CreateCounter<long>("aggregation.alerts", description: "Source alerts raised by kind");
     public static readonly Counter<long> FetchLogPurged = Meter.CreateCounter<long>("aggregation.fetch_log.purged", description: "Fetch log rows deleted by retention");
 
+    public static readonly Counter<long> ItemsPurged = Meter.CreateCounter<long>("aggregation.items.purged", description: "Unclustered items deleted by retention");
+
     private static long _lastCycleUnix;
     private static int _radarEnabled;
     private static int _lastLeased;
@@ -110,7 +112,8 @@ public static class CollectorMetrics
 }
 
 /// <summary>
-/// Việc vận hành của worker (ADR-0008 §4, §9; NFR-AGG-06): dọn <c>agg_fetch_log</c> quá hạn giữ (mặc định 30 ngày, theo lô), gửi cảnh báo nguồn
+/// Việc vận hành của worker (ADR-0008 §4, §9; NFR-AGG-06): dọn <c>agg_fetch_log</c> quá hạn giữ (mặc định 30 ngày, theo lô), xóa mục tin không thuộc
+/// cụm nào quá hạn giữ (mặc định 90 ngày — BA-01 L-03), gửi cảnh báo nguồn
 /// chờ gửi ra kênh ngoài (tối đa 10 lần thử mỗi cảnh báo), ghi nhịp tim tiến trình.
 /// </summary>
 public sealed partial class CollectorOperations(ITinhteDatabase database, IAlertSink sink, AggregationOptions options, ILogger<CollectorOperations> logger)
@@ -138,6 +141,38 @@ public sealed partial class CollectorOperations(ITinhteDatabase database, IAlert
         {
             CollectorMetrics.FetchLogPurged.Add(total);
             LogPurged(logger, total, options.FetchLogRetentionDays);
+        }
+
+        return total;
+    }
+
+    /// <summary>
+    /// Xóa mục tin không thuộc cụm nào (<c>cluster_id IS NULL</c>: ngoài phạm vi, chưa gom, bị đánh trùng) có <c>first_seen_at</c> cũ hơn
+    /// <c>Aggregation:UnclusteredItemRetentionDays</c> (BA-01 L-03, chốt 10/11/2026: 90 ngày), theo lô 5000. Mục trong cụm — kể cả cụm đã có bài
+    /// (COVERED) — được giữ; mục đang là đại diện của một cụm (sau tách/gộp) cũng giữ. Nhật ký thu thập theo <see cref="PurgeFetchLogAsync"/>.
+    /// </summary>
+    public async Task<long> PurgeUnclusteredItemsAsync(CancellationToken ct, int maxBatches = 20)
+    {
+        long total = 0;
+        await using var connection = await database.OpenConnectionAsync(ct);
+        for (var batch = 0; batch < maxBatches; batch++)
+        {
+            await using var command = AggregationSql.Command(connection, null, """
+                DELETE FROM tt.agg_items WHERE id IN (
+                  SELECT i.id FROM tt.agg_items i
+                   WHERE i.cluster_id IS NULL AND i.first_seen_at < now() - @days * interval '1 day'
+                     AND NOT EXISTS (SELECT 1 FROM tt.agg_clusters c WHERE c.representative_item_id = i.id)
+                   ORDER BY i.first_seen_at LIMIT @batch)
+                """).WithInt("days", options.UnclusteredItemRetentionDays).WithInt("batch", PurgeBatch);
+            var deleted = await command.ExecuteNonQueryAsync(ct);
+            total += deleted;
+            if (deleted < PurgeBatch) break;
+        }
+
+        if (total > 0)
+        {
+            CollectorMetrics.ItemsPurged.Add(total);
+            LogItemsPurged(logger, total, options.UnclusteredItemRetentionDays);
         }
 
         return total;
@@ -216,6 +251,9 @@ public sealed partial class CollectorOperations(ITinhteDatabase database, IAlert
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Purged {Count} fetch log rows older than {Days} days")]
     private static partial void LogPurged(ILogger logger, long count, int days);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Purged {Count} unclustered items older than {Days} days")]
+    private static partial void LogItemsPurged(ILogger logger, long count, int days);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Alert {AlertId} could not be delivered: {Error}")]
     private static partial void LogAlertFailed(ILogger logger, long alertId, string error);

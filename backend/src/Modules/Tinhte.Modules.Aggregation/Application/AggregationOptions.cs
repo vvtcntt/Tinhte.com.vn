@@ -13,7 +13,9 @@ namespace Tinhte.Modules.Aggregation.Application;
 ///         <c>Classification:Sites:{siteKey}:AutoAssign|Review</c> — BR-31;</item>
 ///   <item><c>Clustering:Similarity</c> (0.5), <c>Clustering:SimilarityWithEntity</c> (0.25), <c>Clustering:WindowHours</c> (48) — BR-21;</item>
 ///   <item><c>Scoring:Sources|Trust|Relevance|Velocity|Freshness</c> (35/15/15/15/20) — BR-32; <c>Worker:MaintenanceMinutes</c> (5);</item>
-///   <item><c>FetchLogRetentionDays</c> (30), <c>Alerts:WebhookUrl</c> (https, tùy chọn — kênh gửi cảnh báo nguồn);</item>
+///   <item><c>FetchLogRetentionDays</c> (30), <c>UnclusteredItemRetentionDays</c> (90 — L-03), <c>Alerts:WebhookUrl</c> (https, tùy chọn);</item>
+///   <item><c>Intake:TodayOnly</c> (true — P-02: chỉ nhận tin có thời điểm hiệu lực từ 00:00 hôm nay theo giờ tòa soạn; false = quy tắc cũ BR-14:
+///         lần đầu đọc feed nhận tin trong 24 giờ, các lần sau nhận mọi tin);</item>
 ///   <item><c>FeedTests:PerMinute</c> (10) — số lần thử feed mỗi phút cho một người (429 RATE_LIMITED);</item>
 ///   <item><c>SensitiveTopicsPath</c> (config/aggregation/sensitive-topics.json), <c>BotSiteKey</c>, <c>BotInfoPath</c>.</item>
 /// </list>
@@ -34,6 +36,12 @@ public sealed class AggregationOptions
 
     /// <summary>Số ngày giữ agg_fetch_log (ADR-0008 §9: 30 ngày), worker dọn theo lô.</summary>
     public int FetchLogRetentionDays { get; init; } = 30;
+
+    /// <summary>Số ngày giữ mục tin không thuộc cụm nào (BA-01 L-03, chốt 10/11/2026: 90 ngày); mục trong cụm giữ cùng cụm.</summary>
+    public int UnclusteredItemRetentionDays { get; init; } = 90;
+
+    /// <summary>Chỉ nhận tin trong ngày theo giờ tòa soạn (BA-01 P-02, chốt 10/11/2026) — thay quy tắc 24 giờ lần đầu của BR-14.</summary>
+    public bool TodayOnly { get; init; } = true;
 
     public ClusteringOptions Clustering { get; init; } = ClusteringOptions.Default;
 
@@ -61,6 +69,8 @@ public sealed class AggregationOptions
             FeedTestsPerMinute = Int(section, "FeedTests:PerMinute", 10, 1, 1000),
             MaintenanceInterval = TimeSpan.FromMinutes(Int(section, "Worker:MaintenanceMinutes", 5, 1, 1440)),
             FetchLogRetentionDays = Int(section, "FetchLogRetentionDays", 30, 1, 365),
+            UnclusteredItemRetentionDays = Int(section, "UnclusteredItemRetentionDays", 90, 7, 3650),
+            TodayOnly = section["Intake:TodayOnly"] is not { } todayOnly || bool.Parse(todayOnly),
             Clustering = new ClusteringOptions(
                 Fraction(section, "Clustering:Similarity", ClusteringOptions.Default.Similarity),
                 Fraction(section, "Clustering:SimilarityWithEntity", ClusteringOptions.Default.SimilarityWithEntity),

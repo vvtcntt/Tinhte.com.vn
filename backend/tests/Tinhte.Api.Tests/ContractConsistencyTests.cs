@@ -33,7 +33,7 @@ public sealed partial class ContractConsistencyTests
     public void Feature_flag_keys_match_spec_registry()
     {
         var spec = FlagPattern().Matches(Block("x-feature-flags")).Select(m => m.Groups["key"].Value).Order().ToList();
-        Assert.Equal(18, spec.Count);
+        Assert.Equal(19, spec.Count);
         Assert.Equal(spec, FeatureFlagKeys.All.Order().ToList());
     }
 

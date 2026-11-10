@@ -57,7 +57,7 @@ public static class FeedHealth
 public static partial class AggregationLimits
 {
     public const int DefaultTrustWeight = 3;
-    public const int DefaultScheduleMinutes = 15;
+    public const int DefaultScheduleMinutes = 30;   // BA-01 P-02, chốt 10/11/2026
     public const int MinScheduleMinutes = 5;
     public const int MaxScheduleMinutes = 1440;
     public const int MaxCategoryMappings = 100;

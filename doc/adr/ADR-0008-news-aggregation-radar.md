@@ -1,7 +1,7 @@
 ---
 id: ADR-0008
 title: Module Aggregation — thu thập RSS và Radar tin (giai đoạn 1, chưa có AI viết)
-status: PROPOSED — ĐỀ XUẤT, CHƯA HIỆN THỰC. Chờ TL (kiến trúc, hợp đồng), PO (phạm vi, ưu tiên — BA-01 Q-AGG-06), BA/PO (quyền mới), Security (bộ thu thập), Legal (chế độ khai thác nguồn)
+status: PROPOSED — đã hiện thực GĐ1 trên nhánh; chủ dự án chốt A-1…A-5 và quy tắc quét ngày 10/11/2026 (mục "Kết quả chốt"); vẫn chờ TL/DBA/Security/Legal/Ban biên tập ký phiếu BA-01
 date: 2026-11-09
 related: BA-01, ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0007, WBS-019, WBS-020, WBS-023, WBS-031, FR-AGG-001…005
 ---
@@ -16,6 +16,7 @@ related: BA-01, ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0007, WBS-019, WBS-0
   - thu thập feed, chuẩn hóa, khử trùng, phân loại bằng luật, gom cụm;
   - màn Radar và màn Quản lý nguồn;
   - **không gọi AI**, không đưa nội dung nguồn ra ngoài, không xuất bản gì.
+  - *Sửa đổi 10/11/2026 (chủ dự án, BA-01 P-02):* GĐ1 được dùng AI cho **một việc duy nhất** — xác định hai tin có trùng chủ đề không — sau cờ riêng tắt mặc định; chỉ gửi tiêu đề + tóm tắt. Xem §7.
 - Lý do tách GĐ1: GĐ1 có giá trị ngay cho tòa soạn và gần như không phụ thuộc các câu hỏi pháp lý còn mở (BA-01 Q-AGG-01/02/05). GĐ2 sẽ có ADR riêng.
 - Hiện trạng repo:
   - chưa có worker hay hàng đợi job (WBS-020 chưa làm, `ContentPublished` còn TODO);
@@ -91,11 +92,12 @@ related: BA-01, ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0007, WBS-019, WBS-0
   - Lưu `published_at` (UTC) và `first_seen_at`.
   - Thời điểm không tin được ⇒ `time_reliable = false` (BR-11/12).
 - Mục cũ đổi nội dung đáng kể ⇒ tăng `version` của mục, gắn nhãn "Nguồn đã cập nhật" (BR-13).
-- Bật feed lần đầu: chỉ nhận mục trong 24 giờ gần nhất (BR-14).
+- ~~Bật feed lần đầu: chỉ nhận mục trong 24 giờ gần nhất (BR-14).~~ **Thay bằng (chủ dự án, 10/11/2026, BA-01 P-02):** worker **chỉ nhận tin trong ngày** — bỏ qua mục có thời điểm hiệu lực trước 00:00 hôm nay theo `Aggregation:NewsroomTimeZone`, ở **mọi** lần đọc (không chỉ lần đầu). Cấu hình `Aggregation:Intake:TodayOnly` (mặc định `true`; `false` = quy tắc BR-14 cũ).
+- Chu kỳ đọc feed mặc định **30 phút** (BA-01 P-02); hợp đồng vẫn cho 5–1440 phút.
 - Làm sạch HTML ở phía server; CMS chỉ nhận văn bản thuần (BR-16).
 - GĐ1 **không lưu toàn văn** bài nguồn: chỉ tiêu đề, link, tóm tắt feed, tác giả, thời điểm, category của feed. Toàn văn chỉ cần cho GĐ2 và phụ thuộc chế độ M2/M3.
 
-### 7. Phân loại và gom cụm không dùng AI
+### 7. Phân loại và gom cụm (AI chỉ để xác định tin trùng chủ đề, cờ riêng, tắt mặc định)
 
 - **Phân loại** (BR-30 tầng 1–2):
   - ánh xạ category của feed → chuyên mục (cấu hình theo feed);
@@ -108,15 +110,25 @@ related: BA-01, ADR-0001, ADR-0002, ADR-0003, ADR-0004, ADR-0007, WBS-019, WBS-0
 - **Gom cụm:**
   - so độ giống tiêu đề + tóm tắt đã chuẩn hóa (bỏ dấu, bỏ từ dừng; MinHash trên shingle từ);
   - cộng thực thể chung (từ khóa sản phẩm/hãng trong luật);
-  - cửa sổ 48 giờ, chỉ trong cùng site.
-- **Giới hạn đã biết:** chưa gom được tin tiếng Anh và tiếng Việt về cùng sự kiện. Cần embedding đa ngôn ngữ ở GĐ2 sau khi chọn nhà cung cấp (BA-01 Q-AGG-15). BTV gộp tay được (BR-23).
+  - cửa sổ 48 giờ, chỉ trong cùng site;
+  - **chỉ so mục cùng chuyên mục** (chủ dự án xác nhận 10/11/2026, BA-01 P-02): mục có `category_ids` = chuyên mục chính + các chuyên mục khác cùng site đủ ngưỡng "cần xem" (ánh xạ category của feed hoặc từ khóa). Mục nhiều chuyên mục được so trong từng chuyên mục của nó; một mục chỉ thuộc một cụm (cụm giống nhất). Mục `OUT_OF_SCOPE` không vào cụm.
+- **Giới hạn đã biết:** MinHash chưa gom được tin tiếng Anh và tiếng Việt về cùng sự kiện. BTV gộp tay được (BR-23). Bước AI dưới đây xử lý được khi bật.
+- **AI xác định tin trùng chủ đề** — *sửa quyết định "GĐ1 không dùng AI"* theo chủ dự án 10/11/2026 (BA-01 P-02; thiết kế ở `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md` mục 5):
+  1. Máy lọc trước bằng cách hiện có (MinHash, cùng site, cùng chuyên mục, cùng ngày) để ra **cặp ứng viên** "có thể trùng" — không hỏi AI cho mọi cặp.
+  2. Gửi cho AI **chỉ tiêu đề + tóm tắt** (trường công khai của RSS, đã làm sạch) của hai mục, qua module kết nối AI (YesScale — đang làm ở phiên/nhánh riêng `feat/ai-module`, **chưa phải quyết định nhà cung cấp**). AI trả "cùng sự kiện" / "khác sự kiện" + độ tin cậy.
+  3. Cùng sự kiện ⇒ gộp cụm; khác ⇒ giữ riêng. Mỗi kết luận được ghi lại (nhà cung cấp, model, độ tin cậy) để BTV kiểm khi tách/gộp tay.
+  4. AI lỗi, hết giờ, hết ngân sách hoặc cờ tắt ⇒ quay về MinHash; Radar vẫn chạy.
+  5. Không gọi AI trong transaction đang giữ khóa tư vấn của site: bước AI chạy sau khi ghi mục (vd. trong chu kỳ bảo trì), rồi mới gộp/tách dưới khóa.
+  - **Điểm nối đã có** (lát 6): interface `Tinhte.Platform.Ai.ISameEventJudge` + bản mặc định `NoAiSameEventJudge` (không gọi AI, luôn "không kết luận"), đăng ký `TryAddSingleton` trong module Aggregation để module AI thay. Cờ `aggregation.ai_dedup` (OFF, P2, không có endpoint). **Chưa nối vào gom cụm**, chưa có bảng ghi kết luận AI — làm khi module AI vào nhánh tích hợp.
+  - **Chỉ bật sau:** Legal L-07 + Security S-03 (chấp nhận gửi tiêu đề/tóm tắt qua nhà cung cấp), Legal xác nhận so sánh nội bộ vẫn trong phạm vi M0, PM/Finance F-02 (ngân sách). Không merge nhánh module AI vào nhánh này.
 - **Điểm ưu tiên** theo BR-32. Trọng số cấu hình `Aggregation:Scoring`, đổi có ghi lịch sử.
 
 ### 8. Cờ và quyền
 
 - **Cờ mới `aggregation.radar`:**
   - production mặc định **OFF**, người duyệt bật: PO;
-  - phạm vi tạm ghi **P2** (thấp nhất) cho tới khi PO xếp hạng (BA-01 Q-AGG-06). Không tự nâng.
+  - phạm vi ~~tạm ghi P2~~ **P1** — chủ dự án chốt 10/11/2026 (BA-01 P-01); migration 0346 đổi dòng `tt.feature_gates`. GĐ2 (AI viết lại, ADR-0009) giữ P2.
+- **Cờ `aggregation.ai_dedup`** (10/11/2026): bước AI xác định tin trùng chủ đề (§7). OFF, **P2**, người duyệt PO + Legal + Security, không có endpoint; tắt độc lập với Radar.
   - Mọi thao tác `/admin/aggregation/*` kiểm cờ phía server; thao tác ghi kiểm trong transaction.
   - **Worker cũng kiểm cờ** mỗi vòng quét. Cờ OFF ⇒ không thu thập.
 - **Quyền mới** (thêm vào `config/rbac/rbac.json` + `Permissions` khi hiện thực; BA/PO duyệt, BA-01 Q-AGG-07):
@@ -245,10 +257,40 @@ Lát 5 (phần còn lại) — vẫn PROPOSED:
 - **CI**: job `worker-image` — build image worker, chạy thử (thiếu chuỗi kết nối ⇒ thoát 1 với thông báo rõ), quét Trivy (CRITICAL/HIGH có bản vá ⇒ fail), `promtool check rules`. **Chưa chạy** trên GitHub Actions từ máy dựng (không có Docker).
 - **GĐ2**: ADR-0009 (PROPOSED) + hợp đồng nháp riêng `doc/07_AI_REVIEW/v0.3/proposals/07_OPENAPI_AGGREGATION_GD2_PROPOSAL.yaml` (hợp lệ OpenAPI 3.1). Không có code, không đổi spec chính/`ErrorCatalog`/`rbac.json` — chờ Legal (Q-AGG-01/02/04/05/13/14) và TL chọn nhà cung cấp AI.
 
+## Kết quả chốt ngày 10/11/2026 (chủ dự án) và lát 6
+
+Nguồn: `doc/ba/BA-01_PHIEU_XIN_QUYET_DINH_v0.1_DRAFT.md` (mục "Kết quả chốt", ô Trả lời) và `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md` mục 5. Các câu thuộc chuyên môn TL/DBA/Security/Legal/Ban biên tập vẫn chờ bên đó ký ở phiếu.
+
+| # | Kết quả |
+|---|---|
+| A-1 | **Đồng ý** (T-01): worker là project riêng `Tinhte.Worker`, deploy riêng, chạy nhiều bản. |
+| A-2 | **Đồng ý** (T-02): bảng `agg_source_profiles` 1–1, thứ tự migration 0340 → 0346. DBA còn trả lời việc đối chiếu schema 04 (stub schema 04 chỉ dùng ở Development). |
+| A-3 | **Giữ ma trận đang cấp tạm, không thêm vai trò** (P-03): EDITOR đề xuất/sửa nguồn; APPROVER duyệt (MFA). Hai thành viên thí điểm được cấp **EDITOR + APPROVER** — là gán vai trò cho người dùng, **không sửa `rbac.json`**. M2/M3 vẫn bắt buộc người duyệt khác người đề xuất. Xem lại khi có người của Legal trực tiếp duyệt trong CMS. |
+| A-4 | **Duyệt nguyên trạng kèm điều kiện hạ tầng** (S-01): worker chạy trong **mạng riêng**; tường lửa chỉ cho **ra Internet cổng 443** và **kết nối tới DB**; không mở cổng vào. Ghi ở runbook `backend/src/Tinhte.Worker/README.md`. S-02 (giá trị lỗi `UNSAFE_TARGET`) chưa trả lời, không chặn thí điểm. |
+| A-5 | **P1** (P-01) cho cờ `aggregation.radar` và FR-AGG-001…005, WBS-140…145. Cờ vẫn OFF ở production. GĐ2 giữ P2. |
+
+**Thí điểm (P-02, E-03):**
+- site **`www`** (site public-web duy nhất của Site Registry; `cms`/`media` không nhận tin);
+- **2 thành viên** quản lý dùng và gán nhãn (mỗi người 10–15 phút/ngày tách/gộp khi gom sai), **3 tuần**, trên **staging**;
+- bắt đầu (ngày bật cờ `aggregation.radar` trên staging) khi đủ cả ba: (1) PR Radar đã merge vào `sprint-0/scaffold` và deploy staging **gồm worker**; (2) có **ít nhất 1 nguồn được duyệt**; (3) **Grafana Cloud** đã nhận số đo và **gửi được email cảnh báo**;
+- hết 3 tuần xem số liệu (số tin/ngày, tỉ lệ gom đúng qua lệnh `calibrate`, góp ý BTV) rồi mới quyết định lên production.
+
+**Nguồn (L-01, E-02, hướng dẫn cài đặt nguồn mục 1):** 10–20 nguồn thí điểm, tất cả M0, tối đa M1. Điều khoản RSS "miễn phí cho cá nhân, phi lợi nhuận" của VnExpress, Dân trí, Tuổi Trẻ: **xin phép trước khi duyệt** nguồn; trong lúc chờ có thể thí điểm với Thanh Niên, GenK. Không coi điều khoản/giấy phép nào là đã có.
+
+**Hiện thực lát 6 (theo các quyết định trên):**
+- **Migration 0346** (`aggregation_owner_decisions`): `aggregation.radar` P2 → P1; thêm cờ `aggregation.ai_dedup` (OFF, P2); `agg_feeds.schedule_minutes` mặc định 30; `agg_items.category_ids` (+ trigger giữ chuyên mục chính ở đầu, dữ liệu cũ điền từ `category_id`); index cho việc xóa mục lẻ. Bản down trả P2, gỡ cờ (từ chối nếu cờ AI đang bật), trả mặc định 15.
+- **Hợp đồng** (spec v0.3): `x-feature-flags` (`aggregation.radar` P1, thêm `aggregation.ai_dedup`), `x-scope` P1 cho 24 thao tác `/admin/aggregation/*`, `AggregationFeedCreate.scheduleMinutes` mặc định 30; inventory, FR addendum (FR-AGG-001…005 gói P1), WBS-140…145 P1. `FeatureFlagKeys` 19 cờ.
+- **P-02 quy tắc quét**: chu kỳ mặc định 30 phút (API + CMS); chỉ nhận tin trong ngày (§6); gom cụm chỉ trong cùng chuyên mục (§7); Radar CMS mở mặc định "Hôm nay" (đã là mặc định, nay thành hằng số có test).
+- **L-03 thời gian lưu**: worker xóa mục tin **không thuộc cụm nào** có `first_seen_at` cũ hơn `Aggregation:UnclusteredItemRetentionDays` (**90**, cấu hình 7–3650) theo lô 5000 trong cùng chu kỳ bảo trì với việc dọn `agg_fetch_log` (vẫn 30 ngày). Mục trong cụm — kể cả cụm `COVERED` đã có bài — được giữ cùng cụm; mục đang là đại diện của một cụm cũng giữ. Mục trong cụm chưa có bài: chưa có quyết định, đang giữ.
+- **E-01**: `config/aggregation/sensitive-topics.json` thêm 3 nhóm *pháp luật/vụ án*, *y tế/dịch bệnh*, *trẻ em* (giữ dấu tiếng Việt + tiếng Anh; tránh từ thông dụng của tin công nghệ như "trial", "học sinh"); file vẫn DRAFT. Trọng số điểm giữ nguyên trong thí điểm; "chủ đề nóng" và "ít nhất 2 nguồn" để sau thí điểm.
+- **T-05 giám sát**: **Grafana Cloud**, cảnh báo qua **email** (contact point email của Grafana) cho 2 thành viên; webhook của worker (`Aggregation:Alerts:WebhookUrl`) thành tùy chọn. Runbook + `infra/monitoring/aggregation-worker.rules.yml` cập nhật.
+- **AI trùng chủ đề**: chỉ điểm nối + cờ + thiết kế (§7); không gọi AI thật, không merge nhánh module AI.
+- **Kiểm tra**: PGlite 362/362 (AG34–AG37 mới); test đơn vị mốc nhận tin theo giờ tòa soạn, chuyên mục phụ, mặc định cấu hình, chủ đề nhạy cảm mới, bộ so sánh mặc định; `[DbFact]` chỉ nhận tin trong ngày, gom cụm theo chuyên mục, xóa mục lẻ.
+
 ## Hệ quả
 
 - **Được:**
-  - tòa soạn có Radar tin mà không có rủi ro dữ liệu ra nước ngoài hay viết lại nội dung;
+  - tòa soạn có Radar tin mà không có rủi ro dữ liệu ra nước ngoài hay viết lại nội dung (khi bật `aggregation.ai_dedup`: tiêu đề + tóm tắt công khai đi qua nhà cung cấp AI — chỉ sau L-07/S-03/F-02);
   - không phải chờ WBS-020;
   - lịch thu thập an toàn khi chạy nhiều worker;
   - ranh giới module giữ nguyên.
@@ -271,15 +313,17 @@ Lát 5 (phần còn lại) — vẫn PROPOSED:
 | Chạy thu thập trong tiến trình API (`IHostedService`) | Mỗi bản API đều quét. Một feed treo ảnh hưởng thời gian phản hồi API. Scale API kéo theo scale bot. |
 | Chờ WBS-020 rồi mới làm | Lịch theo `next_fetch_at` + `SKIP LOCKED` đủ cho bài toán thu thập và đơn giản hơn hàng đợi chung |
 | Thêm cột thu thập vào `tt.content_sources` | Trộn dữ liệu của hai module vào bảng của News; chế độ khai thác thuộc nghiệp vụ thu thập |
-| Gom cụm bằng embedding ngay GĐ1 | Phải chọn nhà cung cấp và gửi dữ liệu ra ngoài: đúng những câu hỏi Legal còn mở |
+| Gom cụm bằng embedding ngay GĐ1 | Phải chọn nhà cung cấp và gửi dữ liệu ra ngoài: đúng những câu hỏi Legal còn mở. *10/11/2026:* thay bằng AI so cặp ứng viên sau cờ riêng (§7) |
+| Hỏi AI cho mọi cặp tin / thay MinHash bằng AI | Chi phí theo bình phương số tin, Radar dừng khi AI lỗi; MinHash lọc trước rồi AI chỉ xét cặp ứng viên, AI lỗi thì quay về MinHash |
 | Thư viện `SyndicationFeed` có sẵn của .NET làm parser duy nhất | Không đọc JSON Feed, chịu lỗi kém với feed thực tế (ngày sai định dạng, encoding lệch). Có thể dùng bên trong nếu bọc an toàn XML như mục 5; TL quyết khi code |
 
 ## Câu hỏi cần quyết
 
-| # | Ai | Câu hỏi |
-|---|---|---|
-| A-1 | TL | Đồng ý worker là project riêng `Tinhte.Worker`, deploy riêng? |
-| A-2 | TL + DBA | Đồng ý bảng `agg_source_profiles` 1–1 thay vì thêm cột vào `content_sources`? Thứ tự migration với ADR-0007 §1? |
-| A-3 | PO + BA | Cấp `aggregation.sources_approve` cho ai? Có cần vai trò mới (sửa CHECK `ck_user_roles_role`)? |
-| A-4 | Security | Duyệt danh sách dải IP bị chặn, giới hạn kích thước/timeout, cách xử lý `robots.txt` |
-| A-5 | PO | Xếp `aggregation.radar` / FR-AGG-001…005 vào P1 hay giữ P2? |
+| # | Ai | Câu hỏi | Kết quả (10/11/2026) |
+|---|---|---|---|
+| A-1 | TL | Đồng ý worker là project riêng `Tinhte.Worker`, deploy riêng? | Đồng ý |
+| A-2 | TL + DBA | Đồng ý bảng `agg_source_profiles` 1–1 thay vì thêm cột vào `content_sources`? Thứ tự migration với ADR-0007 §1? | Đồng ý; DBA còn trả lời schema 04 |
+| A-3 | PO + BA | Cấp `aggregation.sources_approve` cho ai? Có cần vai trò mới (sửa CHECK `ck_user_roles_role`)? | Giữ ma trận tạm, không vai trò mới |
+| A-4 | Security | Duyệt danh sách dải IP bị chặn, giới hạn kích thước/timeout, cách xử lý `robots.txt` | Duyệt kèm điều kiện mạng riêng + tường lửa |
+| A-5 | PO | Xếp `aggregation.radar` / FR-AGG-001…005 vào P1 hay giữ P2? | P1 |
+| A-6 | Legal + Security + PM/Finance | Bật `aggregation.ai_dedup`: gửi tiêu đề/tóm tắt qua nhà cung cấp AI (L-07, S-03), so sánh nội bộ có nằm trong M0, ngân sách (F-02)? | Chưa trả lời — cờ OFF |

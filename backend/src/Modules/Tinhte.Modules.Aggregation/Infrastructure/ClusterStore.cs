@@ -23,11 +23,13 @@ internal static class ClusterStore
         }
     }
 
-    private sealed record PendingItem(Guid Id, string SiteKey, string Status, Guid? ClusterId, string Title, string? Summary, DateTimeOffset EffectiveAt);
+    private sealed record PendingItem(Guid Id, string SiteKey, string Status, Guid? ClusterId, string Title, string? Summary, DateTimeOffset EffectiveAt,
+        Guid[] CategoryIds);
 
     /// <summary>
     /// Mục mới/đổi nội dung: tính chữ ký MinHash; mục CLASSIFIED chưa vào cụm → vào cụm giống nhất (BR-21: giống đủ ngưỡng, hoặc giống vừa + chung thực thể,
-    /// trong cửa sổ 48 giờ, cùng site) hoặc mở cụm mới; mục đã trong cụm → tính lại cụm đó. Trả số mục vừa vào cụm.
+    /// trong cửa sổ 48 giờ, cùng site, có chung ít nhất một chuyên mục — BA-01 P-02: mục nhiều chuyên mục được so trong từng chuyên mục của nó)
+    /// hoặc mở cụm mới; mục đã trong cụm → tính lại cụm đó. Trả số mục vừa vào cụm.
     /// </summary>
     public static async Task<int> ClusterItemsAsync(NpgsqlConnection connection, NpgsqlTransaction tx, IReadOnlyCollection<Guid> itemIds, ClusteringOptions options,
         ScoringWeights weights, DateTimeOffset now, CancellationToken ct)
@@ -35,7 +37,7 @@ internal static class ClusterStore
         if (itemIds.Count == 0) return 0;
         var pending = new List<PendingItem>();
         await using (var command = AggregationSql.Command(connection, tx, $"""
-            SELECT i.id, i.site_key, i.status, i.cluster_id, i.title, i.summary, {AggregationSql.ItemEffectiveAt}
+            SELECT i.id, i.site_key, i.status, i.cluster_id, i.title, i.summary, {AggregationSql.ItemEffectiveAt}, i.category_ids
               FROM tt.agg_items i WHERE i.id = ANY(@ids) AND i.site_key IS NOT NULL ORDER BY i.first_seen_at, i.id
             """).WithUuidArray("ids", [.. itemIds]))
         await using (var r = await command.ExecuteReaderAsync(ct))
@@ -43,7 +45,7 @@ internal static class ClusterStore
             while (await r.ReadAsync(ct))
             {
                 pending.Add(new PendingItem(r.GetGuid(0), r.GetString(1), r.GetString(2), AggregationSql.NullableGuid(r, 3), r.GetString(4),
-                    AggregationSql.NullableText(r, 5), r.GetFieldValue<DateTimeOffset>(6)));
+                    AggregationSql.NullableText(r, 5), r.GetFieldValue<DateTimeOffset>(6), r.GetFieldValue<Guid[]>(7)));
             }
         }
 
@@ -56,7 +58,7 @@ internal static class ClusterStore
             var signature = MinHash.Signature(item.Title, item.Summary);
             var bands = signature is null ? null : MinHash.BandKeys(signature);
             Guid? cluster = item.ClusterId;
-            if (cluster is null && item.Status == ItemClassifier.Classified && signature is not null)
+            if (cluster is null && item.Status == ItemClassifier.Classified && signature is not null && item.CategoryIds.Length > 0)
             {
                 if (!entities.TryGetValue(item.SiteKey, out var siteEntities)) entities[item.SiteKey] = siteEntities = await EntityKeywordsAsync(connection, tx, item.SiteKey, ct);
                 cluster = await FindClusterAsync(connection, tx, item, signature, bands!, siteEntities, options, ct)
@@ -114,11 +116,11 @@ internal static class ClusterStore
               FROM tt.agg_items i
               JOIN tt.agg_clusters c ON c.id = i.cluster_id
              WHERE i.site_key = @site AND i.cluster_id IS NOT NULL AND i.minhash_bands && @bands AND i.id <> @self
-               AND c.site_key = @site AND c.status IN {JoinableStatuses}
+               AND i.category_ids && @categories AND c.site_key = @site AND c.status IN {JoinableStatuses}
                AND {AggregationSql.ItemEffectiveAt} BETWEEN @from AND @to
              LIMIT 500
             """)
-            .WithText("site", item.SiteKey).WithLongArray("bands", bands).WithUuid("self", item.Id)
+            .WithText("site", item.SiteKey).WithLongArray("bands", bands).WithUuid("self", item.Id).WithUuidArray("categories", item.CategoryIds)
             .WithTime("from", item.EffectiveAt - options.Window).WithTime("to", item.EffectiveAt + options.Window);
         Guid? best = null;
         var bestSimilarity = -1.0;

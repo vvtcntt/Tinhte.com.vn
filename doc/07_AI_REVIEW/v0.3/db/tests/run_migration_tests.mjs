@@ -135,7 +135,7 @@ const SLOT = (over = '') => `INSERT INTO tt.ad_placements (code, label, status, 
 
 async function behaviour(sc, db) {
   // Registry cờ (0300)
-  await expectValue(sc, db, 'F1 18 khóa registry (17 của 0300 + aggregation.radar của 0341) + 1 khóa ngoài registry được giữ', `SELECT count(*)::int FROM tt.feature_gates`, 19);
+  await expectValue(sc, db, 'F1 19 khóa registry (17 của 0300 + aggregation.radar của 0341 + aggregation.ai_dedup của 0346) + 1 khóa ngoài registry được giữ', `SELECT count(*)::int FROM tt.feature_gates`, 20);
   await expectValue(sc, db, 'F1b khóa cũ đã đổi tên hết', `SELECT count(*)::int FROM tt.feature_gates WHERE key IN ('community.comments','member.bookmark')`, 0);
   await expectValue(sc, db, 'F1c chỉ community.moderation ON, mọi cờ public OFF', `SELECT string_agg(key, ',' ORDER BY key) FROM tt.feature_gates WHERE enabled`, 'community.moderation');
   await expectError(sc, db, 'F2 bật cờ không có hồ sơ duyệt bị chặn', `UPDATE tt.feature_gates SET enabled = true WHERE key = 'ads.sponsored_publication'`, /ck_feature_gates_enabled_requires_approval/);
@@ -376,8 +376,9 @@ async function behaviour(sc, db) {
   const FEED = (url = 'https://bao-cong-nghe.example/rss') => `INSERT INTO tt.agg_feeds (id, content_source_id, url) VALUES ('${id('fe1')}', '${SRC}', '${url}');`;
   const ITEM = (guid, hash) => `INSERT INTO tt.agg_items (content_source_id, feed_id, guid, url, url_hash, title, content_hash)
     VALUES ('${SRC}', '${id('fe1')}', ${guid ? `'${guid}'` : 'NULL'}, 'https://bao-cong-nghe.example/a', repeat('${hash}', 64), 'Tin mới', repeat('c', 64));`;
-  await expectValue(sc, db, 'AG1 cờ aggregation.radar có trong registry: OFF, P2, mặc định production OFF',
-    `SELECT key || '=' || enabled || '/' || scope || '/' || production_default FROM tt.feature_gates WHERE key = 'aggregation.radar'`, 'aggregation.radar=false/P2/false');
+  await expectValue(sc, db, 'AG1 cờ Radar trong registry: aggregation.radar OFF/P1 (0346, P-01), aggregation.ai_dedup OFF/P2; mặc định production OFF',
+    `SELECT string_agg(key || '=' || enabled || '/' || scope || '/' || production_default, ',' ORDER BY key) FROM tt.feature_gates WHERE key LIKE 'aggregation.%'`,
+    'aggregation.ai_dedup=false/P2/false,aggregation.radar=false/P1/false');
   await expectOk(sc, db, 'AG2 duyệt M1 → ENABLED; lịch sử trạng thái ghi PROPOSED rồi ENABLED, người thao tác từ tt.actor_id', `${AGG} ${AGG_APPROVE('M1')}
     DO $$ BEGIN IF (SELECT string_agg(coalesce(from_status, '-') || '>' || to_status || '@' || actor_id, ',' ORDER BY id) FROM tt.agg_source_status_history)
       <> '->PROPOSED@${U2},PROPOSED>ENABLED@${U1}' THEN RAISE EXCEPTION 'history'; END IF; END $$;`);
@@ -416,7 +417,7 @@ async function behaviour(sc, db) {
   await expectError(sc, db, 'AG23 cụm COVERED phải có bài', `INSERT INTO tt.agg_clusters (site_key, title, status) VALUES ('www', 'Sự kiện', 'COVERED')`, /ck_agg_clusters_covered/);
   await expectError(sc, db, 'AG24 down 0341 từ chối khi đã có lịch sử nguồn', `${AGG} ${read(path.join(MIG_DIR, '0341_aggregation_radar.down.sql'))}`, /Refusing to roll back 0341/);
   await expectError(sc, db, 'AG25 down 0340 từ chối khi đã có giấy phép', `INSERT INTO tt.licenses (code, name, usage_scope) VALUES ('LIC-X', 'X', 'Y');
-    ${['0345_aggregation_calibration', '0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
+    ${['0346_aggregation_owner_decisions', '0345_aggregation_calibration', '0344_aggregation_operations', '0343_aggregation_clustering', '0342_aggregation_collector', '0341_aggregation_radar', '0340_content_sources_licenses']
       .map((m) => read(path.join(MIG_DIR, `${m}.down.sql`))).join(' ')}`, /Refusing to roll back 0340/);
   // Bộ thu thập (0342): row_version của feed chỉ đổi khi CMS sửa; failing_since; down tạo lại trigger cũ.
   const FEED_RV = `SELECT row_version FROM tt.agg_feeds WHERE id = '${id('fe1')}'`;
@@ -473,6 +474,23 @@ async function behaviour(sc, db) {
         IF SQLERRM = 'append-only not enforced' THEN RAISE; END IF;
       END;
     END $$;`);
+
+  // Kết quả chốt 10/11/2026 (0346): chu kỳ mặc định 30 phút; chuyên mục phụ của mục tin luôn chứa chuyên mục chính; down trả P2, gỡ cờ AI.
+  await expectOk(sc, db, 'AG34 feed mới mặc định 30 phút; mục tin chưa phân loại có category_ids rỗng', `${AGG} ${FEED()} ${ITEM(null, 'a')}
+    DO $$ BEGIN
+      IF (SELECT schedule_minutes FROM tt.agg_feeds) <> 30 THEN RAISE EXCEPTION 'schedule'; END IF;
+      IF (SELECT cardinality(category_ids) FROM tt.agg_items) <> 0 THEN RAISE EXCEPTION 'ids'; END IF;
+    END $$;`);
+  await expectOk(sc, db, 'AG35 đổi chuyên mục chính ⇒ category_ids tự có chuyên mục đó (đứng đầu)', `${AGG} ${FEED()} ${ITEM(null, 'a')}
+    UPDATE tt.agg_items SET category_id = '${id('ca1')}', category_ids = '{}';
+    DO $$ BEGIN IF (SELECT category_ids FROM tt.agg_items) <> ARRAY['${id('ca1')}'::uuid] THEN RAISE EXCEPTION 'ids'; END IF; END $$;`);
+  await expectOk(sc, db, 'AG36 down 0346 trả aggregation.radar về P2, gỡ aggregation.ai_dedup và category_ids', `${read(path.join(MIG_DIR, '0346_aggregation_owner_decisions.down.sql'))}
+    DO $$ BEGIN
+      IF (SELECT string_agg(key || '/' || scope, ',') FROM tt.feature_gates WHERE key LIKE 'aggregation.%') <> 'aggregation.radar/P2' THEN RAISE EXCEPTION 'flags'; END IF;
+      IF tt_migration.has_column('agg_items', 'category_ids') THEN RAISE EXCEPTION 'column'; END IF;
+    END $$;`);
+  await expectError(sc, db, 'AG37 down 0346 từ chối khi aggregation.ai_dedup đang bật', `${APPROVE('aggregation.ai_dedup')}
+    ${read(path.join(MIG_DIR, '0346_aggregation_owner_decisions.down.sql'))}`, /Refusing to roll back 0346/);
 
   // Tùy chọn 0311
   await expectError(sc, db, 'O1 privacy request VERIFIED thiếu verified_at bị chặn', `INSERT INTO tt.privacy_requests (request_type, email_ciphertext, email_hmac, policy_version, status) VALUES ('ACCESS', '\\x00', repeat('b', 64), 'v1', 'VERIFIED')`, /ck_privacy_requests_verified_at/);

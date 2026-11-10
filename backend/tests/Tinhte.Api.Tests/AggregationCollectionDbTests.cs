@@ -81,12 +81,15 @@ public sealed partial class AggregationCollectionDbTests(MigratedDatabaseFixture
 
     private async Task<bool> IsPgliteAsync() => (await db.ScalarAsync<string>("SELECT version()"))!.Contains("emscripten", StringComparison.OrdinalIgnoreCase);
 
-    private FeedCollectionService Collector(FakeFeedHandler handler, int parallelism = 1)
+    /// <param name="todayOnly">false (mặc định của test): quy tắc BR-14 cũ, để test dùng mốc "N giờ trước" không phụ thuộc giờ chạy; quy tắc
+    /// "chỉ tin trong ngày" (P-02, mặc định của sản phẩm) có test riêng.</param>
+    private FeedCollectionService Collector(FakeFeedHandler handler, int parallelism = 1, bool todayOnly = false)
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["ConnectionStrings:Tinhte"] = db.ConnectionString,
             ["Aggregation:Worker:Parallelism"] = parallelism.ToString(CultureInfo.InvariantCulture),
+            ["Aggregation:Intake:TodayOnly"] = todayOnly ? "true" : "false",
         }).Build();
         var database = new TinhteDatabase(config);
         _databases.Add(database);
