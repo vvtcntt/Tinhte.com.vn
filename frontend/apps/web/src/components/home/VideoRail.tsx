@@ -5,10 +5,10 @@ import { routes } from '../../lib/routes';
 import { PlayIcon } from '../SiteHeader';
 import { SponsorBadge, Thumb } from './parts';
 
-/** Dải Video nổi bật: thẻ 9:16 cuộn ngang. Không autoplay ở trang chủ (FR-VID-011/012). */
-export function VideoRail({ videos }: { videos: VideoSummary[] }) {
+/** Dải Video nổi bật: thẻ 9:16 cuộn ngang (nút ‹ › ở tiêu đề vùng: RailControls). Không autoplay ở trang chủ (FR-VID-011/012). */
+export function VideoRail({ id, videos }: { id: string; videos: VideoSummary[] }) {
   return (
-    <ul className="video-rail" aria-label="Danh sách video nổi bật">
+    <ul id={id} className="video-rail" aria-label="Danh sách video nổi bật">
       {videos.map((v) => {
         const len = duration(v.durationMs);
         return (
@@ -17,15 +17,15 @@ export function VideoRail({ videos }: { videos: VideoSummary[] }) {
               <Link href={routes.video(v.id)} className="card-link">
                 <div className="video-card__media">
                   <Thumb src={v.posterUrl} ratio="9/16" sizes="180px" />
-                  <span className="video-card__play" aria-hidden="true">
-                    <PlayIcon size={18} />
+                  <span className="video-card__badge">
+                    <PlayIcon size={10} />
+                    {len && (
+                      <>
+                        <span className="visually-hidden">Thời lượng </span>
+                        {len}
+                      </>
+                    )}
                   </span>
-                  {len && (
-                    <span className="video-card__duration">
-                      <span className="visually-hidden">Thời lượng </span>
-                      {len}
-                    </span>
-                  )}
                 </div>
                 <SponsorBadge kind={v.contentKind} label={v.sponsorLabel} />
                 <h3 className="video-card__title">{v.title}</h3>

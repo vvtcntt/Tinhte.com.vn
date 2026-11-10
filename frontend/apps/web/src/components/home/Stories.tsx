@@ -8,7 +8,7 @@ export function LeadStory({ article }: { article: ArticleSummary }) {
   return (
     <article className="lead-story">
       <Link href={routes.article(article.slug)} className="card-link">
-        <Thumb src={article.thumbnailUrl} ratio="16/9" priority sizes="(min-width: 1024px) 760px, 100vw" />
+        <Thumb src={article.thumbnailUrl} ratio="16/9" priority sizes="(min-width: 1024px) 820px, 100vw" />
         <div className="lead-story__body">
           <SponsorBadge kind={article.contentKind} label={article.sponsorLabel} />
           <h3 className="lead-story__title">{article.title}</h3>

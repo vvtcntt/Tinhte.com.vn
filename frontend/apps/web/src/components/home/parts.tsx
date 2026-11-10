@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { ContentKind } from '../../lib/contracts';
 import { fullDateTime, relativeTime } from '../../lib/format';
 import { safeHttpUrl } from '../../lib/routes';
+import { LogoMark } from '../Logo';
 
 /** Nhãn tài trợ: bắt buộc với SPONSORED, không có tùy chọn ẩn (ContentKind, FR-ADS-001, FR-NEWS-008). */
 export function SponsorBadge({ kind, label }: { kind: ContentKind; label?: string | null }) {
@@ -42,7 +43,9 @@ export function Thumb({
           decoding="async"
         />
       ) : (
-        <span className="thumb__empty" aria-hidden="true" />
+        <span className="thumb__empty" aria-hidden="true">
+          <LogoMark className="thumb__mark" />
+        </span>
       )}
     </div>
   );
@@ -52,7 +55,7 @@ export function SectionHeading({ id, title, action }: { id: string; title: strin
   return (
     <div className="section-heading">
       <h2 id={id}>{title}</h2>
-      {action}
+      {action && <div className="section-heading__actions">{action}</div>}
     </div>
   );
 }

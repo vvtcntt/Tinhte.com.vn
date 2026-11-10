@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { findSite, isIndexable, originFor, parseSiteEnv } from '@tinhte/sites';
 import { AdSlot } from '../../components/home/AdSlot';
 import { SectionHeading } from '../../components/home/parts';
+import { RailControls } from '../../components/home/RailControls';
 import { LeadStory, StoryCard } from '../../components/home/Stories';
 import { VideoRail } from '../../components/home/VideoRail';
 import { HOME_AD_CODES, HOME_FEED_AD_AFTER, loadHome } from '../../lib/home';
@@ -116,18 +117,38 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
             id="video-noi-bat"
             title="Video nổi bật"
             action={
-              <Link href={routes.shorts()} className="section-heading__more">
-                Xem Shorts <span aria-hidden="true">→</span>
-              </Link>
+              <>
+                <RailControls targetId="video-noi-bat-rail" label="Cuộn danh sách video" />
+                <Link href={routes.shorts()} className="section-heading__more">
+                  Xem Shorts <span aria-hidden="true">→</span>
+                </Link>
+              </>
             }
           />
-          <VideoRail videos={home.featuredVideos} />
+          <VideoRail id="video-noi-bat-rail" videos={home.featuredVideos} />
         </section>
+      )}
+
+      {/* Tin mới rỗng (mọi bài đang ở Tin nổi bật) vẫn phải có đường sang trang danh sách. */}
+      {home.recentArticles.length === 0 && !empty && (
+        <p className="home-more">
+          <Link href={routes.latest()} className="button button--primary">
+            Xem tất cả tin
+          </Link>
+        </p>
       )}
 
       {home.recentArticles.length > 0 && (
         <section className="home-section" aria-labelledby="tin-moi">
-          <SectionHeading id="tin-moi" title="Tin mới" />
+          <SectionHeading
+            id="tin-moi"
+            title="Tin mới"
+            action={
+              <Link href={routes.latest()} className="section-heading__more">
+                Xem tất cả <span aria-hidden="true">→</span>
+              </Link>
+            }
+          />
           <div className={sidebarAd ? 'latest latest--with-aside' : 'latest'}>
             <div className="latest__list">
               {recentHead.map((a) => (
@@ -137,9 +158,11 @@ function HomeContent({ data }: { data: Extract<Awaited<ReturnType<typeof loadHom
               {recentTail.map((a) => (
                 <StoryCard key={a.id} article={a} variant="row" />
               ))}
-              <Link href={routes.latest()} className="button button--block">
-                Xem thêm tin mới
-              </Link>
+              <p className="latest__more">
+                <Link href={routes.latest()} className="button button--primary">
+                  Xem thêm tin mới
+                </Link>
+              </p>
             </div>
             {sidebarAd && (
               <div className="latest__aside">

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import type { SiteDefinition } from '@tinhte/sites';
-import logo from '../assets/logo.png';
 import type { Category } from '../lib/contracts';
 import { routes } from '../lib/routes';
+import { Logo } from './Logo';
+import { SiteNav } from './SiteNav';
 
 export function SiteHeader({ site, categories }: { site: SiteDefinition; categories: Category[] }) {
   return (
@@ -12,20 +13,9 @@ export function SiteHeader({ site, categories }: { site: SiteDefinition; categor
       </a>
       <div className="container site-header__bar">
         <Link href={routes.home()} className="site-header__logo" aria-label={`${site.label} — Trang chủ`}>
-          {/* Ảnh tĩnh qua /_next/static (không đi qua proxy phân giải site). */}
-          <img src={logo.src} width={132} height={48} alt="" />
+          <Logo height={38} />
         </Link>
-        {categories.length > 0 && (
-          <nav className="site-nav" aria-label="Chuyên mục">
-            <ul>
-              {categories.map((c) => (
-                <li key={c.id}>
-                  <Link href={routes.category(c.slug)}>{c.name}</Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        )}
+        {categories.length > 0 && <SiteNav categories={categories} />}
         <div className="site-header__actions">
           <Link href={routes.shorts()} className="pill pill--shorts">
             <PlayIcon /> Shorts

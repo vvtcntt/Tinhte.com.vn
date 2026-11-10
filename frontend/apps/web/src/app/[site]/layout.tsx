@@ -17,7 +17,7 @@ export default async function SiteLayout({ children, params }: { children: React
       <main id="noi-dung" tabIndex={-1}>
         {children}
       </main>
-      <SiteFooter site={site} />
+      <SiteFooter site={site} categories={categories} />
     </>
   );
 }
