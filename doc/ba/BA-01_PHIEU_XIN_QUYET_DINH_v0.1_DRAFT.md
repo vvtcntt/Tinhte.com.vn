@@ -57,8 +57,13 @@ Chủ dự án đã chốt 17 câu, ghi ở mục **Trả lời** của từng c
 
 **Còn thiếu để bật Radar trên staging:**
 - Danh sách nguồn cụ thể (E-02 → L-01). Đã có nghiệp vụ cài đặt và cấu hình mẫu ở `doc/ba/BA-01_HUONG_DAN_CAI_DAT_NGUON_v0.1_DRAFT.md`.
-- Legal chốt cách xử lý điều khoản "RSS miễn phí cho phi lợi nhuận" của VnExpress, Dân trí, Tuổi Trẻ (N-01 trong tài liệu trên).
-- Site và ngày bắt đầu thí điểm; ai trong 2 thành viên giữ vai trò đề xuất, ai duyệt (P-02).
+- ~~Site và ngày bắt đầu thí điểm (P-02).~~ **Đã chốt 10/11/2026 theo đề xuất dưới đây:**
+  - **Site:** `www`, site công khai duy nhất trong Site Registry. Radar gắn nguồn, chuyên mục và luật phân loại theo site, nên phải chọn site nhận tin; `cms` và `media` không nhận tin.
+  - **Ngày bắt đầu:** ngày bật cờ `aggregation.radar` trên staging, khi đã đủ 3 điều kiện: (1) PR Radar đã merge vào `sprint-0/scaffold` và deploy lên staging, gồm cả worker; (2) có ít nhất 1 nguồn được duyệt; (3) Grafana Cloud đã nhận số đo và gửi được email cảnh báo. Thí điểm tính 3 tuần từ ngày đó.
+
+**Đã chốt thêm cùng ngày:**
+- Cả 2 thành viên đều đề xuất và duyệt được nguồn, nếu được cấp EDITOR + APPROVER. M2/M3 vẫn bắt buộc người duyệt khác người đề xuất.
+- Điều khoản RSS của VnExpress, Dân trí, Tuổi Trẻ: **xin phép trước khi bật** (phương án a). Trong lúc chờ có thể thí điểm với Thanh Niên, GenK.
 - S-02 (thêm giá trị lỗi `UNSAFE_TARGET`) chưa trả lời; không chặn thí điểm.
 
 **Việc phát sinh từ các câu đã chốt** (làm trên nhánh Radar, không làm trên `feat/article-page`):
@@ -101,7 +106,10 @@ Chủ dự án đã chốt 17 câu, ghi ở mục **Trả lời** của từng c
 - **Đang tạm làm:** cờ tắt ở mọi nơi.
 - **Nếu chưa trả lời:** không có dữ liệu thật để hiệu chỉnh.
 - **Trả lời:** **Chốt (chủ dự án, 10/11/2026):** (a). Bật trên staging cho 1 site và 2–3 BTV, trong 3 tuần; hết 3 tuần xem số liệu rồi mới quyết định lên production.
-  - *Chưa chốt:* site nào, ngày bắt đầu, tên BTV. Tòa soạn ban đầu chỉ có 2 thành viên quản lý (xem T-05), nên thí điểm dùng chính 2 người này.
+  - **Chốt bổ sung (10/11/2026):**
+    - Site `www`.
+    - Bắt đầu khi đủ 3 điều kiện: Radar đã merge và deploy lên staging, có ít nhất 1 nguồn được duyệt, Grafana Cloud gửi được email cảnh báo.
+    - Người dùng thí điểm là 2 thành viên quản lý, cả hai được cấp EDITOR + APPROVER.
   - **Bổ sung (chủ dự án, 10/11/2026) — quy tắc quét:**
     - quét 30 phút một lần;
     - chỉ lấy tin trong ngày;

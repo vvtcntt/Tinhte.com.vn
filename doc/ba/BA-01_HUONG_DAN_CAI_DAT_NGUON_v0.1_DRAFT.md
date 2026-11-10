@@ -25,21 +25,28 @@ Tinhte là đơn vị kinh doanh, nên việc dùng RSS của các báo này **c
 - (b) Chạy thí điểm M0 nội bộ trong lúc chờ trả lời. Rủi ro do Legal đánh giá.
 - (c) Thí điểm trước với các nguồn không có điều khoản này (GenK, Thanh Niên: chưa thấy điều khoản trên trang RSS; vẫn cần Legal xem điều khoản chung của site).
 
+**Chốt (chủ dự án, 10/11/2026): phương án (a)** — xin phép VnExpress, Dân trí, Tuổi Trẻ trước khi bật.
+- Ba nguồn này chỉ được duyệt sau khi có thư đồng ý; lưu thư vào *Bằng chứng điều khoản*.
+- Trong lúc chờ, thí điểm có thể bắt đầu với nguồn không có điều khoản này (Thanh Niên, GenK), sau khi Legal xem điều khoản chung của hai site đó.
+
 Dù chọn phương án nào: **chụp lại trang điều khoản** lúc duyệt và lưu đường dẫn ảnh vào ô *Bằng chứng điều khoản*. Khi báo yêu cầu ngừng, chuyển nguồn sang **Ngừng** ngay (mục 3, bước 8).
 
 ---
 
 ## 2. Ai làm gì (tòa soạn 2 người)
 
-Ban đầu chỉ có 2 thành viên quản lý, nên chia như sau:
+Ban đầu chỉ có 2 thành viên quản lý. **Chốt (chủ dự án, 10/11/2026): cả 2 người đều có thể đề xuất và duyệt, nếu được phân quyền.**
 
-| Người | Vai trò trong CMS | Làm |
+| Người | Vai trò cần cấp trong CMS | Làm được |
 |---|---|---|
-| **Người A** | EDITOR | Khảo sát nguồn, tạo nguồn, tạo hồ sơ, thêm feed, thử feed, đặt luật chuyên mục |
-| **Người B** | APPROVER (bật MFA) | Kiểm lại, duyệt chế độ M0/M1, bật nguồn; nhận email cảnh báo |
+| Thành viên 1 | EDITOR + APPROVER (bật MFA) | Mọi bước 1–8 |
+| Thành viên 2 | EDITOR + APPROVER (bật MFA) | Mọi bước 1–8 |
 
-- Người đề xuất **không tự duyệt** nguồn của mình. Hệ thống chỉ bắt buộc điều này với M2/M3; với M0/M1 đây là quy ước của tòa soạn.
-- Nếu một người nghỉ, người còn lại vẫn tạo được nguồn nhưng **để chờ duyệt**, không tự bật.
+- Cấp vai trò ở màn quản lý người dùng (quyền `users.manage`). Không cần sửa ma trận quyền.
+- Mỗi bước dưới đây ghi "Người A" là **người làm**, "Người B" là **người duyệt**. Hai vai có thể là cùng một người hoặc hai người khác nhau:
+  - **M0/M1:** hệ thống cho phép người tạo nguồn tự duyệt. Nên để người kia duyệt khi có thể, để có thêm một người kiểm.
+  - **M2/M3** (chưa dùng ở GĐ1): hệ thống **bắt buộc** người duyệt khác người đề xuất. Với 2 người thì vẫn làm được: người này đề xuất, người kia duyệt.
+- Email cảnh báo gửi cho cả 2 người.
 
 ---
 
@@ -198,7 +205,7 @@ Với nguồn tiếng Anh: hiện máy chưa gom được tin Anh với tin Vi�
 
 | # | Ai | Câu hỏi |
 |---|---|---|
-| N-01 | Legal | Với điều khoản "miễn phí cho cá nhân, phi lợi nhuận" của VnExpress, Dân trí, Tuổi Trẻ: chọn (a) xin phép trước, (b) chạy M0 nội bộ trong lúc chờ, hay (c) thí điểm với nguồn khác trước? |
+| N-01 | Legal | ~~Với điều khoản "miễn phí cho cá nhân, phi lợi nhuận" của VnExpress, Dân trí, Tuổi Trẻ: chọn (a), (b) hay (c)?~~ **Đã chốt 10/11/2026: (a) xin phép trước.** |
 | N-02 | Chủ dự án | ~~"Trùng loại" có đúng nghĩa là chỉ so trùng giữa các tin cùng chuyên mục không?~~ **Đã chốt 10/11/2026: đúng, cùng chuyên mục.** |
-| N-03 | Chủ dự án | Site nào chạy thí điểm, ngày bắt đầu, và 2 người cụ thể giữ vai trò Người A / Người B? |
+| N-03 | Chủ dự án | ~~2 người cụ thể giữ vai trò Người A / Người B?~~ **Đã chốt: cả 2 cùng đề xuất và duyệt được.** **Site thí điểm `www`; bắt đầu khi đủ 3 điều kiện ở phiếu, mục Kết quả chốt (đã chốt 10/11/2026).** |
 | N-04 | Ban biên tập | Ánh xạ các feed ở mục 4 vào chuyên mục Tinhte nào? Bổ sung nguồn cho đủ 10–20. |
