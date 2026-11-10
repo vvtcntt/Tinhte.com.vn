@@ -1,8 +1,8 @@
 import type { PublicAdSlot } from './contracts.ts';
-import { HOME_AD_CODE_LIST, HOME_AD_CODES, HOME_AD_SIZES, type HomeAdCode } from './home-model.ts';
+import { HOME_AD_BREAKPOINTS, HOME_AD_CODE_LIST, HOME_AD_CODES, HOME_AD_SIZES, type HomeAdCode } from './home-model.ts';
 
 // Banner mẫu CHỈ để xem các vùng quảng cáo trang chủ trên máy dev (`TT_SITE_ENV=local`), bật bằng `/?demo-ads=1`
-// (hoặc liệt kê mã: `/?demo-ads=home_top,home_mid`). Backend chưa có GET /ads/placements nên đây là cách duy nhất
+// (hoặc liệt kê mã: `/?demo-ads=home_top,home_mid`). Chưa có CMS quản lý đặt chỗ (đợt 3: chờ duyệt quyền ads.*) nên đây là cách nhanh nhất
 // để thấy bố cục có banner. home.ts chỉ gọi khi env là local; route ảnh trả 404 ở mọi môi trường khác.
 
 export const DEMO_ADS_PARAM = 'demo-ads';
@@ -17,15 +17,21 @@ export function parseDemoAds(value: string | string[] | undefined): HomeAdCode[]
   return codes.length > 0 ? codes : null;
 }
 
-/** Slot mẫu đúng hình dạng PublicAdSlot; creative là SVG do route `/demo-ads/{code}.svg` sinh ra trên cùng origin. */
+/**
+ * Slot mẫu đúng hình dạng PublicAdSlot (đợt 3: banner theo breakpoint): mỗi breakpoint mã được hiện có một banner cùng ảnh/kích thước
+ * đề xuất — FE gộp thành một khung như banner thật giống nhau. Creative là SVG do route `/demo-ads/{code}.svg` sinh ra trên cùng origin.
+ */
 export function demoAdSlots(origin: string, codes: readonly HomeAdCode[]): PublicAdSlot[] {
   return codes.map((code) => ({
     code,
     label: 'Quảng cáo',
-    creativeUrl: `${origin}/demo-ads/${code}.svg`,
-    altText: `Banner mẫu ${code}`,
-    targetUrl: `https://example.com/?placement=${code}`,
-    ...HOME_AD_SIZES[code],
+    creatives: HOME_AD_BREAKPOINTS[code].map((breakpoint) => ({
+      breakpoint,
+      creativeUrl: `${origin}/demo-ads/${code}.svg`,
+      altText: `Banner mẫu ${code}`,
+      targetUrl: `https://example.com/?placement=${code}`,
+      ...HOME_AD_SIZES[code],
+    })),
     rel: 'sponsored noopener',
   }));
 }

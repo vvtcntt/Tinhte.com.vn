@@ -426,14 +426,16 @@ main:focus { outline: none; }
 .ad-slot__media picture { display: block; }
 .ad-slot img { width: 100%; height: auto; border-radius: var(--radius-sm); }
 
-/* Hiện theo màn hình (AdSlot `media`): desktop/mobile bù nhau ở mốc 768px; `wide` (⑤) từ 1024px. */
-.ad-slot--desktop, .ad-slot--wide { display: none; }
+/* Ẩn theo breakpoint của banner (lib/ads.ts AD_RANGE): MOBILE < 768px, TABLET 768–1023px, DESKTOP ≥ 1024px. Mỗi khung mang lớp
+   `--no-*` cho breakpoint nó không hiện; viết mobile-first bằng min-width nên các khoảng luôn bù nhau, tổ hợp lớp nào cũng đúng. */
+.ad-slot--no-mobile { display: none; }
 @media (min-width: 768px) {
-  .ad-slot--desktop { display: block; }
-  .ad-slot--mobile { display: none; }
+  .ad-slot--no-mobile { display: block; }
+  .ad-slot--no-tablet { display: none; }
 }
 @media (min-width: 1024px) {
-  .ad-slot--wide { display: block; }
+  .ad-slot--no-tablet { display: block; }
+  .ad-slot--no-desktop { display: none; }
 }
 
 /* Vị trí: ① trên Tin nổi bật, ③ giữa Video và Tin mới, ⑥ trên footer — cách vùng kề bằng khoảng cách giữa các vùng. */

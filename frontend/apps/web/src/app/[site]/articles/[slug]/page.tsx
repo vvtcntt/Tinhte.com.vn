@@ -4,7 +4,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { findSite, isIndexable, originFor, parseSiteEnv } from '@tinhte/sites';
 import logo from '../../../../assets/logo.png';
 import { ArticleBody } from '../../../../components/article/ArticleBody';
-import { AdSlot } from '../../../../components/home/AdSlot';
+import { AdZone } from '../../../../components/home/AdSlot';
 import { SponsorBadge, TimeAgo } from '../../../../components/home/parts';
 import { StoryCard } from '../../../../components/home/Stories';
 import { loadArticle, loadArticleAd, loadRelated } from '../../../../lib/article';
@@ -151,7 +151,7 @@ export default async function ArticlePage({ params }: Props) {
           )}
 
           <ArticleBody blocks={article.bodyBlocks} />
-          <AdSlot slot={ad} className="ad-slot--article" />
+          <AdZone views={ad} className="ad-slot--article" />
         </article>
 
         {related.length > 0 && (

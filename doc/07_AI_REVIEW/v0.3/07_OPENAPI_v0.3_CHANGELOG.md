@@ -288,3 +288,20 @@ Inventory v0.3 (`07_API_ENDPOINT_INVENTORY_v0.3_DRAFT.csv`) có thêm các cột
   - đọc thêm file addendum (biến `TT_FR_ADDENDUM_FILE`, mặc định cạnh file FR84); T22 vẫn kiểm đúng 84 FR gốc và không trùng FR;
   - T30 thêm 9 trường hợp cho quy tắc duyệt chế độ khai thác, PATCH không đổi chế độ, feed https.
 - Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`); backend 192 PASS / 64 SKIP (test DB, chưa đặt `TT_TEST_PG`).
+
+## 16. Đợt 3 trang chủ — quảng cáo theo site, tách vị trí khỏi đặt chỗ, nhiều kích thước (UX-PUB-01, WBS-133, 2026-11-10)
+
+- **DRAFT, chờ TL/PO/BA duyệt** (Commercial + Legal cho quy tắc chọn banner; BA/PO cho quyền `ads.*`). Nguồn: điểm còn mở 8 của `doc/ux/UX-PUB-01_TRANG_CHU_v0.1_DRAFT.md`.
+- **Vị trí thuộc một site (ADR-0001).** `AdPlacement` thêm `siteKey` (bất biến sau khi tạo); `code` chỉ unique trong site — `(siteKey, code)`. `GET /ads/placements` chỉ xét vị trí của site trong Host. `GET /admin/ad-placements` thêm tham số lọc `siteKey` (`SiteKeyFilter`, mã lạ → 400).
+- **Tách vị trí khỏi đặt chỗ/banner.**
+  - Vị trí (`AdPlacement`): code, label, status, `sizes[]` = kích thước cho phép theo breakpoint (`AdSize`). Bỏ `mediaAssetId`, `altText`, `targetUrl`, `advertiserName`, `width`, `height`, `startsAt`, `endsAt`, `creativeUrl` khỏi vị trí. Mở vị trí (APPROVED/ACTIVE) vẫn cần người duyệt.
+  - Đặt chỗ (`AdBooking`, mới): link https, nhà quảng cáo, `startsAt`/`endsAt`, `priority` 0–100, status (`AdStatus`), người duyệt, `creatives[]` — mỗi breakpoint tối đa một banner (`AdCreative`: breakpoint, width, height, mediaAssetId, altText; `creativeUrl` chỉ đọc). Kích thước banner phải thuộc `sizes` của vị trí ở breakpoint đó.
+  - Thêm 4 thao tác P0-ADS (`x-requirements: FR-ADS-002`): `GET`/`POST /admin/ad-placements/{placementId}/bookings`, `GET`/`PUT /admin/ad-bookings/{bookingId}` (ETag/If-Match, Idempotency-Key cho POST, CSRF, 401/403/404/409/412/422/428/429 theo ma trận). Quy tắc trạng thái đặt chỗ ghi trong mô tả `putAdminAdBooking`.
+- **`PublicAdSlot` nhiều kích thước — thay đổi phá vỡ so với v0.3 trước đó:** bỏ `creativeUrl`/`altText`/`targetUrl`/`width`/`height` ở cấp slot, thay bằng `creatives[]` (`PublicAdCreative`: breakpoint, creativeUrl, altText, targetUrl, width, height; 1–3 phần tử). `AdBreakpoint`: MOBILE < 768px, TABLET 768–1023px, DESKTOP ≥ 1024px. Chọn banner mỗi breakpoint: đặt chỗ ACTIVE trong khung giờ của vị trí ACTIVE, ưu tiên cao nhất → `startsAt` mới nhất → id; media READY + IMAGE + PUBLIC + quyền CLEARED. Không có banner → không trả slot. Không xoay vòng (P1, `ads.campaign_advanced`).
+- `AdPlacementUpdate`/`AdPlacementCreate` đổi theo; tạo/sửa vị trí không còn `UNSAFE_URL` (vị trí không có URL). Schema mới: `AdStatus`, `AdBreakpoint`, `AdSize`, `AdCreative`, `AdBooking`, `AdBookingCreate`, `AdBookingUpdate`, `AdBookingList`, `PublicAdCreative`. Tham số mới: `BookingId`, `SiteKeyFilter`.
+- **Không thêm cờ, không thêm mã lỗi.** Vẫn gate bằng `ads.display_slots` (production OFF; OFF → 200 rỗng).
+- Đếm sau thay đổi: 125 path / 146 thao tác / 155 schema / 66 tham số (trước: 123 / 142 / 146 / 64).
+- Inventory: thêm 4 dòng, sửa mã lỗi 3 dòng. FR84: FR-ADS-002 thêm 4 API, migration `0350`.
+- Test tĩnh: T29 kiểm kích thước qua `AdPlacement.sizes[]` + `PublicAdCreative`; T30 thêm 12 trường hợp (vị trí thiếu site/kích thước/breakpoint lạ, link `javascript:`, banner thiếu alt, ưu tiên > 100, slot không banner, slot kiểu cũ); T10 nhận thêm `PAUSED`/`EXPIRED`/`PUBLIC` là giá trị enum, không phải mã lỗi.
+- **Migration `0350_ad_site_bookings`** (xem `db/README.md`). **Backend:** `GET /api/v1/ads/placements` (module Ads). **Chưa làm:** API quản trị vị trí/đặt chỗ và màn hình CMS — chờ duyệt quyền `ads.manage`/`ads.approve` trong `config/rbac/rbac.json`.
+- Kiểm lại: 34/34 test tĩnh v0.3 PASS (gồm `openapi-spec-validator`).

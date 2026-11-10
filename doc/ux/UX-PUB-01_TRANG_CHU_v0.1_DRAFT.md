@@ -3,6 +3,7 @@
 **Trạng thái:** DRAFT, chờ UX/PO duyệt (WBS-004 khóa 18 màn hình). Ngày 09/11/2026.
 **Cập nhật 10/11/2026 — giao diện đợt 1:** font Be Vietnam Pro + token chữ/khoảng cách, bỏ hộp thẻ, cột phải 300px, logo SVG có bản tối, menu "Thêm", nút ‹ › cho dải video, footer nhiều cột, luôn có đường sang danh sách tin.
 **Cập nhật 10/11/2026 — đợt 2, vùng quảng cáo:** dựng sẵn 6 vùng banner ①–⑥ phía frontend (Bước 3 "Vùng quảng cáo"). Khi backend có `GET /ads/placements` và CMS tạo placement, banner tự hiện, không cần deploy. Không có banner thì trang y hệt đợt 1. Mã placement vẫn là đề xuất, chờ WBS-131 chốt.
+**Cập nhật 10/11/2026 — đợt 3 (DRAFT, chờ TL/PO/BA duyệt):** hợp đồng + DB quảng cáo theo site, tách vị trí khỏi đặt chỗ, nhiều kích thước theo breakpoint (OpenAPI v0.3 changelog §16, migration 0350); backend có `GET /ads/placements`; FE chuyển sang `creatives[]`, giữ 10 mã đề xuất và hành vi "không có banner thì không có khung".
 **Truy vết:** `FR-DISC-003` (vùng tin mới, tin nổi bật, video nổi bật) · `WBS-027` (SSR, responsive, đổi block không cần deploy) · `FR-ID-001` (khách đọc không cần tài khoản) · `FR-DISC-004/005`, `FR-VID-010` (không lộ nội dung đã gỡ) · `FR-ADS-001/002`, `FR-NEWS-008`, `WBS-133` (nhãn tài trợ, 1–2 slot tĩnh, không CLS) · `NFR-SEO-001`, `WBS-052`.
 **Hợp đồng:** `GET /home` → `HomePage`, `GET /categories`, `GET /ads/placements` (OpenAPI v0.3 DRAFT).
 **Code:** `frontend/apps/web/src/app/[site]/page.tsx`, `frontend/apps/web/src/components/home/*`, `frontend/apps/web/src/lib/*`.
@@ -132,7 +133,7 @@ Tablet 768–1023px: bài chính trải hết chiều ngang, 4 tin phụ xếp l
 ### Vùng quảng cáo ①–⑥ (đợt 2)
 
 Mã placement là **đề xuất, chờ WBS-131 (PO + Commercial + Legal) chốt** — "Điểm còn mở" số 3. Nguồn trong code: `HOME_AD_CODES`, `HOME_AD_SIZES` ở `frontend/apps/web/src/lib/home-model.ts`.
-Hợp đồng hiện tại cho **mỗi mã một kích thước**, nên vùng nào khác kích thước giữa desktop và mobile thì có hai mã (hậu tố `_mobile`). Mã không hậu tố hiện từ **768px**, mã `_mobile` hiện dưới 768px.
+Đợt 2 tách mã desktop/mobile (hậu tố `_mobile`) vì hợp đồng cũ chỉ cho một kích thước mỗi mã. **Đợt 3 (DRAFT):** mỗi slot có `creatives[]`, tối đa một banner cho mỗi breakpoint `MOBILE` (< 768px), `TABLET` (768–1023px), `DESKTOP` (≥ 1024px). FE **vẫn giữ 10 mã** tới khi WBS-131 chốt; `HOME_AD_BREAKPOINTS` (`lib/home-model.ts`) quy định mã nào được hiện ở breakpoint nào: mã `_mobile` chỉ MOBILE, mã không hậu tố TABLET + DESKTOP, ② mọi màn hình, ⑤ chỉ DESKTOP. Banner API trả cho breakpoint mà mã không được hiện thì bị bỏ qua. Nếu WBS-131 gộp cặp mã, chỉ cần sửa hai hằng số này.
 
 | # | Mã (đề xuất) | Vị trí | ≥ 768px (desktop, tablet) | < 768px (mobile) | Tải ảnh |
 |---|---|---|---|---|---|
@@ -144,7 +145,8 @@ Hợp đồng hiện tại cho **mỗi mã một kích thước**, nên vùng n�
 | ⑥ | `home_bottom` · `home_bottom_mobile` | cuối nội dung, trên footer | 970×90 | 320×100 | lazy |
 
 Mười mã = đúng mức tối đa `placementCodes` (`maxItems: 10`) của một lần gọi `GET /ads/placements`; thêm vùng nữa thì phải gọi hai lần hoặc sửa spec (test `home-model.test.ts` chặn khi vượt).
-Kích thước ở bảng là đề xuất khi tạo placement. FE không ép: khung giữ chỗ theo `width/height` API trả, nên ① chạy chiến dịch lớn 970×250 chỉ cần sửa kích thước placement trong CMS, không cần deploy (khi đó bài chính bị đẩy xuống thêm ~160px — Commercial cân nhắc).
+Kích thước ở bảng là đề xuất khi tạo placement. FE không ép: khung giữ chỗ theo `width/height` của từng banner API trả. Với hợp đồng đợt 3, một vị trí có thể cho phép nhiều kích thước (ví dụ ① DESKTOP 970×90 **và** 970×250, TABLET 728×90): chiến dịch lớn chỉ cần đặt chỗ với banner 970×250, không cần deploy (khi đó bài chính bị đẩy xuống thêm ~160px — Commercial cân nhắc).
+Thiếu banner TABLET thì khung TABLET dùng banner DESKTOP của cùng mã thu nhỏ vừa khung (và ngược lại) — giữ hành vi đợt 2. MOBILE không mượn banner desktop.
 
 **Hiển thị**
 - Khung nền `--surface-2` bo góc, nhãn **QUẢNG CÁO** (chữ `label` do API trả; rỗng thì dùng "Quảng cáo") luôn ở trên creative. Thẻ bài không có nền/khung nên không nhầm quảng cáo với tin.
@@ -153,8 +155,8 @@ Kích thước ở bảng là đề xuất khi tạo placement. FE không ép: k
 - Khoảng cách dùng token sẵn có: ① cách Tin nổi bật `--sp-5`; ③ ⑥ cách vùng kề `--sp-7` (bằng khoảng cách giữa các vùng); ④ theo nhịp `--sp-4` của danh sách.
 
 **Không tải cả hai ảnh, không CLS**
-- Mỗi bản desktop/mobile là một `<aside>` riêng, ẩn/hiện bằng CSS theo mốc 768px (⑤: 1024px). Hai nửa viết bằng `min-width` và `not all and (min-width)` nên không có độ rộng nào hiện cả hai hay ẩn cả hai.
-- Ảnh nằm trong `<picture>` có `<source media="(khoảng bị ẩn)">` trỏ GIF 1×1 `data:` → ở màn hình không hiện, trình duyệt chọn GIF và **không tải creative**, kể cả ① không lazy. Đã kiểm trên trình duyệt: 390px chỉ tải bản `_mobile` + `home_hero_side`; 820/1440px không tải bản `_mobile`; dưới 1024px không tải ⑤.
+- Mỗi banner khác nhau là một `<aside>` riêng; banner giống hệt nhau ở nhiều breakpoint gộp một khung (`resolveAdZone`, `lib/ads.ts`). Khung mang lớp `ad-slot--no-{mobile|tablet|desktop}` cho breakpoint nó không hiện; CSS viết mobile-first bằng `min-width` ở mốc 768/1024px nên tổ hợp lớp nào cũng đúng, không có độ rộng nào hiện hai khung của cùng vùng.
+- Ảnh nằm trong `<picture>` có `<source media="(các khoảng bị ẩn)">` trỏ GIF 1×1 `data:` → ở màn hình không hiện, trình duyệt chọn GIF và **không tải creative**, kể cả ① không lazy. Đã kiểm lại sau đợt 3 (banner mẫu, Chromium của app): 375px chỉ tải `home_top_mobile`; 768px và 820px chỉ tải `home_top`; 1440px chỉ tải `home_top` (ảnh lazy dưới màn hình đầu chưa tải); khung hiện đúng 5 vùng mobile / 5 vùng tablet (không ⑤) / 6 vùng desktop.
 - `width`/`height` + `aspect-ratio` có ngay từ SSR → khung giữ chỗ trước khi ảnh tải.
 
 **Quy tắc vùng nào được hiện** (`homeAdPlan`, có test)
@@ -162,7 +164,8 @@ Kích thước ở bảng là đề xuất khi tạo placement. FE không ép: k
 | Điều kiện | Kết quả |
 |---|---|
 | API không trả slot của mã đó (cờ `ads.display_slots` OFF, chưa tạo placement, hết lịch, API lỗi, URL không an toàn) | Không render gì — không khung, không khoảng trống. |
-| Chỉ có bản desktop hoặc chỉ bản mobile của một vùng | Màn hình còn lại không có gì ở vùng đó. |
+| Vùng chỉ có banner cho một số breakpoint (ví dụ chỉ bản desktop, hoặc chỉ mã `_mobile`) | Breakpoint còn lại không có gì ở vùng đó (TABLET/DESKTOP mượn banner của nhau trong cùng mã). |
+| ② có banner nhưng không phủ đủ MOBILE + TABLET + DESKTOP | Coi như không có ② (bố cục cột phải đổi ở mọi màn hình, thiếu một màn hình sẽ để trống cột). |
 | Trang không có nội dung (khối "Chưa có bài viết") | Không quảng cáo nào. |
 | ② có banner | Tin nổi bật còn 4 bài (1 chính + 3 phụ); bài thứ 5 chuyển xuống Tin mới đúng vị trí theo thời gian xuất bản (cũ hơn cả 12 bài thì chỉ còn ở trang danh sách). |
 | ② có banner nhưng không có tin phụ nào | Không hiện ② (cột phải không chỉ có quảng cáo). |
@@ -222,8 +225,8 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 | `StoryCard` (`compact` / `row`) | Ảnh nhỏ, tiêu đề, thời gian, (sapo ở `row`) | Ảnh `loading=lazy`. |
 | `VideoCard` | Poster 9:16, badge "▶ m:ss" góc dưới trái, tiêu đề | Không autoplay trên trang chủ (FR-VID-011/012). |
 | `SponsorBadge` | Chữ `sponsorLabel` do backend trả | Không có props để ẩn. |
-| `AdSlot` | Nhãn (`label`, mặc định "Quảng cáo") + ảnh creative, `rel="sponsored noopener"` | Chỉ render khi có slot; `width/height` + `aspect-ratio` từ SSR. `media`: `all` / `desktop` (≥ 768px) / `mobile` (< 768px) / `wide` (≥ 1024px) — ở màn hình bị ẩn không tải creative. `eager` cho ①. |
-| `AdPairSlot` | Cặp bản desktop + mobile của một vùng (①③④⑥) | Hai mã riêng vì mỗi mã chỉ một kích thước. |
+| `AdSlot` | Một khung: nhãn (`label`, mặc định "Quảng cáo") + một banner, `rel="sponsored noopener"` | `width/height` + `aspect-ratio` của banner từ SSR. Hiện ở các breakpoint của banner (`ad-slot--no-*` ẩn phần còn lại, ở đó không tải creative). `eager` cho ①. |
+| `AdZone` | Một vùng (①–⑥, cuối bài): các khung do `resolveAdZone` chọn | Mỗi breakpoint tối đa một khung; rỗng → không render gì. |
 | `RelativeTime` | "5 phút trước" / "hôm qua" / ngày | Luôn kèm `<time datetime>`. |
 | `Thumb` (không ảnh) | Nền `--surface-2` + biểu tượng logo mờ | Dùng khi `thumbnailUrl`/`posterUrl` null. |
 
@@ -260,12 +263,12 @@ Bo góc ảnh 6px (video 10px); ảnh luôn có tỉ lệ cố định (16:9, 4:
 5. **Tên chuyên mục trên thẻ bài**: `ArticleSummary` chưa có `categorySlug/categoryName`. Muốn hiện chuyên mục trên thẻ thì phải thêm vào hợp đồng.
 6. **Backend:** đã có `GET /home` và `GET /categories`. `featuredVideos` trả rỗng tới khi có feed video công khai (WBS-041/046).
 7. **Analytics impression** (FR-ANL-001/002) chưa gắn — kể cả impression/click của banner.
-8. **Khoảng trống hợp đồng/DB quảng cáo — để đợt 3, cần duyệt (contract-first, sửa spec v0.3 trước):**
-   - `tt.ad_placements` (migration 0302) **chưa có `site_key`** và `code` UNIQUE toàn hệ thống → không thể có banner riêng theo site (ADR-0001). Cần `site_key` + unique `(site_key, code)`, và `GET /ads/placements` lọc theo site của request.
-   - **Mỗi code chỉ một banner** (một hàng) → không xoay vòng nhiều creative, không lên lịch nối tiếp nhiều chiến dịch cho cùng vị trí. Nếu cần: tách bảng vị trí (placement) và bảng creative/booking.
-   - **Mỗi code chỉ một width/height** → desktop/mobile phải tách mã (nay 10 mã, chạm `maxItems: 10` của `placementCodes`). Hướng sửa: một vị trí có nhiều biến thể theo breakpoint (ví dụ `variants[{ minWidth, creativeUrl, width, height }]`), hoặc nâng `maxItems`.
-   - ① 970×250 cho chiến dịch lớn: hợp đồng hiện tại chỉ làm được bằng cách sửa kích thước placement; nếu cần chạy song song hai cỡ thì cần biến thể như trên.
-   - ④ "dạng tin" (native): `PublicAdSlot` chỉ có ảnh. Bài tài trợ dạng tin hiện đi qua `contentKind: SPONSORED` trong `recentArticles`; muốn native ad riêng thì phải thêm kiểu creative vào hợp đồng.
+8. **Hợp đồng/DB quảng cáo — đợt 3 đã soạn bản nháp, chờ duyệt** (OpenAPI v0.3 changelog §16, migration `0350_ad_site_bookings`, `db/README.md`):
+   - **Đã soạn (DRAFT, TL/PO/BA duyệt):** vị trí có `site_key` + unique `(site_key, code)`, `GET /ads/placements` lọc theo site của Host; tách **vị trí** (mã, site, kích thước cho phép theo breakpoint) khỏi **đặt chỗ** (banner theo breakpoint, link, lịch, ưu tiên, duyệt); `PublicAdSlot.creatives[]` nhiều kích thước. Backend đã có `GET /api/v1/ads/placements` (module Ads, test `[DbFact]`). FE đã chuyển sang hợp đồng mới.
+   - **Cần Commercial/PO quyết:** quy tắc chọn banner khi nhiều đặt chỗ trùng giờ (đang: ưu tiên cao nhất → bắt đầu muộn nhất → id; **không xoay vòng**, xoay vòng/tần suất thuộc P1 `ads.campaign_advanced`); TABLET mượn banner DESKTOP khi thiếu (đang bật).
+   - **Chưa làm — API quản trị + CMS:** spec đã có `/admin/ad-placements*`, `/admin/ad-bookings/{bookingId}`, `/admin/ad-placements/{placementId}/bookings`; backend và màn CMS **chưa làm** vì cần quyền mới. Đề xuất (chờ BA/PO duyệt ma trận RBAC DRAFT): `ads.manage` (tạo/sửa vị trí + đặt chỗ, không MFA) và `ads.approve` (duyệt/mở vị trí và đặt chỗ, MFA), vai trò mới `AD_OPS` hoặc gán cho vai trò có sẵn. Khi duyệt phải sửa cùng lúc `config/rbac/rbac.json`, hằng số `Permissions`/`StaffRoles` và CHECK `ck_user_roles_role` (migration mới) — ADR-0004.
+   - **URL công khai của banner:** backend tạm dựng `{origin site media trong Registry}/{storage_key}` (không viết cứng host). Đường dẫn công khai/CDN của media chưa chốt (WBS media) — đổi ở `AdCreativeUrls` khi có.
+   - **Cột banner cũ** trên `tt.ad_placements` (media, alt, link, kích thước, lịch) vẫn còn để down an toàn; API mới không đọc. Gỡ bằng migration riêng khi TL duyệt.
+   - ④ "dạng tin" (native): `PublicAdCreative` chỉ có ảnh. Bài tài trợ dạng tin hiện đi qua `contentKind: SPONSORED` trong `recentArticles`; muốn native ad riêng thì phải thêm kiểu creative vào hợp đồng.
    - **CSP**: `img-src` chỉ cho `'self' data:` + origin media (đang Report-Only). Creative phải nằm trên origin media của Tinhte, hoặc thêm origin ad server vào CSP khi chuyển sang enforce (WBS-071).
-   - **Backend chưa có** `GET /ads/placements` và `/admin/ad-placements`; **CMS chưa có** màn quản lý quảng cáo. Khi có, banner tự hiện ở các vùng trên, không cần deploy web.
    - Mật độ/khoảng cách quảng cáo hiện do FE tự giữ (`homeAdPlan`); nếu Commercial cần đổi vị trí mà không deploy thì phải có cấu hình bố cục từ backend (liên quan điểm 1).
